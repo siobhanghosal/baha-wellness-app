@@ -1,0 +1,779 @@
+{
+  "queries": [
+    {
+      "perspective": "parent",
+      "query": "Signs of anxiety",
+      "expected_topic": "anxiety",
+      "result_count": 10,
+      "coverage_score": 0.2,
+      "citation_quality": 1.0,
+      "confidence": 0.3834,
+      "top_10_sources": [
+        {
+          "title": "Investigation of Esketamine Administration During Surgical Procedures for the Alleviation of Postoperative Anxiety and Depression in Adolescent Patients: A Randomized Controlled Trial.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.2147/DDDT.S587626",
+          "confidence": 0.4145,
+          "topic": "depression"
+        },
+        {
+          "title": "Investigation of Esketamine Administration During Surgical Procedures for the Alleviation of Postoperative Anxiety and Depression in Adolescent Patients: A Randomized Controlled Trial.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.2147/DDDT.S587626",
+          "confidence": 0.4132,
+          "topic": "depression"
+        },
+        {
+          "title": "Awesome-AYA-Manual-2020.pdf",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/wp-content/uploads/2021/04/Awesome-AYA-Manual-2020.pdf",
+          "confidence": 0.385,
+          "topic": "adolescent health"
+        },
+        {
+          "title": "Guidelines-Screen-Time-Guidelines-for-Parents-Ch-005.pdf",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org//pdf/Guidelines-Screen-Time-Guidelines-for-Parents-Ch-005.pdf",
+          "confidence": 0.3832,
+          "topic": "physical activity"
+        },
+        {
+          "title": "Awesome-AYA-Manual-2020.pdf",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/wp-content/uploads/2021/04/Awesome-AYA-Manual-2020.pdf",
+          "confidence": 0.3823,
+          "topic": "adolescent health"
+        },
+        {
+          "title": "Awesome-AYA-Manual-2020.pdf",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/wp-content/uploads/2021/04/Awesome-AYA-Manual-2020.pdf",
+          "confidence": 0.3724,
+          "topic": "adolescent health"
+        },
+        {
+          "title": "Awesome-AYA-Manual-2020.pdf",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/wp-content/uploads/2021/04/Awesome-AYA-Manual-2020.pdf",
+          "confidence": 0.372,
+          "topic": "adolescent health"
+        },
+        {
+          "title": "Awesome-AYA-Manual-2020.pdf",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/wp-content/uploads/2021/04/Awesome-AYA-Manual-2020.pdf",
+          "confidence": 0.3713,
+          "topic": "adolescent health"
+        },
+        {
+          "title": "Dealing-with-Disorders-of-Learning.pptx",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/pdf/tteach/ppt/Dealing-with-Disorders-of-Learning.pptx",
+          "confidence": 0.3712,
+          "topic": "learning difficulties"
+        },
+        {
+          "title": "d9685302b6d847ddac956d7908a1482d.pdf",
+          "organization": "NIMHANS",
+          "url": "https://nimhansbkt.demo-appiness.com/prodnimhans/documents/publication/d9685302b6d847ddac956d7908a1482d.pdf",
+          "confidence": 0.3688,
+          "topic": "adolescent mental health"
+        }
+      ],
+      "organization_coverage": [
+        "Europe PMC",
+        "IAP Adolescent Health Academy",
+        "NIMHANS"
+      ]
+    },
+    {
+      "perspective": "parent",
+      "query": "Child depression",
+      "expected_topic": "depression",
+      "result_count": 10,
+      "coverage_score": 0.2,
+      "citation_quality": 1.0,
+      "confidence": 0.6182,
+      "top_10_sources": [
+        {
+          "title": "Clinical efficacy of intermittent theta burst stimulation in the acute phase of adolescent depression: study protocol of a double-blind, randomized controlled trial.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1186/s13063-026-09705-4",
+          "confidence": 0.6935,
+          "topic": "depression"
+        },
+        {
+          "title": "Investigation of Esketamine Administration During Surgical Procedures for the Alleviation of Postoperative Anxiety and Depression in Adolescent Patients: A Randomized Controlled Trial.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.2147/DDDT.S587626",
+          "confidence": 0.6893,
+          "topic": "depression"
+        },
+        {
+          "title": "3087970debe044e2b4522146c52c88fb.pdf",
+          "organization": "NIMHANS",
+          "url": "https://nimhansbkt.demo-appiness.com/prodnimhans/documents/publication/3087970debe044e2b4522146c52c88fb.pdf",
+          "confidence": 0.6283,
+          "topic": "adolescent mental health"
+        },
+        {
+          "title": "48b84ebc2ce541b2aa78d2e4fce64567.pdf",
+          "organization": "NIMHANS",
+          "url": "https://nimhansbkt.demo-appiness.com/prodnimhans/documents/publication/48b84ebc2ce541b2aa78d2e4fce64567.pdf",
+          "confidence": 0.6169,
+          "topic": "performance anxiety"
+        },
+        {
+          "title": "c0a178d5248342d2b8aee6362fcf80c8.pdf",
+          "organization": "NIMHANS",
+          "url": "https://nimhansbkt.demo-appiness.com/prodnimhans/documents/publication/c0a178d5248342d2b8aee6362fcf80c8.pdf",
+          "confidence": 0.5969,
+          "topic": "friendship issues"
+        },
+        {
+          "title": "3087970debe044e2b4522146c52c88fb.pdf",
+          "organization": "NIMHANS",
+          "url": "https://nimhansbkt.demo-appiness.com/prodnimhans/documents/publication/3087970debe044e2b4522146c52c88fb.pdf",
+          "confidence": 0.5948,
+          "topic": "adolescent mental health"
+        },
+        {
+          "title": "a5712ebfc0bb42c397964a6ce2e403c3.pdf",
+          "organization": "NIMHANS",
+          "url": "https://nimhansbkt.demo-appiness.com/prodnimhans/documents/publication/a5712ebfc0bb42c397964a6ce2e403c3.pdf",
+          "confidence": 0.5948,
+          "topic": "mental health"
+        },
+        {
+          "title": "3087970debe044e2b4522146c52c88fb.pdf",
+          "organization": "NIMHANS",
+          "url": "https://nimhansbkt.demo-appiness.com/prodnimhans/documents/publication/3087970debe044e2b4522146c52c88fb.pdf",
+          "confidence": 0.5916,
+          "topic": "adolescent mental health"
+        },
+        {
+          "title": "Perspectives of mothers and fathers affected by addiction of an adolescent/adult child - results from a mixed-method study.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1186/s13690-025-01826-7",
+          "confidence": 0.5884,
+          "topic": "adolescent mental health"
+        },
+        {
+          "title": "1c7a6143098b4c4a8f0c76b5647edcbe.pdf",
+          "organization": "NIMHANS",
+          "url": "https://nimhansbkt.demo-appiness.com/prodnimhans/documents/publication/1c7a6143098b4c4a8f0c76b5647edcbe.pdf",
+          "confidence": 0.5875,
+          "topic": "mental health"
+        }
+      ],
+      "organization_coverage": [
+        "Europe PMC",
+        "NIMHANS"
+      ]
+    },
+    {
+      "perspective": "parent",
+      "query": "Sleep problems",
+      "expected_topic": "sleep",
+      "result_count": 10,
+      "coverage_score": 0.9,
+      "citation_quality": 1.0,
+      "confidence": 0.6404,
+      "top_10_sources": [
+        {
+          "title": "Prospective Pathways Among Rumination, Depression, and Insomnia in Youth.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1007/s10802-025-01406-x",
+          "confidence": 0.6796,
+          "topic": "depression"
+        },
+        {
+          "title": "Prevalence and Correlates of Sleep Problems in Children and Adolescents with Type 1 Diabetes: A Cross-Sectional Study.",
+          "organization": "PubMed",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/42267250/",
+          "confidence": 0.6611,
+          "topic": "sleep"
+        },
+        {
+          "title": "Prospective Pathways Among Rumination, Depression, and Insomnia in Youth.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1007/s10802-025-01406-x",
+          "confidence": 0.6591,
+          "topic": "depression"
+        },
+        {
+          "title": "Prospective Pathways Among Rumination, Depression, and Insomnia in Youth.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1007/s10802-025-01406-x",
+          "confidence": 0.6496,
+          "topic": "depression"
+        },
+        {
+          "title": "Prospective Pathways Among Rumination, Depression, and Insomnia in Youth.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1007/s10802-025-01406-x",
+          "confidence": 0.6494,
+          "topic": "depression"
+        },
+        {
+          "title": "Prospective Pathways Among Rumination, Depression, and Insomnia in Youth.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1007/s10802-025-01406-x",
+          "confidence": 0.6481,
+          "topic": "depression"
+        },
+        {
+          "title": "Inclusivity in Insomnia: Adolescents' Perspectives on the Sleep Solved App: Qualitative Interview Study.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.2196/82410",
+          "confidence": 0.6182,
+          "topic": "sleep"
+        },
+        {
+          "title": "Toward Earlier Bedtimes: Randomized Trial of Multi-Method Interventions in a Community Cohort of Adolescents.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1016/j.jadohealth.2025.12.247",
+          "confidence": 0.6161,
+          "topic": "sleep"
+        },
+        {
+          "title": "Prospective Pathways Among Rumination, Depression, and Insomnia in Youth.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1007/s10802-025-01406-x",
+          "confidence": 0.6157,
+          "topic": "depression"
+        },
+        {
+          "title": "Innovations in Practice: A Pilot Randomised Trial on Smartphone and Social Media Abstinence: Effects on Sleep Quality and Psychological Well-being in Adolescents",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.31234/osf.io/ujv78_v4",
+          "confidence": 0.6073,
+          "topic": "sleep"
+        }
+      ],
+      "organization_coverage": [
+        "Europe PMC",
+        "PubMed"
+      ]
+    },
+    {
+      "perspective": "teacher",
+      "query": "Bullying intervention",
+      "expected_topic": "bullying",
+      "result_count": 10,
+      "coverage_score": 1.0,
+      "citation_quality": 1.0,
+      "confidence": 0.737,
+      "top_10_sources": [
+        {
+          "title": "Who's Watching, Who's Waiting? Predictors of Bystander Intervention in Adolescent Bullying.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1177/08862605251408136",
+          "confidence": 0.7693,
+          "topic": "bullying"
+        },
+        {
+          "title": "The efficacy of three types of gratitude interventions for promoting defending behavior in response to school bullying among Chinese early adolescents.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1186/s40359-026-04134-z",
+          "confidence": 0.7613,
+          "topic": "bullying"
+        },
+        {
+          "title": "The development and pilot testing of an adolescent bullying intervention in Indonesia - the ROOTS Indonesia program.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1080/16549716.2019.1656905",
+          "confidence": 0.7393,
+          "topic": "bullying"
+        },
+        {
+          "title": "A qualitative study on parents' illness perceptions and psychosomatic experiences of adolescent patients with emotional disorders caused by school bullying.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.3389/fpsyg.2026.1682557",
+          "confidence": 0.7391,
+          "topic": "bullying"
+        },
+        {
+          "title": "A qualitative study on parents' illness perceptions and psychosomatic experiences of adolescent patients with emotional disorders caused by school bullying.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.3389/fpsyg.2026.1682557",
+          "confidence": 0.7337,
+          "topic": "bullying"
+        },
+        {
+          "title": "The efficacy of three types of gratitude interventions for promoting defending behavior in response to school bullying among Chinese early adolescents.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1186/s40359-026-04134-z",
+          "confidence": 0.7308,
+          "topic": "bullying"
+        },
+        {
+          "title": "A qualitative study on parents' illness perceptions and psychosomatic experiences of adolescent patients with emotional disorders caused by school bullying.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.3389/fpsyg.2026.1682557",
+          "confidence": 0.7278,
+          "topic": "bullying"
+        },
+        {
+          "title": "A qualitative study on parents' illness perceptions and psychosomatic experiences of adolescent patients with emotional disorders caused by school bullying.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.3389/fpsyg.2026.1682557",
+          "confidence": 0.7252,
+          "topic": "bullying"
+        },
+        {
+          "title": "A qualitative study on parents' illness perceptions and psychosomatic experiences of adolescent patients with emotional disorders caused by school bullying.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.3389/fpsyg.2026.1682557",
+          "confidence": 0.7241,
+          "topic": "bullying"
+        },
+        {
+          "title": "The effect of the restorative justice program implemented in schools on adolescents' peer bullying behaviors.",
+          "organization": "PubMed",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/42204571/",
+          "confidence": 0.7194,
+          "topic": "bullying"
+        }
+      ],
+      "organization_coverage": [
+        "Europe PMC",
+        "PubMed"
+      ]
+    },
+    {
+      "perspective": "teacher",
+      "query": "Classroom stress",
+      "expected_topic": "stress",
+      "result_count": 10,
+      "coverage_score": 0.3,
+      "citation_quality": 1.0,
+      "confidence": 0.636,
+      "top_10_sources": [
+        {
+          "title": "Study protocol for a randomised evaluation of a brief psychological intervention for clinically stressed parents of adolescents: Approach for Parenting Teenagers (APT).",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1186/s40359-026-04048-w",
+          "confidence": 0.7012,
+          "topic": "stress"
+        },
+        {
+          "title": "A qualitative study on parents' illness perceptions and psychosomatic experiences of adolescent patients with emotional disorders caused by school bullying.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.3389/fpsyg.2026.1682557",
+          "confidence": 0.65,
+          "topic": "bullying"
+        },
+        {
+          "title": "Art-of-Communication.pptx",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/pdf/tteach/ppt/Art-of-Communication.pptx",
+          "confidence": 0.6488,
+          "topic": "life skills"
+        },
+        {
+          "title": "Investing in youth public mental health in India: multi-stakeholder co-production of a whole school program to promote the mental health of Indian adolescents.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.3389/fpubh.2025.1670439",
+          "confidence": 0.6439,
+          "topic": "mental health"
+        },
+        {
+          "title": "Using RE-AIM to Assess Infant Early Childhood Mental Health Practices in Classrooms Serving Children with and Without Disabilities.",
+          "organization": "Europe PMC",
+          "url": "https://www.mdpi.com/2227-9032/12/24/2501/pdf?version=1733901973",
+          "confidence": 0.6385,
+          "topic": "mental health"
+        },
+        {
+          "title": "Developing-Classroom-Rules-with-Students-n-Parents.pdf",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/pdf/tteach/resource-material/Developing-Classroom-Rules-with-Students-n-Parents.pdf",
+          "confidence": 0.6224,
+          "topic": "adolescent health"
+        },
+        {
+          "title": "Awesome-AYA-Manual-2020.pdf",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/wp-content/uploads/2021/04/Awesome-AYA-Manual-2020.pdf",
+          "confidence": 0.6206,
+          "topic": "adolescent health"
+        },
+        {
+          "title": "Investing in youth public mental health in India: multi-stakeholder co-production of a whole school program to promote the mental health of Indian adolescents.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.3389/fpubh.2025.1670439",
+          "confidence": 0.6124,
+          "topic": "mental health"
+        },
+        {
+          "title": "Classroom-Management-Profile.pdf",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/pdf/tteach/resource-material/Classroom-Management-Profile.pdf",
+          "confidence": 0.6114,
+          "topic": "physical activity"
+        },
+        {
+          "title": "199d058a5e6542caa0b03f2493158d34.pdf",
+          "organization": "NIMHANS",
+          "url": "https://nimhansbkt.demo-appiness.com/prodnimhans/documents/publication/199d058a5e6542caa0b03f2493158d34.pdf",
+          "confidence": 0.6105,
+          "topic": "mental health"
+        }
+      ],
+      "organization_coverage": [
+        "Europe PMC",
+        "IAP Adolescent Health Academy",
+        "NIMHANS"
+      ]
+    },
+    {
+      "perspective": "teacher",
+      "query": "ADHD support",
+      "expected_topic": "adhd",
+      "result_count": 10,
+      "coverage_score": 0.4,
+      "citation_quality": 1.0,
+      "confidence": 0.4003,
+      "top_10_sources": [
+        {
+          "title": "Autism-Awareness-Week-IAPRAIGAD.pdf",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/pdf/Autism-Awareness-Week-IAPRAIGAD.pdf",
+          "confidence": 0.435,
+          "topic": "autism"
+        },
+        {
+          "title": "Advances in the management of ADHD in children and adolescents.",
+          "organization": "PubMed",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/42259585/",
+          "confidence": 0.4176,
+          "topic": "adhd"
+        },
+        {
+          "title": "Abstracts-T-TEACH-MODULE.pdf",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/pdf/tteach/resource-material/Abstracts-T-TEACH-MODULE.pdf",
+          "confidence": 0.4148,
+          "topic": "emotional regulation"
+        },
+        {
+          "title": "Investigation of the feasibility and acceptability of a school-based intervention for children with traits of ADHD: protocol for an iterative case-series study.",
+          "organization": "PubMed",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/36787977/",
+          "confidence": 0.4138,
+          "topic": "adhd"
+        },
+        {
+          "title": "Adaptation of behavioural activation for adolescents with mild to moderate intellectual disabilities and depression.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.3389/fpsyt.2026.1771276",
+          "confidence": 0.4036,
+          "topic": "depression"
+        },
+        {
+          "title": "Adaptation of behavioural activation for adolescents with mild to moderate intellectual disabilities and depression.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.3389/fpsyt.2026.1771276",
+          "confidence": 0.4031,
+          "topic": "depression"
+        },
+        {
+          "title": "Co-production of the 'EPIC' multidimensional tool-kit to support neurodivergent children and young people at home and school: a feasibility and pilot study.",
+          "organization": "PubMed",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/39127770/",
+          "confidence": 0.3873,
+          "topic": "adhd"
+        },
+        {
+          "title": "Swati-Y-Bhave-JTCP-AHA-oration-7.10.23.pdf",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/pdf/Swati-Y-Bhave-JTCP-AHA-oration-7.10.23.pdf",
+          "confidence": 0.3822,
+          "topic": "adolescent health"
+        },
+        {
+          "title": "Dealing-with-Disorders-of-Learning.pptx",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/pdf/tteach/ppt/Dealing-with-Disorders-of-Learning.pptx",
+          "confidence": 0.3785,
+          "topic": "learning difficulties"
+        },
+        {
+          "title": "Advancing intervention science in child and youth mental health: from mechanisms to scalable care.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1007/s00787-026-03000-y",
+          "confidence": 0.3673,
+          "topic": "adolescent mental health"
+        }
+      ],
+      "organization_coverage": [
+        "IAP Adolescent Health Academy",
+        "PubMed",
+        "Europe PMC"
+      ]
+    },
+    {
+      "perspective": "counselor",
+      "query": "Self harm assessment",
+      "expected_topic": "self harm",
+      "result_count": 10,
+      "coverage_score": 0.0,
+      "citation_quality": 1.0,
+      "confidence": 0.5847,
+      "top_10_sources": [
+        {
+          "title": "Clinical efficacy of intermittent theta burst stimulation in the acute phase of adolescent depression: study protocol of a double-blind, randomized controlled trial.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1186/s13063-026-09705-4",
+          "confidence": 0.6896,
+          "topic": "depression"
+        },
+        {
+          "title": "Perspectives of mothers and fathers affected by addiction of an adolescent/adult child - results from a mixed-method study.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1186/s13690-025-01826-7",
+          "confidence": 0.5806,
+          "topic": "adolescent mental health"
+        },
+        {
+          "title": "barbados.pdf?sfvrsn=ae2429cd_3",
+          "organization": "WHO",
+          "url": "https://cdn.who.int/media/docs/default-source/mental-health/mental-health-atlas-2024-country-profiles/barbados.pdf?sfvrsn=ae2429cd_3",
+          "confidence": 0.5747,
+          "topic": "adolescent mental health"
+        },
+        {
+          "title": "sri-lanka.pdf?sfvrsn=8202fd50_3",
+          "organization": "WHO",
+          "url": "https://cdn.who.int/media/docs/default-source/mental-health/mental-health-atlas-2024-country-profiles/sri-lanka.pdf?sfvrsn=8202fd50_3",
+          "confidence": 0.5743,
+          "topic": "adolescent mental health"
+        },
+        {
+          "title": "turkiye.pdf?sfvrsn=b55287f_3",
+          "organization": "WHO",
+          "url": "https://cdn.who.int/media/docs/default-source/mental-health/mental-health-atlas-2024-country-profiles/turkiye.pdf?sfvrsn=b55287f_3",
+          "confidence": 0.5727,
+          "topic": "adolescent mental health"
+        },
+        {
+          "title": "iraq.pdf?sfvrsn=e8e3b9a1_3",
+          "organization": "WHO",
+          "url": "https://cdn.who.int/media/docs/default-source/mental-health/mental-health-atlas-2024-country-profiles/iraq.pdf?sfvrsn=e8e3b9a1_3",
+          "confidence": 0.5724,
+          "topic": "adolescent mental health"
+        },
+        {
+          "title": "togo.pdf?sfvrsn=fcde06bc_3",
+          "organization": "WHO",
+          "url": "https://cdn.who.int/media/docs/default-source/mental-health/mental-health-atlas-2024-country-profiles/togo.pdf?sfvrsn=fcde06bc_3",
+          "confidence": 0.5724,
+          "topic": "adolescent mental health"
+        },
+        {
+          "title": "austria.pdf?sfvrsn=17a661fc_3",
+          "organization": "WHO",
+          "url": "https://cdn.who.int/media/docs/default-source/mental-health/mental-health-atlas-2024-country-profiles/austria.pdf?sfvrsn=17a661fc_3",
+          "confidence": 0.5704,
+          "topic": "adolescent mental health"
+        },
+        {
+          "title": "mexico.pdf?sfvrsn=b5f312b1_3",
+          "organization": "WHO",
+          "url": "https://cdn.who.int/media/docs/default-source/mental-health/mental-health-atlas-2024-country-profiles/mexico.pdf?sfvrsn=b5f312b1_3",
+          "confidence": 0.5699,
+          "topic": "adolescent mental health"
+        },
+        {
+          "title": "antigua-and-barbuda.pdf?sfvrsn=e26ca208_3",
+          "organization": "WHO",
+          "url": "https://cdn.who.int/media/docs/default-source/mental-health/mental-health-atlas-2024-country-profiles/antigua-and-barbuda.pdf?sfvrsn=e26ca208_3",
+          "confidence": 0.5697,
+          "topic": "adolescent mental health"
+        }
+      ],
+      "organization_coverage": [
+        "Europe PMC",
+        "WHO"
+      ]
+    },
+    {
+      "perspective": "counselor",
+      "query": "Suicide prevention",
+      "expected_topic": "suicide prevention",
+      "result_count": 10,
+      "coverage_score": 0.0,
+      "citation_quality": 1.0,
+      "confidence": 0.6253,
+      "top_10_sources": [
+        {
+          "title": "Abstracts-T-TEACH-MODULE.pdf",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/pdf/tteach/resource-material/Abstracts-T-TEACH-MODULE.pdf",
+          "confidence": 0.6582,
+          "topic": "emotional regulation"
+        },
+        {
+          "title": "Suicide attempts among youth attending special education centres: risk and protective factors.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.5114/ppn.2026.161372",
+          "confidence": 0.6515,
+          "topic": "cyberbullying"
+        },
+        {
+          "title": "A qualitative study on parents' illness perceptions and psychosomatic experiences of adolescent patients with emotional disorders caused by school bullying.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.3389/fpsyg.2026.1682557",
+          "confidence": 0.6444,
+          "topic": "bullying"
+        },
+        {
+          "title": "A coach-supported, digital parenting programme for parents of adolescents at risk of suicide: pilot trial of acceptability, feasibility, validity and short-term effects.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1192/bjo.2026.11046",
+          "confidence": 0.6425,
+          "topic": "mental health"
+        },
+        {
+          "title": "Parents-mku-handout.pdf",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/wp-content/uploads/2021/04/Parents-mku-handout.pdf",
+          "confidence": 0.6338,
+          "topic": "life skills"
+        },
+        {
+          "title": "Silently-Suffering-Teens.pptx",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/pdf/tteach/ppt/Silently-Suffering-Teens.pptx",
+          "confidence": 0.614,
+          "topic": "internet addiction"
+        },
+        {
+          "title": "A coach-supported, digital parenting programme for parents of adolescents at risk of suicide: pilot trial of acceptability, feasibility, validity and short-term effects.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1192/bjo.2026.11046",
+          "confidence": 0.6045,
+          "topic": "mental health"
+        },
+        {
+          "title": "CovidHCWMentalHealthSupportGuidance.pdf",
+          "organization": "NIMHANS",
+          "url": "https://nimhansbkt.demo-appiness.com/prodnimhans/documents/pdf_documents/CovidHCWMentalHealthSupportGuidance.pdf",
+          "confidence": 0.6023,
+          "topic": "substance abuse"
+        },
+        {
+          "title": "Investing in youth public mental health in India: multi-stakeholder co-production of a whole school program to promote the mental health of Indian adolescents.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.3389/fpubh.2025.1670439",
+          "confidence": 0.6016,
+          "topic": "mental health"
+        },
+        {
+          "title": "A review of the scope of non-suicidal self-injury behavior in adolescents with depressive disorders: an analysis of related influencing factors.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1186/s12888-025-07361-7",
+          "confidence": 0.6006,
+          "topic": "self harm"
+        }
+      ],
+      "organization_coverage": [
+        "IAP Adolescent Health Academy",
+        "Europe PMC",
+        "NIMHANS"
+      ]
+    },
+    {
+      "perspective": "counselor",
+      "query": "Referral guidance",
+      "expected_topic": "mental health",
+      "result_count": 10,
+      "coverage_score": 0.6,
+      "citation_quality": 1.0,
+      "confidence": 0.5984,
+      "top_10_sources": [
+        {
+          "title": "The efficacy of three types of gratitude interventions for promoting defending behavior in response to school bullying among Chinese early adolescents.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1186/s40359-026-04134-z",
+          "confidence": 0.6377,
+          "topic": "bullying"
+        },
+        {
+          "title": "Swati-Y-Bhave-JTCP-AHA-oration-7.10.23.pdf",
+          "organization": "IAP Adolescent Health Academy",
+          "url": "https://aha.iapindia.org/pdf/Swati-Y-Bhave-JTCP-AHA-oration-7.10.23.pdf",
+          "confidence": 0.6017,
+          "topic": "adolescent health"
+        },
+        {
+          "title": "Design and implementation of a parent guide for coaching teen drivers.",
+          "organization": "Semantic Scholar",
+          "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7738003",
+          "confidence": 0.6,
+          "topic": "stress"
+        },
+        {
+          "title": "Guidelines-for-Telepsychotherapy-Services-17.4.2020.pdf",
+          "organization": "NIMHANS",
+          "url": "https://nimhansbkt.demo-appiness.com/prodnimhans/documents/pdf_documents/Guidelines-for-Telepsychotherapy-Services-17.4.2020.pdf",
+          "confidence": 0.5977,
+          "topic": "mental health"
+        },
+        {
+          "title": "Design and implementation of a parent guide for coaching teen drivers.",
+          "organization": "Semantic Scholar",
+          "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7738003",
+          "confidence": 0.5969,
+          "topic": "stress"
+        },
+        {
+          "title": "Guidelines-for-Telepsychotherapy-Services-17.4.2020.pdf",
+          "organization": "NIMHANS",
+          "url": "https://nimhansbkt.demo-appiness.com/prodnimhans/documents/pdf_documents/Guidelines-for-Telepsychotherapy-Services-17.4.2020.pdf",
+          "confidence": 0.5947,
+          "topic": "mental health"
+        },
+        {
+          "title": "c0b30fe810f14dd0b1e5d1d72fb99965.pdf",
+          "organization": "NIMHANS",
+          "url": "https://nimhansbkt.demo-appiness.com/prodnimhans/documents/publication/c0b30fe810f14dd0b1e5d1d72fb99965.pdf",
+          "confidence": 0.5908,
+          "topic": "substance abuse"
+        },
+        {
+          "title": "Guidelines-for-Telepsychotherapy-Services-17.4.2020.pdf",
+          "organization": "NIMHANS",
+          "url": "https://nimhansbkt.demo-appiness.com/prodnimhans/documents/pdf_documents/Guidelines-for-Telepsychotherapy-Services-17.4.2020.pdf",
+          "confidence": 0.5895,
+          "topic": "mental health"
+        },
+        {
+          "title": "A coach-supported, digital parenting programme for parents of adolescents at risk of suicide: pilot trial of acceptability, feasibility, validity and short-term effects.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1192/bjo.2026.11046",
+          "confidence": 0.5879,
+          "topic": "mental health"
+        },
+        {
+          "title": "Perspectives of mothers and fathers affected by addiction of an adolescent/adult child - results from a mixed-method study.",
+          "organization": "Europe PMC",
+          "url": "https://doi.org/10.1186/s13690-025-01826-7",
+          "confidence": 0.5869,
+          "topic": "adolescent mental health"
+        }
+      ],
+      "organization_coverage": [
+        "Europe PMC",
+        "IAP Adolescent Health Academy",
+        "Semantic Scholar",
+        "NIMHANS"
+      ]
+    }
+  ],
+  "average_coverage": 0.4,
+  "average_citation_quality": 1.0,
+  "average_confidence": 0.5804,
+  "generated_at": "2026-06-13T10:38:03.561779+00:00"
+}

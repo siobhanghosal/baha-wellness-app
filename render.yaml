@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: baha-api
+    runtime: docker
+    rootDir: Baha_Data
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: AUTH_JWKS_URL
+        sync: false
+      - key: AUTH_ISSUER
+        sync: false
+      - key: AUTH_AUDIENCE
+        sync: false
+      - key: AUTH_JWT_SECRET
+        sync: false
+      - key: ALLOW_DEV_IDENTITY_HEADERS
+        value: "false"
+      - key: ALLOWED_CORS_ORIGINS
+        value: https://admin.baha.local
+      - key: STORAGE_ROOT
+        value: /app/storage/raw
+      - key: OBJECT_STORAGE_PROVIDER
+        value: local
+      - key: OBJECT_STORAGE_BUCKET
+        sync: false
+      - key: OBJECT_STORAGE_REGION
+        sync: false
+      - key: OBJECT_STORAGE_ENDPOINT
+        sync: false
+      - key: OBJECT_STORAGE_PUBLIC_BASE_URL
+        sync: false
+      - key: OBJECT_STORAGE_PREFIX
+        value: raw
+      - key: EMBEDDING_BACKEND
+        value: hash
+      - key: EMBEDDING_AUTO_INDEX
+        value: "false"

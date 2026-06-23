@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: baha-rag-ingestion
+  namespace: baha-rag
+spec:
+  schedule: "0 2 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: ingestion
+              image: baha-rag-api:0.1.0
+              command: ["python", "-m", "baha_rag.cli"]
+              args: ["ingest-url", "https://www.who.int/", "--organization", "WHO"]
+              envFrom:
+                - configMapRef:
+                    name: baha-rag-config
+                - secretRef:
+                    name: baha-rag-secret

@@ -1,0 +1,122 @@
+[
+  {
+    "topic": "bullying",
+    "current_count": 116,
+    "target_count": 200,
+    "gap_count": 84,
+    "gap_percent": "42.00",
+    "below_ten_percent_gap": false
+  },
+  {
+    "topic": "school refusal",
+    "current_count": 0,
+    "target_count": 75,
+    "gap_count": 75,
+    "gap_percent": "100.00",
+    "below_ten_percent_gap": false
+  },
+  {
+    "topic": "performance anxiety",
+    "current_count": 2,
+    "target_count": 75,
+    "gap_count": 73,
+    "gap_percent": "97.33",
+    "below_ten_percent_gap": false
+  },
+  {
+    "topic": "risk taking",
+    "current_count": 7,
+    "target_count": 75,
+    "gap_count": 68,
+    "gap_percent": "90.67",
+    "below_ten_percent_gap": false
+  },
+  {
+    "topic": "peer pressure",
+    "current_count": 8,
+    "target_count": 75,
+    "gap_count": 67,
+    "gap_percent": "89.33",
+    "below_ten_percent_gap": false
+  },
+  {
+    "topic": "self awareness",
+    "current_count": 14,
+    "target_count": 50,
+    "gap_count": 36,
+    "gap_percent": "72.00",
+    "below_ten_percent_gap": false
+  },
+  {
+    "topic": "cyberbullying",
+    "current_count": 137,
+    "target_count": 150,
+    "gap_count": 13,
+    "gap_percent": "8.67",
+    "below_ten_percent_gap": true
+  },
+  {
+    "topic": "communication skills",
+    "current_count": 76,
+    "target_count": 50,
+    "gap_count": 0,
+    "gap_percent": "0.00",
+    "below_ten_percent_gap": true
+  },
+  {
+    "topic": "decision making",
+    "current_count": 188,
+    "target_count": 50,
+    "gap_count": 0,
+    "gap_percent": "0.00",
+    "below_ten_percent_gap": true
+  },
+  {
+    "topic": "digital wellness",
+    "current_count": 1158,
+    "target_count": 200,
+    "gap_count": 0,
+    "gap_percent": "0.00",
+    "below_ten_percent_gap": true
+  },
+  {
+    "topic": "emotional intelligence",
+    "current_count": 80,
+    "target_count": 50,
+    "gap_count": 0,
+    "gap_percent": "0.00",
+    "below_ten_percent_gap": true
+  },
+  {
+    "topic": "problem solving",
+    "current_count": 53,
+    "target_count": 50,
+    "gap_count": 0,
+    "gap_percent": "0.00",
+    "below_ten_percent_gap": true
+  },
+  {
+    "topic": "resilience",
+    "current_count": 53,
+    "target_count": 50,
+    "gap_count": 0,
+    "gap_percent": "0.00",
+    "below_ten_percent_gap": true
+  },
+  {
+    "topic": "school avoidance",
+    "current_count": 533,
+    "target_count": 75,
+    "gap_count": 0,
+    "gap_percent": "0.00",
+    "below_ten_percent_gap": true
+  },
+  {
+    "topic": "screen time",
+    "current_count": 80,
+    "target_count": 75,
+    "gap_count": 0,
+    "gap_percent": "0.00",
+    "below_ten_percent_gap": true
+  }
+]

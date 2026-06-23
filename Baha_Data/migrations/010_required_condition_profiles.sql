@@ -1,0 +1,28 @@
+update condition_profile_targets
+set required = condition in (
+  'Depression',
+  'Anxiety',
+  'Stress',
+  'Burnout',
+  'Bullying',
+  'Cyberbullying',
+  'Sleep Disorders',
+  'ADHD',
+  'Autism',
+  'Learning Difficulties',
+  'Gaming Addiction',
+  'Internet Addiction',
+  'Peer Pressure',
+  'Social Isolation',
+  'Substance Abuse',
+  'Self Harm',
+  'Suicide Prevention',
+  'Exam Stress',
+  'School Refusal',
+  'Performance Anxiety',
+  'Anger',
+  'Emotional Regulation',
+  'Risk Taking',
+  'Loneliness',
+  'Grief'
+);

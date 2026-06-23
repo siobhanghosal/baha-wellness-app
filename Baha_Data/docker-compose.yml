@@ -1,0 +1,37 @@
+services:
+  postgres:
+    build:
+      context: ./migrations
+    image: baha-postgres:local
+    environment:
+      POSTGRES_DB: baha_rag
+      POSTGRES_USER: baha
+      POSTGRES_PASSWORD: baha
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U baha -d baha_rag"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://baha:baha@postgres:5432/baha_rag
+      STORAGE_ROOT: /app/storage/raw
+    ports:
+      - "8000:8000"
+    volumes:
+      - acquisition-storage:/app/storage/raw
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  acquisition-storage:

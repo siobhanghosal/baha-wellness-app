@@ -1,0 +1,144 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: baha-acquisition-web-discovery
+  namespace: baha-rag
+spec:
+  schedule: "0 1 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: discover-web
+              image: baha-rag-api:0.1.0
+              command: ["baha-rag"]
+              args: ["discover-documents"]
+              envFrom:
+                - configMapRef:
+                    name: baha-rag-config
+                - secretRef:
+                    name: baha-rag-secret
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: baha-acquisition-research-discovery
+  namespace: baha-rag
+spec:
+  schedule: "30 1 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: discover-research
+              image: baha-rag-api:0.1.0
+              command: ["baha-rag"]
+              args: ["discover-research", "--limit-per-topic", "25"]
+              envFrom:
+                - configMapRef:
+                    name: baha-rag-config
+                - secretRef:
+                    name: baha-rag-secret
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: baha-acquisition-download
+  namespace: baha-rag
+spec:
+  schedule: "0 3 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: download
+              image: baha-rag-api:0.1.0
+              command: ["baha-rag"]
+              args: ["download-documents", "--limit", "500"]
+              envFrom:
+                - configMapRef:
+                    name: baha-rag-config
+                - secretRef:
+                    name: baha-rag-secret
+              volumeMounts:
+                - name: acquisition-storage
+                  mountPath: /data/raw
+          volumes:
+            - name: acquisition-storage
+              persistentVolumeClaim:
+                claimName: acquisition-storage
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: baha-priority-gap-closure
+  namespace: baha-rag
+spec:
+  schedule: "0 0 * * *"
+  timeZone: "Asia/Kolkata"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: priority-gap-closure
+              image: baha-rag-api:0.1.0
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  baha-rag priority-gap-closure --max-topics 9 --exit-when-complete
+                  status=$?
+                  if [ "$status" -eq 20 ]; then exit 0; fi
+                  if [ "$status" -ne 0 ]; then exit "$status"; fi
+                  baha-rag discover-documents --organization BAHA &&
+                  baha-rag discover-documents --organization IAP &&
+                  baha-rag discover-documents --organization NIMHANS &&
+                  baha-rag discover-documents --organization WHO &&
+                  baha-rag discover-documents --organization UNICEF &&
+                  baha-rag discover-documents --organization UNESCO &&
+                  baha-rag download-documents --limit 500
+              envFrom:
+                - configMapRef:
+                    name: baha-rag-config
+                - secretRef:
+                    name: baha-rag-secret
+              volumeMounts:
+                - name: acquisition-storage
+                  mountPath: /data/raw
+          volumes:
+            - name: acquisition-storage
+              persistentVolumeClaim:
+                claimName: acquisition-storage
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: baha-weekly-priority-gap-report
+  namespace: baha-rag
+spec:
+  schedule: "0 6 * * 1"
+  timeZone: "Asia/Kolkata"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: weekly-gap-report
+              image: baha-rag-api:0.1.0
+              command: ["baha-rag"]
+              args: ["weekly-gap-report"]
+              envFrom:
+                - configMapRef:
+                    name: baha-rag-config
+                - secretRef:
+                    name: baha-rag-secret
