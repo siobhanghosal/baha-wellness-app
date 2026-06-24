@@ -51,6 +51,10 @@ Returns:
 
 Returns active student check-in templates filtered by the actor's age cohort.
 
+`GET /mobile/student/checkin-templates/{template_id}`
+
+Returns one student check-in template including ordered question definitions so the client can render a live submission form.
+
 `GET /mobile/student/modules`
 
 Returns active approved student learning modules plus latest progress for the current student.
@@ -106,6 +110,10 @@ Returns the latest parent-safe weekly summary if:
 `GET /mobile/teacher/classes`
 
 Returns classes assigned to the teacher.
+
+`GET /mobile/teacher/classes/{class_id}/students`
+
+Returns active students in a teacher-assigned class so the pastoral flag flow can target the right student profile.
 
 `GET /mobile/teacher/classes/{class_id}/cohort-summary/latest`
 

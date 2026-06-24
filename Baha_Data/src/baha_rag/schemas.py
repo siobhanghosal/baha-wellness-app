@@ -194,6 +194,28 @@ class MobileCheckinTemplateSummary(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class MobileCheckinQuestion(BaseModel):
+    id: UUID
+    question_key: str
+    dimension: str
+    question_type: str
+    prompt: str
+    response_config: dict[str, Any] = Field(default_factory=dict)
+    is_required: bool
+    ordinal: int
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class MobileCheckinTemplateDetail(BaseModel):
+    id: UUID
+    template_key: str
+    title: str
+    cadence: str
+    age_cohort: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    questions: list[MobileCheckinQuestion] = Field(default_factory=list)
+
+
 class MobileModuleSummary(BaseModel):
     id: UUID
     module_code: str
@@ -279,6 +301,13 @@ class TeacherClassSummary(BaseModel):
     grade_band: str | None = None
     assignment_type: str
     active_student_count: int
+
+
+class TeacherClassStudentSummary(BaseModel):
+    student_profile_id: UUID
+    student_name: str
+    age_cohort: str | None = None
+    membership_status: str
 
 
 class TeacherCohortSummaryResponse(BaseModel):

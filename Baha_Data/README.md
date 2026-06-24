@@ -35,6 +35,15 @@ The local Postgres port exposed on the host is `5433`.
 For Android emulator testing, use `http://10.0.2.2:8000` as the API base URL.
 For a physical device on the same network, use your machine's LAN IP instead of `localhost`.
 
+For a repeatable local-first phone workflow, see:
+
+- [mobile_suite/docs/LOCAL_FIRST_PHONE_TESTING.md](/Users/solomonkaruppiah/Desktop/Baha_Data/baha-wellness-app-sudharshan/mobile_suite/docs/LOCAL_FIRST_PHONE_TESTING.md)
+
+Convenience scripts:
+
+- [Baha_Data/scripts/start_local_mobile_stack.sh](/Users/solomonkaruppiah/Desktop/Baha_Data/baha-wellness-app-sudharshan/Baha_Data/scripts/start_local_mobile_stack.sh)
+- [Baha_Data/scripts/stop_local_mobile_stack.sh](/Users/solomonkaruppiah/Desktop/Baha_Data/baha-wellness-app-sudharshan/Baha_Data/scripts/stop_local_mobile_stack.sh)
+
 For local syntax checks without installing dependencies:
 
 ```bash

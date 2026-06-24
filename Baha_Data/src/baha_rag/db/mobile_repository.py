@@ -86,6 +86,42 @@ class MobileAppRepository:
         row = result.mappings().first()
         return self._row_to_actor_context(row) if row else None
 
+    async def get_actor_context_by_email(self, email: str) -> ActorContext | None:
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  u.id as user_id,
+                  u.external_auth_id,
+                  u.display_name,
+                  sp.id as student_profile_id,
+                  g.id as guardian_id,
+                  tp.id as teacher_profile_id,
+                  sp.presentation_age_cohort,
+                  coalesce(sp.school_id, tp.school_id) as school_id,
+                  array_remove(array_agg(distinct r.role_key), null) as roles
+                from users u
+                left join user_roles ur
+                  on ur.user_id = u.id and ur.status = 'active'
+                left join roles r
+                  on r.id = ur.role_id
+                left join student_profiles sp
+                  on sp.user_id = u.id and sp.enrollment_status = 'active'
+                left join guardians g
+                  on g.user_id = u.id
+                left join teacher_profiles tp
+                  on tp.user_id = u.id
+                where lower(u.email) = lower(:email) and u.status = 'active'
+                group by
+                  u.id, u.external_auth_id, u.display_name,
+                  sp.id, g.id, tp.id, sp.presentation_age_cohort, coalesce(sp.school_id, tp.school_id)
+                """
+            ),
+            {"email": email},
+        )
+        row = result.mappings().first()
+        return self._row_to_actor_context(row) if row else None
+
     async def list_student_checkin_templates(self, *, age_cohort: str | None) -> list[dict[str, Any]]:
         result = await self.session.execute(
             text(
@@ -117,6 +153,61 @@ class MobileAppRepository:
             {"age_cohort": age_cohort},
         )
         return [dict(row) for row in result.mappings().all()]
+
+    async def get_student_checkin_template_detail(
+        self,
+        *,
+        template_id: UUID,
+        age_cohort: str | None,
+    ) -> dict[str, Any] | None:
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  ct.id,
+                  ct.template_key,
+                  ct.title,
+                  ct.cadence,
+                  ct.age_cohort,
+                  ct.metadata,
+                  coalesce(
+                    jsonb_agg(
+                      jsonb_build_object(
+                        'id', cq.id,
+                        'question_key', cq.question_key,
+                        'dimension', cq.dimension,
+                        'question_type', cq.question_type,
+                        'prompt', cq.prompt,
+                        'response_config', cq.response_config,
+                        'is_required', cq.is_required,
+                        'ordinal', cq.ordinal,
+                        'metadata', cq.metadata
+                      )
+                      order by cq.ordinal
+                    ) filter (where cq.id is not null),
+                    '[]'::jsonb
+                  ) as questions
+                from checkin_templates ct
+                left join checkin_questions cq
+                  on cq.template_id = ct.id
+                where ct.id = :template_id
+                  and ct.active = true
+                  and ct.audience_app = 'student'
+                  and (
+                    ct.age_cohort = 'all'
+                    or :age_cohort is null
+                    or ct.age_cohort = :age_cohort
+                  )
+                group by ct.id, ct.template_key, ct.title, ct.cadence, ct.age_cohort, ct.metadata
+                """
+            ),
+            {
+                "template_id": template_id,
+                "age_cohort": age_cohort,
+            },
+        )
+        row = result.mappings().first()
+        return dict(row) if row else None
 
     async def list_student_modules(
         self,
@@ -620,6 +711,40 @@ class MobileAppRepository:
                 """
             ),
             {"teacher_profile_id": teacher_profile_id},
+        )
+        return [dict(row) for row in result.mappings().all()]
+
+    async def list_teacher_class_students(
+        self,
+        *,
+        teacher_profile_id: UUID,
+        class_id: UUID,
+    ) -> list[dict[str, Any]]:
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  sp.id as student_profile_id,
+                  u.display_name as student_name,
+                  sp.presentation_age_cohort as age_cohort,
+                  cm.membership_status
+                from teacher_assignments ta
+                join class_memberships cm
+                  on cm.class_id = ta.class_id
+                join student_profiles sp
+                  on sp.id = cm.student_profile_id
+                join users u
+                  on u.id = sp.user_id
+                where ta.teacher_profile_id = :teacher_profile_id
+                  and ta.class_id = :class_id
+                  and ta.status = 'active'
+                order by u.display_name
+                """
+            ),
+            {
+                "teacher_profile_id": teacher_profile_id,
+                "class_id": class_id,
+            },
         )
         return [dict(row) for row in result.mappings().all()]
 

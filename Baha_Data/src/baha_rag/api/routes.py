@@ -54,6 +54,7 @@ from baha_rag.schemas import (
     MobileChatMessage,
     MobileChatMessageCreateRequest,
     MobileActorResponse,
+    MobileCheckinTemplateDetail,
     MobileCheckinTemplateSummary,
     MobileLinkedStudentSummary,
     MobileModuleSummary,
@@ -67,6 +68,7 @@ from baha_rag.schemas import (
     ReviewDecisionRequest,
     StudentCheckinDetail,
     StudentCheckinSummary,
+    TeacherClassStudentSummary,
     TeacherClassSummary,
     TeacherCohortSummaryResponse,
     ViewRequest,
@@ -249,6 +251,22 @@ async def mobile_student_checkin_templates(
     _require_student(actor)
     rows = await MobileAppRepository(session).list_student_checkin_templates(age_cohort=actor.age_cohort)
     return [MobileCheckinTemplateSummary.model_validate(row) for row in rows]
+
+
+@router.get("/mobile/student/checkin-templates/{template_id}", response_model=MobileCheckinTemplateDetail)
+async def mobile_student_checkin_template_detail(
+    template_id: UUID,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> MobileCheckinTemplateDetail:
+    _require_student(actor)
+    row = await MobileAppRepository(session).get_student_checkin_template_detail(
+        template_id=template_id,
+        age_cohort=actor.age_cohort,
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Check-in template not found")
+    return MobileCheckinTemplateDetail.model_validate(row)
 
 
 @router.get("/mobile/student/modules", response_model=list[MobileModuleSummary])
@@ -579,6 +597,23 @@ async def mobile_teacher_classes(
     _require_teacher(actor)
     rows = await MobileAppRepository(session).list_teacher_classes(teacher_profile_id=actor.teacher_profile_id)
     return [TeacherClassSummary.model_validate(row) for row in rows]
+
+
+@router.get("/mobile/teacher/classes/{class_id}/students", response_model=list[TeacherClassStudentSummary])
+async def mobile_teacher_class_students(
+    class_id: UUID,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> list[TeacherClassStudentSummary]:
+    _require_teacher(actor)
+    assigned_classes = await MobileAppRepository(session).list_teacher_classes(teacher_profile_id=actor.teacher_profile_id)
+    if class_id not in {row["class_id"] for row in assigned_classes}:
+        raise HTTPException(status_code=403, detail="Teacher is not assigned to this class")
+    rows = await MobileAppRepository(session).list_teacher_class_students(
+        teacher_profile_id=actor.teacher_profile_id,
+        class_id=class_id,
+    )
+    return [TeacherClassStudentSummary.model_validate(row) for row in rows]
 
 
 @router.get("/mobile/teacher/classes/{class_id}/cohort-summary/latest", response_model=TeacherCohortSummaryResponse)

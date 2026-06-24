@@ -129,6 +129,7 @@ The implemented mobile-facing routes are:
 ### Student
 
 - `GET /mobile/student/checkin-templates`
+- `GET /mobile/student/checkin-templates/{template_id}`
 - `GET /mobile/student/checkins`
 - `GET /mobile/student/checkins/{response_set_id}`
 - `POST /mobile/student/checkins`
@@ -144,6 +145,7 @@ The implemented mobile-facing routes are:
 ### Teacher
 
 - `GET /mobile/teacher/classes`
+- `GET /mobile/teacher/classes/{class_id}/students`
 - `GET /mobile/teacher/classes/{class_id}/cohort-summary/latest`
 - `POST /mobile/teacher/pastoral-flags`
 
