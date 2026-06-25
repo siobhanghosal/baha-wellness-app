@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException
@@ -9,6 +10,12 @@ from baha_rag.config import Settings, get_settings
 from baha_rag.db.mobile_repository import MobileAppRepository
 from baha_rag.db.session import get_session
 from baha_rag.identity import ActorContext
+
+
+@dataclass(slots=True)
+class TokenIdentity:
+    subject: str
+    email: str | None = None
 
 
 def _parse_user_id(raw_user_id: str) -> UUID:
@@ -25,9 +32,9 @@ async def get_actor_context(
     x_baha_user_id: str | None = Header(default=None),
     x_baha_external_auth_id: str | None = Header(default=None),
 ) -> ActorContext:
-    external_auth_id = await _external_auth_id_from_authorization(authorization, settings)
+    token_identity = await _identity_from_authorization(authorization, settings)
 
-    if not x_baha_user_id and not x_baha_external_auth_id and not external_auth_id:
+    if not x_baha_user_id and not x_baha_external_auth_id and token_identity is None:
         raise HTTPException(
             status_code=401,
             detail="Provide a valid bearer token or development identity headers for mobile endpoints",
@@ -39,18 +46,54 @@ async def get_actor_context(
         actor = await repository.get_actor_context_by_user_id(_parse_user_id(x_baha_user_id))
     elif x_baha_external_auth_id:
         actor = await repository.get_actor_context_by_external_auth_id(x_baha_external_auth_id)
-    elif external_auth_id:
-        actor = await repository.get_actor_context_by_external_auth_id(external_auth_id)
+    elif token_identity:
+        actor = await repository.get_actor_context_by_external_auth_id(token_identity.subject)
+        if actor is None and token_identity.email:
+            active_user_count = await repository.count_active_users_by_email(token_identity.email)
+            if active_user_count > 1:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Multiple active BAHA users share this email; manual identity linking is required",
+                )
+            actor = await repository.get_actor_context_by_email(token_identity.email)
+            if actor is not None:
+                bound = await repository.bind_external_auth_id(
+                    user_id=actor.user_id,
+                    external_auth_id=token_identity.subject,
+                )
+                if not bound:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Unable to link bearer token identity to the matched BAHA user",
+                    )
+                actor = await repository.get_actor_context_by_user_id(actor.user_id)
 
     if actor is None:
         raise HTTPException(status_code=401, detail="No active BAHA user found for the provided identity")
     return actor
 
 
-async def _external_auth_id_from_authorization(
+async def get_provisioning_identity(
+    settings: Settings = Depends(get_settings),
+    authorization: str | None = Header(default=None),
+    x_baha_external_auth_id: str | None = Header(default=None),
+    x_baha_auth_email: str | None = Header(default=None),
+) -> TokenIdentity:
+    token_identity = await _identity_from_authorization(authorization, settings)
+    if token_identity is not None:
+        return token_identity
+    if settings.allow_dev_identity_headers and x_baha_external_auth_id:
+        return TokenIdentity(subject=x_baha_external_auth_id, email=x_baha_auth_email)
+    raise HTTPException(
+        status_code=401,
+        detail="Provide a valid bearer token or a development external auth identity for auth bootstrap routes",
+    )
+
+
+async def _identity_from_authorization(
     authorization: str | None,
     settings: Settings,
-) -> str | None:
+) -> TokenIdentity | None:
     if not authorization:
         return None
     scheme, _, token = authorization.partition(" ")
@@ -90,4 +133,5 @@ async def _external_auth_id_from_authorization(
     subject = payload.get("sub")
     if not subject:
         raise HTTPException(status_code=401, detail="Bearer token is missing a subject claim")
-    return str(subject)
+    email = payload.get("email")
+    return TokenIdentity(subject=str(subject), email=str(email) if email else None)

@@ -31,6 +31,49 @@ Planned production direction:
 
 ## 3. Available Endpoints
 
+### Auth / onboarding
+
+`POST /auth/bootstrap`
+
+Creates or updates the BAHA-side account record for a bearer-token identity using the canonical `users`-based schema.
+
+In local development, this route can also use:
+
+- `X-BAHA-External-Auth-Id`
+- `X-BAHA-Auth-Email` (optional)
+
+`GET /auth/onboarding-state`
+
+Returns the current BAHA account/bootstrap status for the bearer-token identity, including approval, consent, and next-step guidance.
+
+`GET /auth/me`
+
+Returns the authenticated BAHA account state for an already-linked active user.
+
+`POST /auth/guardian/link-student`
+
+Creates or updates a guardian-to-student relationship using `student_profile_id` or `student_code`.
+
+`POST /auth/guardian/consent/platform-participation`
+
+Records guardian platform-participation consent for a linked minor student and activates the student account when granted.
+
+`GET /auth/guardian/consent/parent-summary-sharing/{student_profile_id}`
+
+Returns the latest parent-summary sharing consent record for a linked student, or a `pending` state if no consent has been recorded yet.
+
+`POST /auth/guardian/consent/parent-summary-sharing`
+
+Records guardian consent for parent-safe weekly summary sharing for a linked student.
+
+`GET /auth/approval-requests`
+
+Lists approval requests visible to the current reviewer role.
+
+`POST /auth/approval-requests/{request_id}/decision`
+
+Approves, rejects, or revokes a pending approval request.
+
 ### Identity
 
 `GET /mobile/me`
@@ -50,6 +93,10 @@ Returns:
 `GET /mobile/student/checkin-templates`
 
 Returns active student check-in templates filtered by the actor's age cohort.
+
+`GET /mobile/student/checkin-templates/{template_id}`
+
+Returns one student check-in template including ordered question definitions so the client can render a live submission form.
 
 `GET /mobile/student/modules`
 
@@ -107,6 +154,10 @@ Returns the latest parent-safe weekly summary if:
 
 Returns classes assigned to the teacher.
 
+`GET /mobile/teacher/classes/{class_id}/students`
+
+Returns active students in a teacher-assigned class so the pastoral flag flow can target the right student profile.
+
 `GET /mobile/teacher/classes/{class_id}/cohort-summary/latest`
 
 Returns the latest anonymized cohort summary for an assigned class.
@@ -152,13 +203,28 @@ Returns:
 - unresolved monitoring signals without a case
 - open help requests
 
+Current access behavior:
+
+- `baha_admin` can view the full queue
+- counselors and administrators are limited to cases, signals, and help requests from their own school scope
+
 `GET /mobile/counselor/cases/{case_id}`
 
 Returns case details, notes, events, and assignments.
 
+Current access behavior:
+
+- `baha_admin` can view any case
+- counselors and administrators can only view school-scoped cases
+
 `POST /mobile/counselor/cases/{case_id}/notes`
 
 Adds a case note and records a case event.
+
+Current validation:
+
+- the case must already be visible to the actor
+- notes cannot be added to `resolved`, `closed`, or `cancelled` cases
 
 ## 4. Current Limitations
 
@@ -169,6 +235,7 @@ These endpoints do not yet provide:
 - teacher/student individual override views
 - complete counselor assignment workflows
 - final hosted object-storage wiring
+- consent history/audit views beyond the latest guardian-managed state
 
 Those are next-phase backend tasks.
 

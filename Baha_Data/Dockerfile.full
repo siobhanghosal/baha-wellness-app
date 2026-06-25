@@ -3,8 +3,6 @@ FROM python:3.11-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-ARG BAHA_PIP_EXTRAS=""
-
 WORKDIR /app
 
 RUN apt-get update \
@@ -14,11 +12,7 @@ RUN apt-get update \
 COPY pyproject.toml README.md ./
 COPY src ./src
 
-RUN if [ -n "$BAHA_PIP_EXTRAS" ]; then \
-      pip install --no-cache-dir ".${BAHA_PIP_EXTRAS}"; \
-    else \
-      pip install --no-cache-dir .; \
-    fi
+RUN pip install --no-cache-dir ".[retrieval,acquisition]"
 
 EXPOSE 8000
 

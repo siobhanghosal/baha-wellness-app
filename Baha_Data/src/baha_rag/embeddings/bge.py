@@ -20,8 +20,14 @@ class EmbeddingService:
 
     def _load_model(self):
         if self._model is None:
-            from sentence_transformers import SentenceTransformer
-            import torch
+            try:
+                from sentence_transformers import SentenceTransformer
+                import torch
+            except ModuleNotFoundError as exc:
+                raise RuntimeError(
+                    "The BGE embedding backend requires the retrieval runtime dependencies. "
+                    "Install the retrieval extra or set EMBEDDING_BACKEND=hash."
+                ) from exc
 
             device = "mps" if torch.backends.mps.is_available() else "cpu"
             self._model = SentenceTransformer(self.settings.embedding_model, device=device)

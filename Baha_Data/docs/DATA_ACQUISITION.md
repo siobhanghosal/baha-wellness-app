@@ -87,6 +87,26 @@ ZIP imports reject traversal paths, archives with more than 500 files, members l
 
 ## Docker
 
+Default `docker compose up --build` is now optimized for the Flutter/mobile API handoff, not for acquisition-heavy admin operations.
+
+That default runtime:
+
+- uses the lightweight `Dockerfile`
+- keeps `EMBEDDING_BACKEND=hash`
+- omits acquisition-only crawler and document-processing dependencies
+
+If you need the full acquisition runtime locally, build:
+
+```bash
+docker build -f Dockerfile.full -t baha_data-api:full .
+```
+
+or install the full dependency set directly in a Python environment.
+
+The heavier acquisition endpoints return `503` in the lightweight runtime instead of crashing the API process.
+
+For the lightweight mobile/backend runtime:
+
 ```bash
 cp .env.example .env
 docker compose up --build

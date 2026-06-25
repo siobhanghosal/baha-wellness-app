@@ -18,6 +18,8 @@ The repository already includes:
 
 - a Docker Compose setup with a local PostgreSQL image built from `migrations/`
 - automatic migration initialization baked into that image
+- a lightweight default API runtime in `Dockerfile`
+- a heavier full runtime in `Dockerfile.full` for acquisition and richer retrieval work
 - Kubernetes manifests for API deployment
 - production-oriented environment placeholders
 
@@ -59,6 +61,18 @@ This starts:
 
 ```bash
 docker compose up -d api
+```
+
+Default local API behavior:
+
+- installs only the mobile/API dependency set
+- uses `EMBEDDING_BACKEND=hash`
+- does not include acquisition-heavy runtime dependencies by default
+
+If you need the full acquisition or retrieval runtime locally, build:
+
+```bash
+docker build -f Dockerfile.full -t baha_data-api:full .
 ```
 
 ### 3.4 What happens automatically
@@ -135,6 +149,14 @@ curl http://localhost:8000/health/ready
 - `parent_weekly_summaries`
 - `teacher_cohort_summaries`
 
+6. Validate counselor demo seed coverage:
+
+- one open help request
+- two monitoring signals
+- one escalation case
+- one active case assignment
+- one seeded case note
+
 ## 5. Local Docker Notes for This Workspace
 
 The earlier version of this setup mounted `./migrations` directly from the host path. In this workspace that created Docker Desktop mount failures from the Desktop-based repo path.
@@ -144,6 +166,11 @@ That issue has been reduced by changing the database service to build a local Po
 - it removes the fragile bind mount
 - it keeps schema startup reproducible
 - it stays aligned with how the backend will actually be deployed later
+
+The API side now also uses runtime profiles:
+
+- default `Dockerfile`: lightweight Flutter-facing API runtime
+- `Dockerfile.full`: acquisition and full retrieval runtime
 
 There are still two important operational realities:
 

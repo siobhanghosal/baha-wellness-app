@@ -70,6 +70,8 @@ Use Docker locally for the database and optionally for the API:
 
 - Postgres host port: `5433`
 - API host port: `8000`
+- default API runtime uses `EMBEDDING_BACKEND=hash`
+- default API runtime is intentionally lighter than the acquisition/full-retrieval runtime
 
 ### Android emulator base URL
 
@@ -117,6 +119,13 @@ Recommended auth mapping:
 
 - Supabase auth user ID becomes `users.external_auth_id`
 - app-specific profile and role data remains in BAHA tables like `users`, `user_roles`, `student_profiles`, and `guardians`
+- the existing BAHA tables are the canonical runtime identity model; do not add a second parallel profile system for mobile auth
+
+Hosted-auth bridge behavior:
+
+- if a bearer token `sub` already matches `users.external_auth_id`, the backend uses that BAHA user directly
+- if no direct match exists and the token email matches exactly one active BAHA user, the backend links that row by writing `users.external_auth_id`
+- if multiple active BAHA users share the same email, automatic linking is rejected and the data must be cleaned up manually
 
 Do not make the Flutter app talk directly to product tables for sensitive workflows.
 Keep FastAPI as the policy and workflow layer.
@@ -126,7 +135,7 @@ Keep FastAPI as the policy and workflow layer.
 Use Render for:
 
 - hosting the FastAPI backend over HTTPS
-- building from the existing Dockerfile
+- building from the lightweight default Dockerfile
 - setting runtime environment variables
 - exposing `/health` for service monitoring
 
@@ -152,9 +161,13 @@ To support real Flutter development, the backend should now move in this order:
 Current implementation status:
 
 - request identity plumbing is now present for `/mobile/*`
+- backend auth/onboarding APIs now exist for users-based bootstrap and approval handling
+- guardian consent APIs now cover both platform participation and parent-summary sharing
+- default Docker runtime is now slimmed down for Flutter/backend handoff instead of always shipping the acquisition/ML stack
 - first mobile endpoints now exist for:
   - `/mobile/me`
   - `/mobile/student/checkin-templates`
+  - `/mobile/student/checkin-templates/{template_id}`
   - `/mobile/student/checkins`
   - `/mobile/student/modules`
   - `/mobile/student/modules/{module_id}/progress`
@@ -162,6 +175,7 @@ Current implementation status:
   - `/mobile/parent/students`
   - `/mobile/parent/students/{student_profile_id}/weekly-summary/latest`
   - `/mobile/teacher/classes`
+  - `/mobile/teacher/classes/{class_id}/students`
   - `/mobile/teacher/classes/{class_id}/cohort-summary/latest`
   - `/mobile/teacher/pastoral-flags`
   - `/mobile/chat/sessions`
@@ -170,10 +184,17 @@ Current implementation status:
   - `/mobile/counselor/cases/{case_id}`
   - `/mobile/counselor/cases/{case_id}/notes`
 
+Current counselor demo coverage now includes:
+
+- one open help request
+- one unassigned signal
+- one assigned escalation case with assignment, events, and notes
+
 Detailed route notes live in:
 
 - [MOBILE_API_SURFACES.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/MOBILE_API_SURFACES.md)
 - [BACKEND_HANDOFF_FOR_FLUTTER.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/BACKEND_HANDOFF_FOR_FLUTTER.md)
+- [ACCOUNT_ONBOARDING_SYSTEM.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/ACCOUNT_ONBOARDING_SYSTEM.md)
 
 Hosting cost and scale notes live in:
 

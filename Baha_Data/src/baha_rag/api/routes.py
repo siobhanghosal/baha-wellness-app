@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 import shutil
 import tempfile
@@ -11,24 +12,17 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from baha_rag.acquisition.gap_closure import PriorityGapClosureEngine
-from baha_rag.acquisition.campaign import PriorityCampaignService
-from baha_rag.acquisition.manual_ingestion import (
-    ManualResourceIngestionService,
-    ManualResourceMetadata,
-)
-from baha_rag.acquisition.review_queue import ClinicalReviewQueueService
-from baha_rag.acquisition.service import AcquisitionService
-from baha_rag.auth import ActorContext, get_actor_context
+from baha_rag.auth import ActorContext, TokenIdentity, get_actor_context, get_provisioning_identity
 from baha_rag.config import Settings, get_settings
 from baha_rag.dashboard.metrics import DashboardService
+from baha_rag.db.auth_repository import AuthRepository
 from baha_rag.db.mobile_repository import MobileAppRepository
 from baha_rag.db.repository import KnowledgeRepository
 from baha_rag.db.session import get_session
 from baha_rag.embeddings.bge import EmbeddingService
 from baha_rag.extraction.condition_profile import ConditionProfileExtractor
 from baha_rag.generation.composer import EvidenceComposer
-from baha_rag.ingestion.pipeline import IngestionPipeline
+from baha_rag.identity import ROLE_PRIORITY
 from baha_rag.privacy import PrivacyService
 from baha_rag.retrieval.hybrid import HybridRetriever
 from baha_rag.safety import assess_safety
@@ -36,6 +30,14 @@ from baha_rag.schemas import (
     AcquisitionDiscoverRequest,
     AcquisitionDownloadRequest,
     AcquisitionJobResponse,
+    AuthApprovalDecisionRequest,
+    AuthApprovalRequestSummary,
+    AuthBootstrapRequest,
+    AuthGuardianLinkStudentRequest,
+    AuthOnboardingStateResponse,
+    AuthParentSummaryConsentRequest,
+    AuthParentSummaryConsentResponse,
+    AuthPlatformParticipationConsentRequest,
     ChatRequest,
     ChatResponse,
     ChatSessionCreateRequest,
@@ -54,6 +56,7 @@ from baha_rag.schemas import (
     MobileChatMessage,
     MobileChatMessageCreateRequest,
     MobileActorResponse,
+    MobileCheckinTemplateDetail,
     MobileCheckinTemplateSummary,
     MobileLinkedStudentSummary,
     MobileModuleSummary,
@@ -67,6 +70,7 @@ from baha_rag.schemas import (
     ReviewDecisionRequest,
     StudentCheckinDetail,
     StudentCheckinSummary,
+    TeacherClassStudentSummary,
     TeacherClassSummary,
     TeacherCohortSummaryResponse,
     ViewRequest,
@@ -77,6 +81,17 @@ router = APIRouter()
 
 
 def get_embedding_service(settings: Settings = Depends(get_settings)) -> EmbeddingService:
+    if settings.embedding_backend == "bge":
+        try:
+            importlib.import_module("sentence_transformers")
+        except ModuleNotFoundError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "The BGE embedding backend is not installed in this runtime. "
+                    "Use EMBEDDING_BACKEND=hash or install the retrieval runtime."
+                ),
+            ) from exc
     return EmbeddingService(settings)
 
 
@@ -107,6 +122,28 @@ def _require_counselor(actor: ActorContext) -> None:
         raise HTTPException(status_code=403, detail="Counselor mobile endpoints require counselor or BAHA admin access")
 
 
+def _optional_dependency(module_name: str, *, feature: str):
+    try:
+        return importlib.import_module(module_name)
+    except ModuleNotFoundError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"{feature} is not installed in this API runtime. "
+                "Use the full backend runtime when you need acquisition or ingestion features."
+            ),
+        ) from exc
+
+
+def _counselor_scope(actor: ActorContext) -> tuple[UUID | None, bool]:
+    _require_counselor(actor)
+    if "baha_admin" in actor.roles:
+        return (None, True)
+    if actor.school_id is None:
+        raise HTTPException(status_code=403, detail="Counselor access requires a school-scoped profile")
+    return (actor.school_id, False)
+
+
 def _assistant_body(response: ChatResponse) -> str:
     answer = response.answer
     return " ".join(
@@ -116,6 +153,173 @@ def _assistant_body(response: ChatResponse) -> str:
             answer.when_to_seek_help.strip(),
         ]
     )
+
+
+def _primary_role_from_roles(roles: list[str]) -> str | None:
+    for role in ROLE_PRIORITY:
+        if role in roles:
+            return role
+    return roles[0] if roles else None
+
+
+def _calculate_age_years(date_of_birth: date) -> int:
+    today = date.today()
+    years = today.year - date_of_birth.year
+    if (today.month, today.day) < (date_of_birth.month, date_of_birth.day):
+        years -= 1
+    return years
+
+
+def _derive_legal_consent_band(request: AuthBootstrapRequest) -> str:
+    if request.legal_consent_band is not None:
+        return request.legal_consent_band
+    if request.date_of_birth is not None:
+        return "adult" if _calculate_age_years(request.date_of_birth) >= 18 else "minor"
+    if request.age_cohort in {"18_plus", "adult"}:
+        return "adult"
+    return "minor"
+
+
+def _derive_student_age_cohort(request: AuthBootstrapRequest) -> str:
+    if request.age_cohort:
+        return request.age_cohort
+    if request.date_of_birth is None:
+        return "13_14"
+    age_years = _calculate_age_years(request.date_of_birth)
+    if age_years <= 12:
+        return "9_12"
+    if age_years <= 14:
+        return "13_14"
+    if age_years <= 17:
+        return "15_18"
+    return "18_plus"
+
+
+async def _build_onboarding_state(
+    repository: AuthRepository,
+    *,
+    identity_match_mode: str,
+    external_auth_id: str,
+    account: dict | None,
+    detail: str | None = None,
+) -> AuthOnboardingStateResponse:
+    if account is None:
+        return AuthOnboardingStateResponse(
+            has_baha_user=False,
+            identity_match_mode=identity_match_mode,
+            external_auth_id=external_auth_id,
+            approval_status="not_required",
+            consent_status="not_required",
+            guardian_link_status="not_required",
+            next_step="bootstrap",
+            detail=detail,
+        )
+
+    roles = [role for role in (account["roles"] or []) if role]
+    primary_role = _primary_role_from_roles(roles)
+    account_status = account["account_status"]
+    linked_student_count = 0
+    linked_guardian_count = 0
+    approval_status = "not_required"
+    consent_status = "not_required"
+    guardian_link_status = "not_required"
+    next_step = "ready"
+
+    if primary_role == "guardian" and account["guardian_id"] is not None:
+        linked_student_count = await repository.count_active_linked_students_for_guardian(guardian_id=account["guardian_id"])
+    if primary_role == "student" and account["student_profile_id"] is not None:
+        linked_guardian_count = await repository.count_active_guardian_links_for_student(student_profile_id=account["student_profile_id"])
+
+    if primary_role in {"teacher", "counselor", "administrator"}:
+        approval_row = await repository.get_latest_approval_request(
+            user_id=account["user_id"],
+            requested_role=primary_role,
+        )
+        approval_status = approval_row["status"] if approval_row else ("approved" if account_status == "active" else "pending")
+
+    if primary_role == "student" and account["legal_consent_band"] == "minor":
+        consent_row = await repository.get_latest_platform_participation_consent(student_user_id=account["user_id"])
+        consent_status = consent_row["status"] if consent_row else "pending"
+        guardian_link_status = "linked" if linked_guardian_count > 0 else "pending"
+    elif primary_role == "guardian":
+        guardian_link_status = "linked" if linked_student_count > 0 else "pending"
+
+    if primary_role is None:
+        next_step = "bootstrap"
+    elif primary_role == "student":
+        if account["student_profile_id"] is None:
+            next_step = "complete_profile"
+        elif account["legal_consent_band"] == "minor" and linked_guardian_count == 0:
+            next_step = "await_guardian_link"
+        elif account["legal_consent_band"] == "minor" and consent_status != "granted":
+            next_step = "await_guardian_consent"
+        elif account_status != "active":
+            next_step = "await_activation"
+    elif primary_role == "guardian":
+        if account["guardian_id"] is None:
+            next_step = "complete_profile"
+        elif linked_student_count == 0:
+            next_step = "link_student"
+    elif primary_role in {"teacher", "counselor", "administrator"}:
+        if account["teacher_profile_id"] is None:
+            next_step = "complete_profile"
+        elif approval_status == "approved" and account_status == "active":
+            next_step = "ready"
+        elif approval_status == "rejected":
+            next_step = "approval_rejected"
+        else:
+            next_step = "await_approval"
+    elif primary_role == "baha_admin":
+        next_step = "ready"
+
+    return AuthOnboardingStateResponse(
+        has_baha_user=True,
+        identity_match_mode=identity_match_mode,
+        external_auth_id=external_auth_id,
+        user_id=account["user_id"],
+        email=account["email"],
+        display_name=account["display_name"],
+        account_status=account_status,
+        roles=roles,
+        primary_role=primary_role,
+        school_id=account["school_id"],
+        student_profile_id=account["student_profile_id"],
+        guardian_id=account["guardian_id"],
+        teacher_profile_id=account["teacher_profile_id"],
+        student_code=account["student_code"],
+        age_cohort=account["presentation_age_cohort"],
+        legal_consent_band=account["legal_consent_band"],
+        approval_status=approval_status,
+        consent_status=consent_status,
+        guardian_link_status=guardian_link_status,
+        linked_student_count=linked_student_count,
+        linked_guardian_count=linked_guardian_count,
+        next_step=next_step,
+        detail=detail,
+    )
+
+
+def _reviewer_scope(actor: ActorContext) -> tuple[str, UUID | None]:
+    if "baha_admin" in actor.roles:
+        return ("baha_admin", actor.school_id)
+    if "administrator" in actor.roles:
+        return ("administrator", actor.school_id)
+    raise HTTPException(status_code=403, detail="Approval review requires administrator or BAHA admin access")
+
+
+def _ensure_request_visible_to_reviewer(
+    *,
+    reviewer_role: str,
+    reviewer_school_id: UUID | None,
+    request_row: dict[str, object],
+) -> None:
+    if reviewer_role == "baha_admin":
+        return
+    if reviewer_role == "administrator":
+        if request_row["requested_role"] != "teacher" or request_row["school_id"] != reviewer_school_id:
+            raise HTTPException(status_code=403, detail="Administrator can only review teacher approvals for their school")
+        return
+    raise HTTPException(status_code=403, detail="Reviewer role is not permitted for this approval workflow")
 
 
 @router.get("/health")
@@ -224,6 +428,400 @@ async def chat(request: ChatRequest, retriever: HybridRetriever = Depends(get_re
     return ChatResponse(answer=answer, retrieved=results)
 
 
+@router.post("/auth/bootstrap", response_model=AuthOnboardingStateResponse)
+async def auth_bootstrap(
+    request: AuthBootstrapRequest,
+    identity: TokenIdentity = Depends(get_provisioning_identity),
+    session: AsyncSession = Depends(get_session),
+) -> AuthOnboardingStateResponse:
+    if request.role == "administrator":
+        create_school_if_missing = True
+    else:
+        create_school_if_missing = False
+
+    repository = AuthRepository(session)
+    existing = await repository.get_account_context_by_external_auth_id(identity.subject)
+    identity_match_mode = "external_auth_id"
+    if existing is None and identity.email:
+        email_count = await repository.count_users_by_email(identity.email)
+        if email_count > 1:
+            raise HTTPException(
+                status_code=409,
+                detail="Multiple BAHA users share this email; automatic bootstrap linking is not allowed",
+            )
+        if email_count == 1:
+            existing = await repository.get_account_context_by_unique_email(identity.email)
+            identity_match_mode = "email"
+
+    if existing is not None and existing["roles"] and request.role not in (existing["roles"] or []):
+        raise HTTPException(
+            status_code=409,
+            detail="Bootstrap cannot add a second role to an existing BAHA user yet",
+        )
+
+    school_id = await repository.resolve_school_id(
+        school_id=request.school_id,
+        school_name=request.school_name,
+        create_if_missing=create_school_if_missing,
+    )
+
+    if request.role == "student" and school_id is None:
+        raise HTTPException(status_code=400, detail="Student bootstrap requires a valid school")
+    if request.role in {"teacher", "administrator"} and school_id is None:
+        raise HTTPException(status_code=400, detail=f"{request.role} bootstrap requires a valid school")
+
+    legal_consent_band = _derive_legal_consent_band(request) if request.role == "student" else None
+    account_status = "active"
+    if request.role in {"teacher", "counselor", "administrator"}:
+        account_status = "pending"
+    elif request.role == "student" and legal_consent_band == "minor":
+        account_status = "pending"
+    if existing is not None and request.role in (existing["roles"] or []) and existing["account_status"] == "active":
+        account_status = "active"
+
+    metadata = {
+        "bootstrap_role": request.role,
+        "bootstrap_source": "auth_bootstrap",
+        **request.metadata,
+    }
+    user_id = await repository.upsert_user(
+        user_id=existing["user_id"] if existing else None,
+        external_auth_id=identity.subject,
+        email=request.email or identity.email or (existing["email"] if existing else None),
+        phone=request.phone,
+        display_name=request.display_name,
+        preferred_language=request.preferred_language,
+        status=account_status,
+        metadata_json=json.dumps(metadata),
+    )
+    await repository.ensure_role_assignment(user_id=user_id, role_key=request.role)
+
+    if request.role == "student":
+        await repository.upsert_student_profile(
+            user_id=user_id,
+            school_id=school_id,
+            age_cohort=_derive_student_age_cohort(request),
+            legal_consent_band=legal_consent_band,
+            date_of_birth=request.date_of_birth.isoformat() if request.date_of_birth else None,
+            gender=request.gender,
+            metadata_json=json.dumps(request.metadata),
+        )
+    elif request.role == "guardian":
+        await repository.upsert_guardian_profile(
+            user_id=user_id,
+            guardian_type=request.guardian_type,
+            metadata_json=json.dumps(request.metadata),
+        )
+    elif request.role in {"teacher", "counselor", "administrator"}:
+        await repository.upsert_teacher_profile(
+            user_id=user_id,
+            school_id=school_id,
+            staff_code=request.staff_code,
+            staff_type=request.role,
+            metadata_json=json.dumps(request.metadata),
+        )
+        await repository.create_or_refresh_approval_request(
+            user_id=user_id,
+            requested_role=request.role,
+            school_id=school_id,
+            metadata_json=json.dumps(request.metadata),
+        )
+
+    await session.commit()
+    account = await repository.get_account_context_by_user_id(user_id)
+    return await _build_onboarding_state(
+        repository,
+        identity_match_mode=identity_match_mode,
+        external_auth_id=identity.subject,
+        account=account,
+    )
+
+
+@router.get("/auth/onboarding-state", response_model=AuthOnboardingStateResponse)
+async def auth_onboarding_state(
+    identity: TokenIdentity = Depends(get_provisioning_identity),
+    session: AsyncSession = Depends(get_session),
+) -> AuthOnboardingStateResponse:
+    repository = AuthRepository(session)
+    account = await repository.get_account_context_by_external_auth_id(identity.subject)
+    if account is not None:
+        return await _build_onboarding_state(
+            repository,
+            identity_match_mode="external_auth_id",
+            external_auth_id=identity.subject,
+            account=account,
+        )
+    if identity.email:
+        email_count = await repository.count_users_by_email(identity.email)
+        if email_count > 1:
+            return await _build_onboarding_state(
+                repository,
+                identity_match_mode="duplicate_email",
+                external_auth_id=identity.subject,
+                account=None,
+                detail="Multiple BAHA users share this email; manual identity linking is required",
+            )
+        if email_count == 1:
+            email_match = await repository.get_account_context_by_unique_email(identity.email)
+            return await _build_onboarding_state(
+                repository,
+                identity_match_mode="email",
+                external_auth_id=identity.subject,
+                account=email_match,
+            )
+    return await _build_onboarding_state(
+        repository,
+        identity_match_mode="none",
+        external_auth_id=identity.subject,
+        account=None,
+    )
+
+
+@router.get("/auth/me", response_model=AuthOnboardingStateResponse)
+async def auth_me(
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> AuthOnboardingStateResponse:
+    repository = AuthRepository(session)
+    account = await repository.get_account_context_by_user_id(actor.user_id)
+    return await _build_onboarding_state(
+        repository,
+        identity_match_mode="external_auth_id",
+        external_auth_id=actor.external_auth_id or "",
+        account=account,
+    )
+
+
+@router.post("/auth/guardian/link-student", response_model=AuthOnboardingStateResponse)
+async def auth_guardian_link_student(
+    request: AuthGuardianLinkStudentRequest,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> AuthOnboardingStateResponse:
+    _require_guardian(actor)
+    repository = AuthRepository(session)
+    student = await repository.get_student_for_link(
+        student_profile_id=request.student_profile_id,
+        student_code=request.student_code,
+    )
+    if student is None:
+        raise HTTPException(status_code=404, detail="Student not found")
+    await repository.upsert_guardian_link(
+        student_profile_id=student["student_profile_id"],
+        guardian_id=actor.guardian_id,
+        relationship_to_student=request.relationship_to_student,
+        is_primary=request.is_primary,
+        consent_authority=request.consent_authority,
+    )
+    await session.commit()
+    account = await repository.get_account_context_by_user_id(actor.user_id)
+    return await _build_onboarding_state(
+        repository,
+        identity_match_mode="external_auth_id",
+        external_auth_id=actor.external_auth_id or "",
+        account=account,
+    )
+
+
+@router.post("/auth/guardian/consent/platform-participation", response_model=AuthOnboardingStateResponse)
+async def auth_guardian_platform_participation_consent(
+    request: AuthPlatformParticipationConsentRequest,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> AuthOnboardingStateResponse:
+    _require_guardian(actor)
+    repository = AuthRepository(session)
+    student = await repository.get_student_for_link(
+        student_profile_id=request.student_profile_id,
+        student_code=None,
+    )
+    if student is None:
+        raise HTTPException(status_code=404, detail="Student not found")
+    link = await repository.get_active_guardian_link(
+        student_profile_id=student["student_profile_id"],
+        guardian_id=actor.guardian_id,
+    )
+    if link is None or not link["consent_authority"]:
+        raise HTTPException(status_code=403, detail="Guardian does not have active consent authority for this student")
+    consent_version = await repository.get_latest_active_consent_version(consent_type="platform_participation")
+    if consent_version is None:
+        raise HTTPException(status_code=500, detail="No active platform participation consent version is configured")
+    await repository.create_platform_participation_consent(
+        consent_version_id=consent_version["id"],
+        student_user_id=student["student_user_id"],
+        guardian_user_id=actor.user_id,
+        student_profile_id=student["student_profile_id"],
+        guardian_id=actor.guardian_id,
+        actor_relationship=link["relationship_to_student"],
+        status=request.status,
+    )
+    await repository.set_user_status(
+        user_id=student["student_user_id"],
+        status="active" if request.status == "granted" else "pending",
+    )
+    await session.commit()
+    student_account = await repository.get_account_context_by_user_id(student["student_user_id"])
+    return await _build_onboarding_state(
+        repository,
+        identity_match_mode="external_auth_id",
+        external_auth_id=student_account["external_auth_id"] if student_account else "",
+        account=student_account,
+    )
+
+
+@router.get(
+    "/auth/guardian/consent/parent-summary-sharing/{student_profile_id}",
+    response_model=AuthParentSummaryConsentResponse,
+)
+async def auth_guardian_parent_summary_consent_status(
+    student_profile_id: UUID,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> AuthParentSummaryConsentResponse:
+    _require_guardian(actor)
+    repository = AuthRepository(session)
+    student = await repository.get_student_for_link(
+        student_profile_id=student_profile_id,
+        student_code=None,
+    )
+    if student is None:
+        raise HTTPException(status_code=404, detail="Student not found")
+    link = await repository.get_active_guardian_link(
+        student_profile_id=student["student_profile_id"],
+        guardian_id=actor.guardian_id,
+    )
+    if link is None or not link["consent_authority"]:
+        raise HTTPException(status_code=403, detail="Guardian does not have active consent authority for this student")
+    consent_row = await repository.get_latest_parent_summary_sharing_consent(
+        student_profile_id=student["student_profile_id"],
+        guardian_id=actor.guardian_id,
+    )
+    if consent_row is not None:
+        return AuthParentSummaryConsentResponse.model_validate(consent_row)
+
+    consent_version = await repository.get_latest_active_consent_version(consent_type="parent_summary_sharing")
+    return AuthParentSummaryConsentResponse(
+        consent_version_id=consent_version["id"] if consent_version else None,
+        student_profile_id=student["student_profile_id"],
+        guardian_id=actor.guardian_id,
+        status="pending",
+        scope="weekly_summaries",
+        actor_relationship=link["relationship_to_student"],
+    )
+
+
+@router.post(
+    "/auth/guardian/consent/parent-summary-sharing",
+    response_model=AuthParentSummaryConsentResponse,
+)
+async def auth_guardian_parent_summary_consent(
+    request: AuthParentSummaryConsentRequest,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> AuthParentSummaryConsentResponse:
+    _require_guardian(actor)
+    repository = AuthRepository(session)
+    student = await repository.get_student_for_link(
+        student_profile_id=request.student_profile_id,
+        student_code=None,
+    )
+    if student is None:
+        raise HTTPException(status_code=404, detail="Student not found")
+    link = await repository.get_active_guardian_link(
+        student_profile_id=student["student_profile_id"],
+        guardian_id=actor.guardian_id,
+    )
+    if link is None or not link["consent_authority"]:
+        raise HTTPException(status_code=403, detail="Guardian does not have active consent authority for this student")
+    consent_version = await repository.get_latest_active_consent_version(consent_type="parent_summary_sharing")
+    if consent_version is None:
+        raise HTTPException(status_code=500, detail="No active parent summary consent version is configured")
+    await repository.create_parent_summary_sharing_consent(
+        consent_version_id=consent_version["id"],
+        student_user_id=student["student_user_id"],
+        guardian_user_id=actor.user_id,
+        student_profile_id=student["student_profile_id"],
+        guardian_id=actor.guardian_id,
+        actor_relationship=link["relationship_to_student"],
+        status=request.status,
+    )
+    await session.commit()
+    consent_row = await repository.get_latest_parent_summary_sharing_consent(
+        student_profile_id=student["student_profile_id"],
+        guardian_id=actor.guardian_id,
+    )
+    if consent_row is None:
+        raise HTTPException(status_code=500, detail="Parent summary consent could not be loaded after write")
+    return AuthParentSummaryConsentResponse.model_validate(consent_row)
+
+
+@router.get("/auth/approval-requests", response_model=list[AuthApprovalRequestSummary])
+async def auth_approval_requests(
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+    status: str = "pending",
+) -> list[AuthApprovalRequestSummary]:
+    reviewer_role, reviewer_school_id = _reviewer_scope(actor)
+    repository = AuthRepository(session)
+    rows = await repository.list_approval_requests_for_reviewer(
+        reviewer_role=reviewer_role,
+        reviewer_school_id=reviewer_school_id,
+        status=status,
+    )
+    return [AuthApprovalRequestSummary.model_validate(row) for row in rows]
+
+
+@router.post("/auth/approval-requests/{request_id}/decision", response_model=AuthApprovalRequestSummary)
+async def auth_approval_request_decision(
+    request_id: UUID,
+    request: AuthApprovalDecisionRequest,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> AuthApprovalRequestSummary:
+    reviewer_role, reviewer_school_id = _reviewer_scope(actor)
+    repository = AuthRepository(session)
+    existing_request = await repository.get_approval_request_by_id(request_id=request_id)
+    if existing_request is None:
+        raise HTTPException(status_code=404, detail="Approval request not found")
+    _ensure_request_visible_to_reviewer(
+        reviewer_role=reviewer_role,
+        reviewer_school_id=reviewer_school_id,
+        request_row=existing_request,
+    )
+    decided = await repository.decide_approval_request(
+        request_id=request_id,
+        reviewer_user_id=actor.user_id,
+        reviewer_notes=request.reviewer_notes,
+        status=request.status,
+    )
+    if decided is None:
+        raise HTTPException(status_code=409, detail="Approval request is no longer pending")
+    if request.status == "approved":
+        await repository.set_user_status(user_id=decided["user_id"], status="active")
+    elif request.status in {"rejected", "revoked"}:
+        await repository.set_user_status(user_id=decided["user_id"], status="pending")
+    await session.commit()
+    rows = await repository.list_approval_requests_for_reviewer(
+        reviewer_role=reviewer_role,
+        reviewer_school_id=reviewer_school_id,
+        status=request.status,
+    )
+    resolved = next((row for row in rows if row["id"] == request_id), None)
+    if resolved is None:
+        refreshed = await repository.get_approval_request_by_id(request_id=request_id)
+        if refreshed is None:
+            raise HTTPException(status_code=404, detail="Approval request not found after decision")
+        rows = await repository.list_approval_requests_for_reviewer(
+            reviewer_role="baha_admin",
+            reviewer_school_id=reviewer_school_id,
+            status=request.status,
+        )
+        resolved = next((row for row in rows if row["id"] == request_id), None)
+    if resolved is None:
+        raise HTTPException(status_code=500, detail="Approval request was updated but could not be reloaded")
+    return AuthApprovalRequestSummary.model_validate(resolved)
+
+
 @router.get("/mobile/me", response_model=MobileActorResponse)
 async def mobile_me(actor: ActorContext = Depends(get_actor_context)) -> MobileActorResponse:
     return MobileActorResponse(
@@ -249,6 +847,22 @@ async def mobile_student_checkin_templates(
     _require_student(actor)
     rows = await MobileAppRepository(session).list_student_checkin_templates(age_cohort=actor.age_cohort)
     return [MobileCheckinTemplateSummary.model_validate(row) for row in rows]
+
+
+@router.get("/mobile/student/checkin-templates/{template_id}", response_model=MobileCheckinTemplateDetail)
+async def mobile_student_checkin_template_detail(
+    template_id: UUID,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> MobileCheckinTemplateDetail:
+    _require_student(actor)
+    row = await MobileAppRepository(session).get_student_checkin_template_detail(
+        template_id=template_id,
+        age_cohort=actor.age_cohort,
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Check-in template not found")
+    return MobileCheckinTemplateDetail.model_validate(row)
 
 
 @router.get("/mobile/student/modules", response_model=list[MobileModuleSummary])
@@ -581,6 +1195,23 @@ async def mobile_teacher_classes(
     return [TeacherClassSummary.model_validate(row) for row in rows]
 
 
+@router.get("/mobile/teacher/classes/{class_id}/students", response_model=list[TeacherClassStudentSummary])
+async def mobile_teacher_class_students(
+    class_id: UUID,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> list[TeacherClassStudentSummary]:
+    _require_teacher(actor)
+    assigned_classes = await MobileAppRepository(session).list_teacher_classes(teacher_profile_id=actor.teacher_profile_id)
+    if class_id not in {row["class_id"] for row in assigned_classes}:
+        raise HTTPException(status_code=403, detail="Teacher is not assigned to this class")
+    rows = await MobileAppRepository(session).list_teacher_class_students(
+        teacher_profile_id=actor.teacher_profile_id,
+        class_id=class_id,
+    )
+    return [TeacherClassStudentSummary.model_validate(row) for row in rows]
+
+
 @router.get("/mobile/teacher/classes/{class_id}/cohort-summary/latest", response_model=TeacherCohortSummaryResponse)
 async def mobile_teacher_latest_cohort_summary(
     class_id: UUID,
@@ -623,8 +1254,12 @@ async def mobile_counselor_queue(
     session: AsyncSession = Depends(get_session),
     limit: int = 20,
 ) -> CounselorQueueResponse:
-    _require_counselor(actor)
-    queue = await MobileAppRepository(session).list_counselor_queue(limit=max(1, min(limit, 50)))
+    school_id, unrestricted = _counselor_scope(actor)
+    queue = await MobileAppRepository(session).list_counselor_queue(
+        limit=max(1, min(limit, 50)),
+        school_id=school_id,
+        unrestricted=unrestricted,
+    )
     return CounselorQueueResponse.model_validate(queue)
 
 
@@ -634,8 +1269,12 @@ async def mobile_counselor_case_detail(
     actor: ActorContext = Depends(get_actor_context),
     session: AsyncSession = Depends(get_session),
 ) -> CounselorCaseDetailResponse:
-    _require_counselor(actor)
-    detail = await MobileAppRepository(session).get_counselor_case_detail(case_id=case_id)
+    school_id, unrestricted = _counselor_scope(actor)
+    detail = await MobileAppRepository(session).get_counselor_case_detail(
+        case_id=case_id,
+        school_id=school_id,
+        unrestricted=unrestricted,
+    )
     if detail is None:
         raise HTTPException(status_code=404, detail="Case not found")
     return CounselorCaseDetailResponse.model_validate(detail)
@@ -648,7 +1287,16 @@ async def mobile_counselor_case_note(
     actor: ActorContext = Depends(get_actor_context),
     session: AsyncSession = Depends(get_session),
 ) -> CounselorCaseNote:
-    _require_counselor(actor)
+    school_id, unrestricted = _counselor_scope(actor)
+    existing = await MobileAppRepository(session).get_counselor_case_detail(
+        case_id=case_id,
+        school_id=school_id,
+        unrestricted=unrestricted,
+    )
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    if existing["case"]["status"] in {"resolved", "closed", "cancelled"}:
+        raise HTTPException(status_code=409, detail="Notes cannot be added to a closed or resolved case")
     note = await MobileAppRepository(session).add_case_note(
         case_id=case_id,
         author_user_id=actor.user_id,
@@ -657,7 +1305,11 @@ async def mobile_counselor_case_note(
         body=request.body,
     )
     await session.commit()
-    detail = await MobileAppRepository(session).get_counselor_case_detail(case_id=case_id)
+    detail = await MobileAppRepository(session).get_counselor_case_detail(
+        case_id=case_id,
+        school_id=school_id,
+        unrestricted=unrestricted,
+    )
     if detail is None:
         raise HTTPException(status_code=404, detail="Case not found")
     created_note = next((row for row in detail["notes"] if row["id"] == note["id"]), None)
@@ -672,6 +1324,8 @@ async def ingest_url(
     session: AsyncSession = Depends(get_session),
     embeddings: EmbeddingService = Depends(get_embedding_service),
 ) -> IngestResponse:
+    ingestion_module = _optional_dependency("baha_rag.ingestion.pipeline", feature="URL ingestion")
+    IngestionPipeline = ingestion_module.IngestionPipeline
     pipeline = IngestionPipeline(session, embeddings)
     try:
         response = await pipeline.ingest_url(
@@ -699,6 +1353,8 @@ async def seed_acquisition_sources(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> AcquisitionJobResponse:
+    acquisition_module = _optional_dependency("baha_rag.acquisition.service", feature="Acquisition workflows")
+    AcquisitionService = acquisition_module.AcquisitionService
     service = AcquisitionService(session, settings)
     count = await service.seed_sources()
     await session.commit()
@@ -711,6 +1367,8 @@ async def discover_research_sources(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> AcquisitionJobResponse:
+    acquisition_module = _optional_dependency("baha_rag.acquisition.service", feature="Acquisition workflows")
+    AcquisitionService = acquisition_module.AcquisitionService
     service = AcquisitionService(session, settings)
     count = await service.discover_research(limit_per_topic=request.limit_per_topic)
     await session.commit()
@@ -723,6 +1381,8 @@ async def download_acquisition_candidates(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> AcquisitionJobResponse:
+    acquisition_module = _optional_dependency("baha_rag.acquisition.service", feature="Acquisition workflows")
+    AcquisitionService = acquisition_module.AcquisitionService
     service = AcquisitionService(session, settings)
     result = await service.download_due_candidates(limit=request.limit)
     await session.commit()
@@ -734,6 +1394,8 @@ async def acquisition_inventory(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> dict:
+    acquisition_module = _optional_dependency("baha_rag.acquisition.service", feature="Acquisition workflows")
+    AcquisitionService = acquisition_module.AcquisitionService
     service = AcquisitionService(session, settings)
     return await service.inventory_dashboard()
 
@@ -743,6 +1405,8 @@ async def acquisition_report(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> dict:
+    acquisition_module = _optional_dependency("baha_rag.acquisition.service", feature="Acquisition workflows")
+    AcquisitionService = acquisition_module.AcquisitionService
     service = AcquisitionService(session, settings)
     return await service.final_report()
 
@@ -760,6 +1424,12 @@ async def upload_manual_resources(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> AcquisitionJobResponse:
+    manual_ingestion_module = _optional_dependency(
+        "baha_rag.acquisition.manual_ingestion",
+        feature="Manual acquisition ingestion",
+    )
+    ManualResourceIngestionService = manual_ingestion_module.ManualResourceIngestionService
+    ManualResourceMetadata = manual_ingestion_module.ManualResourceMetadata
     if not files:
         raise HTTPException(status_code=400, detail="At least one resource file is required")
     try:
@@ -799,6 +1469,8 @@ async def priority_acquisition_dashboard(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> dict:
+    acquisition_module = _optional_dependency("baha_rag.acquisition.service", feature="Acquisition workflows")
+    AcquisitionService = acquisition_module.AcquisitionService
     return await AcquisitionService(session, settings).priority_dashboard()
 
 
@@ -807,6 +1479,8 @@ async def plan_priority_gap_closure(
     max_topics: int = 9,
     session: AsyncSession = Depends(get_session),
 ) -> AcquisitionJobResponse:
+    gap_module = _optional_dependency("baha_rag.acquisition.gap_closure", feature="Priority gap-closure planning")
+    PriorityGapClosureEngine = gap_module.PriorityGapClosureEngine
     result = await PriorityGapClosureEngine(session).plan(max_topics=max(1, min(max_topics, 9)))
     await session.commit()
     return AcquisitionJobResponse(status="ok", detail=result)
@@ -816,6 +1490,8 @@ async def plan_priority_gap_closure(
 async def weekly_priority_gap_report(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
+    gap_module = _optional_dependency("baha_rag.acquisition.gap_closure", feature="Priority gap-closure planning")
+    PriorityGapClosureEngine = gap_module.PriorityGapClosureEngine
     result = await PriorityGapClosureEngine(session).weekly_report()
     await session.commit()
     return result
@@ -825,11 +1501,15 @@ async def weekly_priority_gap_report(
 async def aha_nimhans_campaign_report(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
+    campaign_module = _optional_dependency("baha_rag.acquisition.campaign", feature="Priority campaign reporting")
+    PriorityCampaignService = campaign_module.PriorityCampaignService
     return await PriorityCampaignService(session).report()
 
 
 @router.get("/admin/acquisition/review-queue")
 async def review_queue(session: AsyncSession = Depends(get_session), limit: int = 100) -> list[dict]:
+    review_module = _optional_dependency("baha_rag.acquisition.review_queue", feature="Clinical review queue")
+    ClinicalReviewQueueService = review_module.ClinicalReviewQueueService
     return await ClinicalReviewQueueService(session).list_pending(limit=limit)
 
 
@@ -839,6 +1519,8 @@ async def decide_review_item(
     request: ReviewDecisionRequest,
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
+    review_module = _optional_dependency("baha_rag.acquisition.review_queue", feature="Clinical review queue")
+    ClinicalReviewQueueService = review_module.ClinicalReviewQueueService
     try:
         await ClinicalReviewQueueService(session).decide(
             review_id, status=request.status, reviewer=request.reviewer, notes=request.notes

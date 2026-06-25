@@ -157,6 +157,12 @@ class AcquisitionJobResponse(BaseModel):
 
 
 MobileAppAudience = Literal["student", "parent", "teacher", "counselor"]
+AuthRequestedRole = Literal["student", "guardian", "teacher", "counselor", "administrator"]
+LegalConsentBand = Literal["minor", "adult"]
+ApprovalRequestStatus = Literal["pending", "approved", "rejected", "revoked", "not_required"]
+PlatformConsentStatus = Literal["pending", "granted", "declined", "withdrawn", "not_required"]
+PresentationAgeCohort = Literal["9_12", "13_14", "15_18", "18_plus", "all"]
+GuardianType = Literal["parent", "guardian", "caregiver", "other"]
 ModuleProgressStatus = Literal["not_started", "in_progress", "completed", "paused", "abandoned"]
 ChatSessionType = Literal[
     "general_support",
@@ -168,6 +174,103 @@ ChatSessionType = Literal[
     "crisis_triage",
 ]
 SummaryVisibilityScope = Literal["private", "consented_summary", "safeguarding_only"]
+
+
+class AuthBootstrapRequest(BaseModel):
+    role: AuthRequestedRole
+    display_name: str = Field(min_length=2, max_length=160)
+    email: str | None = Field(default=None, max_length=255)
+    phone: str | None = Field(default=None, max_length=40)
+    preferred_language: str = Field(default="en", min_length=2, max_length=10)
+    school_id: UUID | None = None
+    school_name: str | None = Field(default=None, max_length=160)
+    age_cohort: PresentationAgeCohort | None = None
+    legal_consent_band: LegalConsentBand | None = None
+    date_of_birth: date | None = None
+    gender: str = Field(default="unspecified", max_length=40)
+    guardian_type: GuardianType = "parent"
+    staff_code: str | None = Field(default=None, max_length=80)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class AuthGuardianLinkStudentRequest(BaseModel):
+    student_profile_id: UUID | None = None
+    student_code: str | None = Field(default=None, max_length=80)
+    relationship_to_student: str = Field(min_length=2, max_length=80)
+    is_primary: bool = True
+    consent_authority: bool = True
+
+
+class AuthPlatformParticipationConsentRequest(BaseModel):
+    student_profile_id: UUID
+    status: Literal["granted", "declined", "withdrawn"] = "granted"
+
+
+class AuthParentSummaryConsentRequest(BaseModel):
+    student_profile_id: UUID
+    status: Literal["granted", "declined", "withdrawn"] = "granted"
+
+
+class AuthApprovalDecisionRequest(BaseModel):
+    status: Literal["approved", "rejected", "revoked"]
+    reviewer_notes: str | None = Field(default=None, max_length=1000)
+
+
+class AuthApprovalRequestSummary(BaseModel):
+    id: UUID
+    user_id: UUID
+    requested_role: str
+    school_id: UUID | None = None
+    school_name: str | None = None
+    request_type: str
+    status: str
+    requested_metadata: dict[str, Any] = Field(default_factory=dict)
+    reviewer_user_id: UUID | None = None
+    reviewer_name: str | None = None
+    reviewer_notes: str | None = None
+    requested_at: datetime
+    reviewed_at: datetime | None = None
+    requested_display_name: str
+    requested_email: str | None = None
+
+
+class AuthOnboardingStateResponse(BaseModel):
+    has_baha_user: bool
+    identity_match_mode: str
+    external_auth_id: str
+    user_id: UUID | None = None
+    email: str | None = None
+    display_name: str | None = None
+    account_status: str | None = None
+    roles: list[str] = Field(default_factory=list)
+    primary_role: str | None = None
+    school_id: UUID | None = None
+    student_profile_id: UUID | None = None
+    guardian_id: UUID | None = None
+    teacher_profile_id: UUID | None = None
+    student_code: str | None = None
+    age_cohort: str | None = None
+    legal_consent_band: str | None = None
+    approval_status: str
+    consent_status: str
+    guardian_link_status: str
+    linked_student_count: int = 0
+    linked_guardian_count: int = 0
+    next_step: str
+    detail: str | None = None
+
+
+class AuthParentSummaryConsentResponse(BaseModel):
+    consent_type: Literal["parent_summary_sharing"] = "parent_summary_sharing"
+    consent_version_id: UUID | None = None
+    student_profile_id: UUID
+    guardian_id: UUID
+    status: Literal["pending", "granted", "declined", "withdrawn"]
+    scope: str
+    actor_relationship: str | None = None
+    granted_at: datetime | None = None
+    withdrawn_at: datetime | None = None
+    created_at: datetime | None = None
 
 
 class MobileActorResponse(BaseModel):
@@ -192,6 +295,28 @@ class MobileCheckinTemplateSummary(BaseModel):
     age_cohort: str
     question_count: int
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class MobileCheckinQuestion(BaseModel):
+    id: UUID
+    question_key: str
+    dimension: str
+    question_type: str
+    prompt: str
+    response_config: dict[str, Any] = Field(default_factory=dict)
+    is_required: bool
+    ordinal: int
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class MobileCheckinTemplateDetail(BaseModel):
+    id: UUID
+    template_key: str
+    title: str
+    cadence: str
+    age_cohort: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    questions: list[MobileCheckinQuestion] = Field(default_factory=list)
 
 
 class MobileModuleSummary(BaseModel):
@@ -279,6 +404,13 @@ class TeacherClassSummary(BaseModel):
     grade_band: str | None = None
     assignment_type: str
     active_student_count: int
+
+
+class TeacherClassStudentSummary(BaseModel):
+    student_profile_id: UUID
+    student_name: str
+    age_cohort: str | None = None
+    membership_status: str
 
 
 class TeacherCohortSummaryResponse(BaseModel):

@@ -396,6 +396,136 @@ values
   )
 on conflict (id) do nothing;
 
+insert into help_requests (
+  id, student_profile_id, requested_by_user_id, requested_for_user_id, request_channel,
+  category, urgency, status, summary, details, visibility_scope
+)
+values
+  (
+    '80000000-0000-0000-0000-000000000001',
+    '30000000-0000-0000-0000-000000000001',
+    '20000000-0000-0000-0000-000000000001',
+    '20000000-0000-0000-0000-000000000001',
+    'student_app',
+    'emotional_support',
+    'priority',
+    'open',
+    'Student asked for a follow-up conversation about stress before exams.',
+    '{"demo": true, "source": "student_checkin"}'::jsonb,
+    'private'
+  )
+on conflict (id) do nothing;
+
+insert into monitoring_signals (
+  id, student_profile_id, signal_type, signal_status, severity, confidence,
+  title, signal_summary, derived_facts, reviewed_by_user_id, metadata
+)
+values
+  (
+    '80000000-0000-0000-0000-000000000101',
+    '30000000-0000-0000-0000-000000000001',
+    'checkin_pattern',
+    'new',
+    'moderate',
+    0.8100,
+    'Repeated low-energy check-in pattern',
+    'Two recent check-ins suggest reduced energy and rising school stress.',
+    '{"demo": true, "checkin_count": 2}'::jsonb,
+    null,
+    '{"demo": true}'::jsonb
+  ),
+  (
+    '80000000-0000-0000-0000-000000000102',
+    '30000000-0000-0000-0000-000000000001',
+    'teacher_flag',
+    'reviewing',
+    'high',
+    0.9200,
+    'Teacher reported a sharp mood change',
+    'Pastoral observation plus class behavior change needs counselor review.',
+    '{"demo": true, "flag_type": "mood_change"}'::jsonb,
+    '20000000-0000-0000-0000-000000000004',
+    '{"demo": true}'::jsonb
+  )
+on conflict (id) do nothing;
+
+insert into escalation_cases (
+  id, case_key, student_profile_id, primary_signal_id, opened_by_user_id, case_type,
+  severity, status, safeguarding_owner_user_id, privacy_override_active, override_reason,
+  title, summary, next_review_at, metadata
+)
+values
+  (
+    '81000000-0000-0000-0000-000000000001',
+    'CASE-DEMO-001',
+    '30000000-0000-0000-0000-000000000001',
+    '80000000-0000-0000-0000-000000000102',
+    '20000000-0000-0000-0000-000000000004',
+    'counselor_review',
+    'high',
+    'assigned',
+    '20000000-0000-0000-0000-000000000004',
+    false,
+    null,
+    'Counselor follow-up for sudden mood change',
+    'Teacher observation and supporting signal were escalated for counselor review.',
+    now() + interval '1 day',
+    '{"demo": true}'::jsonb
+  )
+on conflict (id) do nothing;
+
+insert into case_assignments (
+  id, escalation_case_id, assigned_user_id, assignment_role, status, assigned_by_user_id, metadata
+)
+values
+  (
+    '81000000-0000-0000-0000-000000000101',
+    '81000000-0000-0000-0000-000000000001',
+    '20000000-0000-0000-0000-000000000004',
+    'owner',
+    'active',
+    '20000000-0000-0000-0000-000000000005',
+    '{"demo": true}'::jsonb
+  )
+on conflict (id) do nothing;
+
+insert into case_events (
+  id, escalation_case_id, event_type, actor_user_id, event_summary, event_payload
+)
+values
+  (
+    '81000000-0000-0000-0000-000000000201',
+    '81000000-0000-0000-0000-000000000001',
+    'case_opened',
+    '20000000-0000-0000-0000-000000000004',
+    'Demo counselor case opened from teacher flag signal',
+    '{"demo": true}'::jsonb
+  ),
+  (
+    '81000000-0000-0000-0000-000000000202',
+    '81000000-0000-0000-0000-000000000001',
+    'assignment_added',
+    '20000000-0000-0000-0000-000000000005',
+    'Demo counselor assigned as case owner',
+    '{"demo": true}'::jsonb
+  )
+on conflict (id) do nothing;
+
+insert into case_notes (
+  id, escalation_case_id, author_user_id, note_type, visibility_scope, body, metadata
+)
+values
+  (
+    '81000000-0000-0000-0000-000000000301',
+    '81000000-0000-0000-0000-000000000001',
+    '20000000-0000-0000-0000-000000000004',
+    'internal',
+    'safeguarding_only',
+    'Initial review completed. Schedule a supportive student conversation and monitor the next weekly check-in.',
+    '{"demo": true}'::jsonb
+  )
+on conflict (id) do nothing;
+
 insert into student_weekly_summaries (
   student_profile_id, week_start, week_end, privacy_tier_applied, summary_status,
   summary, source_window, generation_version, generated_at

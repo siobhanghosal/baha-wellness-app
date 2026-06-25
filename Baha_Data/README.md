@@ -24,6 +24,8 @@ PostgreSQL is selected because the project needs durable metadata, version histo
 
 ## Quick Start
 
+Default local backend for Flutter and mobile API work:
+
 ```bash
 cp .env.example .env
 docker compose up --build
@@ -31,6 +33,19 @@ docker compose up --build
 
 The API will be available at `http://localhost:8000`.
 The local Postgres port exposed on the host is `5433`.
+
+This default runtime is intentionally lightweight:
+
+- `EMBEDDING_BACKEND=hash`
+- no `torch`
+- no `sentence-transformers`
+- no acquisition-only crawler and document-processing dependencies
+
+If you need the full acquisition and retrieval runtime locally, use:
+
+```bash
+docker build -f Dockerfile.full -t baha_data-api:full .
+```
 
 For Android emulator testing, use `http://10.0.2.2:8000` as the API base URL.
 For a physical device on the same network, use your machine's LAN IP instead of `localhost`.
@@ -65,7 +80,11 @@ See [docs/HOSTING_COST_AND_SCALE.md](/Users/sudharshan/Desktop/PES/RF Internship
 
 See [docs/BACKEND_HANDOFF_FOR_FLUTTER.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/BACKEND_HANDOFF_FOR_FLUTTER.md) for the practical backend handoff reference: local URLs, demo identities, seeded data, and the implemented mobile API surfaces.
 
+See [docs/ACCOUNT_ONBOARDING_SYSTEM.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/ACCOUNT_ONBOARDING_SYSTEM.md) for the current users-based onboarding model, approval workflow, guardian linking flow, and guardian-managed consent behavior for both platform participation and parent summaries.
+
 See [docs/ENVIRONMENT_AND_SECRETS.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/ENVIRONMENT_AND_SECRETS.md) for the runtime configuration, hosted auth variables, and object-storage environment contract.
+
+See [docs/DATA_ACQUISITION.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/DATA_ACQUISITION.md) for when to use the heavier acquisition/runtime profile instead of the default lightweight mobile API runtime.
 
 The acquisition platform includes a BAHA/IAP-first manual ingestion module for PDF, DOCX,
 PPTX, transcript, bulk-directory, and ZIP imports, plus priority coverage dashboards and
