@@ -144,6 +144,8 @@ The seeded demo environment includes:
 - one parent weekly summary
 - one teacher cohort summary
 - one pilot dashboard snapshot
+- one school-scoped pilot dashboard snapshot
+- two pending approval requests for BAHA approval-flow testing
 
 If you need a clean local reset after migration changes:
 
@@ -159,6 +161,9 @@ The implemented mobile-facing routes are:
 ### Shared
 
 - `GET /mobile/me`
+- `GET /mobile/support-contacts`
+- `GET /mobile/content/feed`
+- `GET /mobile/content/{content_item_id}`
 - `GET /mobile/chat/sessions`
 - `POST /mobile/chat/sessions`
 - `GET /mobile/chat/sessions/{session_id}/messages`
@@ -166,6 +171,7 @@ The implemented mobile-facing routes are:
 
 ### Student
 
+- `GET /mobile/student/weekly-summary/latest`
 - `GET /mobile/student/checkin-templates`
 - `GET /mobile/student/checkin-templates/{template_id}`
 - `GET /mobile/student/checkins`
@@ -190,6 +196,7 @@ The implemented mobile-facing routes are:
 ### Counselor / BAHA
 
 - `GET /mobile/counselor/queue`
+- `GET /mobile/counselor/dashboard/latest`
 - `GET /mobile/counselor/cases/{case_id}`
 - `POST /mobile/counselor/cases/{case_id}/notes`
 
@@ -201,10 +208,14 @@ These behaviors are already enforced server-side:
 - parent summary access checks consent state
 - guardians can explicitly read and update parent-summary sharing consent through auth endpoints
 - parent summary access checks privacy-tier configuration
+- published role-safe content is served through app-facing content read models instead of direct table access
+- support contacts are served through app-facing read models instead of hardcoded client copy
+- student weekly summary is available as a direct mobile read model for the student dashboard
 - teacher app gets anonymized cohort summaries, not raw student wellness records
 - emergency chat language creates a monitoring signal and an escalation case
 - counselor queue reads from help requests, signals, and escalation cases
 - counselor queue and case detail are school-scoped for non-BAHA-admin counselor access
+- counselor dashboard prefers school metrics when available and falls back to the latest global metric
 - counselor notes are blocked for resolved, closed, or cancelled cases
 
 ## 9. Remaining Backend Caveats
@@ -217,6 +228,7 @@ The backend is usable for client development, but some areas are still transitio
 - the default lightweight API runtime returns `503` for heavy acquisition workflows unless the full runtime is used
 - object storage integration is defined by config contract but not yet fully wired to a cloud bucket
 - onboarding is now users-based and server-enforced, but richer admin workflows are still deferred
+- content review and threshold-configuration mutations are still not exposed as mobile workflows
 
 ## 10. Last Verified Local Baseline
 
@@ -227,12 +239,65 @@ This backend was last verified locally with:
 
 Verified behavior in that clean local state:
 
-- migrations applied cleanly through `021_auth_onboarding_and_approvals.sql`
+## 11. Current Mobile Workspace Status
+
+The Flutter workspace now exists under:
+
+- [Baha_Mobile/README.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Mobile/README.md)
+
+Implemented mobile status right now:
+
+- the monorepo has four real Flutter apps plus shared packages
+- the student app already implements the first startup slice against this backend
+- that slice uses:
+  - development identity capture
+  - `GET /auth/onboarding-state`
+  - `POST /auth/bootstrap`
+  - `GET /mobile/me`
+- parent, teacher, and counselor apps are scaffolded as role-specific placeholder shells
+- the student app now also implements the learn/modules slice on the real backend:
+  - `GET /mobile/content/feed`
+  - `GET /mobile/content/{content_item_id}`
+  - `GET /mobile/student/modules`
+  - `POST /mobile/student/modules/{module_id}/progress`
+
+Latest verified mobile/backend handshake:
+
+- `GET /health` returned `{"status":"ok"}`
+- `GET /auth/onboarding-state` with `X-BAHA-External-Auth-Id: supabase-student-demo` returned `next_step: ready`
+- `GET /mobile/me` with `X-BAHA-External-Auth-Id: supabase-student-demo` returned the seeded student actor
+- `GET /mobile/student/weekly-summary/latest` returned the seeded student weekly summary
+- `GET /mobile/student/checkin-templates` returned the seeded weekly student template after the backend query fix
+- `POST /mobile/student/checkins` successfully stored a real seeded demo response set
+- `GET /mobile/student/checkins/{response_set_id}` successfully returned stored answers
+- `GET /mobile/content/feed` returned the seeded student learning content feed
+- `GET /mobile/student/modules` returned the seeded student module with direct `content_item_id` linkage
+- `GET /mobile/content/{content_item_id}` returned the seeded module detail body
+- `POST /mobile/student/modules/{module_id}/progress` successfully updated the seeded student module progress
+
+Latest verified Android app build:
+
+- student app debug APK built successfully at:
+  - [app-debug.apk](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Mobile/apps/student_app/build/app/outputs/flutter-apk/app-debug.apk)
+
+Recent backend fix applied during Flutter integration:
+
+- `GET /mobile/student/modules` had been failing with PostgreSQL ambiguous-parameter handling around `age_cohort` and `student_profile_id`
+- the student modules read model now explicitly casts those parameters in the repository query
+- the student modules response now includes `content_item_id` so Flutter can open module content directly through `/mobile/content/{content_item_id}`
+- the repaired code lives in [mobile_repository.py](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/src/baha_rag/db/mobile_repository.py)
+
+- migrations applied cleanly through `022_mobile_ui_alignment_seed.sql`
 - `GET /health` returned `ok`
 - `GET /health/ready` returned `ready`
+- `GET /mobile/student/weekly-summary/latest` returned the seeded student dashboard summary
+- `GET /mobile/content/feed?content_type=conversation_guide` returned the seeded parent guide
+- `GET /mobile/support-contacts` returned the seeded emergency and counselor contacts
 - counselor demo queue returned one case, one unassigned signal, and one help request
+- counselor dashboard returned the seeded school-scoped pilot metric snapshot
 - counselor case detail returned notes, events, and assignments for `CASE-DEMO-001`
 - counselor note creation succeeded on the seeded demo case
+- `GET /auth/approval-requests?status=pending` returned the seeded teacher and counselor approval requests
 - heavy acquisition workflows returned explicit `503` responses in the lightweight runtime instead of crashing the API
 
 ## 11. What The Flutter Developer Can Build Immediately
@@ -241,16 +306,31 @@ The Flutter developer can already build:
 
 - account bootstrap and gating flow using `/auth/onboarding-state` and `/auth/bootstrap`
 - active-account identity bootstrap using `/auth/me` or `/mobile/me`
+- student dashboard summary using `/mobile/student/weekly-summary/latest`
 - student module list and progress flow
 - student check-in list, template-detail, and submission flow
 - chat session list and chat UI with persisted messages
 - parent linked-student summary screens
+- shared support and content screens using `/mobile/support-contacts` and `/mobile/content/feed`
 - teacher class list, class-student, and cohort summary screens
-- counselor queue and case detail views
+- counselor queue, dashboard, and case detail views
 
-## 12. Core References
+## 12. What Is Still Left To Build
+
+In practical order, the next implementation work is:
+
+- student help request UI flow
+- student Buddy/chat UI flow
+- parent app real screens on top of the existing backend contract
+- teacher app real screens on top of the existing backend contract
+- counselor app real screens on top of the existing backend contract
+- hosted auth credential wiring and non-dev identity flow
+- final hosted deployment handoff once the remaining core app slices are stable
+
+## 13. Core References
 
 - [MOBILE_API_SURFACES.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/MOBILE_API_SURFACES.md)
 - [FLUTTER_BACKEND_DELIVERY_PLAN.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/FLUTTER_BACKEND_DELIVERY_PLAN.md)
 - [ENVIRONMENT_AND_SECRETS.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/ENVIRONMENT_AND_SECRETS.md)
 - [ACCOUNT_ONBOARDING_SYSTEM.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/ACCOUNT_ONBOARDING_SYSTEM.md)
+- [UI_BACKEND_INTEGRATION_PLAN.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/UI_BACKEND_INTEGRATION_PLAN.md)

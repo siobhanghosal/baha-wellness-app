@@ -183,12 +183,12 @@ class MobileAppRepository:
                   and ct.audience_app = 'student'
                   and (
                     ct.age_cohort = 'all'
-                    or :age_cohort is null
-                    or ct.age_cohort = :age_cohort
+                    or cast(:age_cohort as text) is null
+                    or ct.age_cohort = cast(:age_cohort as text)
                   )
                 group by ct.id, ct.template_key, ct.title, ct.cadence, ct.age_cohort, ct.metadata
                 order by
-                  case when ct.age_cohort = :age_cohort then 0 else 1 end,
+                  case when ct.age_cohort = cast(:age_cohort as text) then 0 else 1 end,
                   ct.template_key
                 """
             ),
@@ -237,8 +237,8 @@ class MobileAppRepository:
                   and ct.audience_app = 'student'
                   and (
                     ct.age_cohort = 'all'
-                    or :age_cohort is null
-                    or ct.age_cohort = :age_cohort
+                    or cast(:age_cohort as text) is null
+                    or ct.age_cohort = cast(:age_cohort as text)
                   )
                 group by ct.id, ct.template_key, ct.title, ct.cadence, ct.age_cohort, ct.metadata
                 """
@@ -260,6 +260,7 @@ class MobileAppRepository:
                 """
                 select
                   lm.id,
+                  lm.content_item_id,
                   lm.module_code,
                   ci.title,
                   lm.theme,
@@ -280,8 +281,8 @@ class MobileAppRepository:
                     and mp_inner.user_id = :user_id
                     and mp_inner.audience_app = 'student'
                     and (
-                      (:student_profile_id is null and mp_inner.context_student_profile_id is null)
-                      or mp_inner.context_student_profile_id = :student_profile_id
+                      (cast(:student_profile_id as uuid) is null and mp_inner.context_student_profile_id is null)
+                      or mp_inner.context_student_profile_id = cast(:student_profile_id as uuid)
                     )
                   order by mp_inner.updated_at desc
                   limit 1
@@ -292,8 +293,8 @@ class MobileAppRepository:
                   and ci.review_status = 'approved'
                   and (
                     lm.age_cohort = 'all'
-                    or :age_cohort is null
-                    or lm.age_cohort = :age_cohort
+                    or cast(:age_cohort as text) is null
+                    or lm.age_cohort = cast(:age_cohort as text)
                   )
                 order by lm.sort_order, lm.module_code
                 """
@@ -327,8 +328,8 @@ class MobileAppRepository:
                   and module_id = :module_id
                   and audience_app = 'student'
                   and (
-                    (:student_profile_id is null and context_student_profile_id is null)
-                    or context_student_profile_id = :student_profile_id
+                    (cast(:student_profile_id as uuid) is null and context_student_profile_id is null)
+                    or context_student_profile_id = cast(:student_profile_id as uuid)
                   )
                 order by updated_at desc
                 limit 1
@@ -596,6 +597,36 @@ class MobileAppRepository:
         row = result.mappings().first()
         return dict(row) if row else None
 
+    async def get_latest_student_weekly_summary(
+        self,
+        *,
+        student_profile_id: UUID,
+    ) -> dict[str, Any] | None:
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  id,
+                  student_profile_id,
+                  week_start,
+                  week_end,
+                  privacy_tier_applied,
+                  summary_status,
+                  summary,
+                  source_window,
+                  generation_version,
+                  generated_at
+                from student_weekly_summaries
+                where student_profile_id = :student_profile_id
+                order by week_end desc, generated_at desc
+                limit 1
+                """
+            ),
+            {"student_profile_id": student_profile_id},
+        )
+        row = result.mappings().first()
+        return dict(row) if row else None
+
     async def submit_student_checkin(
         self,
         *,
@@ -727,6 +758,224 @@ class MobileAppRepository:
         )
         row = result.mappings().first()
         return dict(row) if row else None
+
+    async def list_published_content(
+        self,
+        *,
+        audience_app: str,
+        age_cohort: str | None,
+        content_type: str | None,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  ci.id,
+                  ci.slug,
+                  ci.title,
+                  ci.content_type,
+                  ci.audience_app,
+                  ci.age_cohort,
+                  ci.theme,
+                  ci.topic,
+                  ci.subtopic,
+                  ci.summary,
+                  ci.metadata,
+                  pv.version_id,
+                  pv.version_number,
+                  pv.plain_text,
+                  pv.published_at
+                from content_items ci
+                join lateral (
+                  select
+                    cv_inner.id as version_id,
+                    cv_inner.version_number,
+                    cv_inner.plain_text,
+                    coalesce(
+                      cpt_inner.effective_from,
+                      cv_inner.effective_from,
+                      cv_inner.reviewed_at,
+                      cv_inner.created_at
+                    ) as published_at
+                  from content_versions cv_inner
+                  join content_publish_targets cpt_inner
+                    on cpt_inner.content_version_id = cv_inner.id
+                  where cv_inner.content_item_id = ci.id
+                    and cv_inner.version_status in ('published', 'approved')
+                    and cpt_inner.activation_status = 'active'
+                    and cpt_inner.platform in ('android', 'all')
+                    and cpt_inner.audience_app in (:audience_app, 'shared')
+                    and (
+                      cpt_inner.age_cohort = 'all'
+                      or cast(:age_cohort as text) is null
+                      or cpt_inner.age_cohort = cast(:age_cohort as text)
+                    )
+                  order by
+                    coalesce(
+                      cpt_inner.effective_from,
+                      cv_inner.effective_from,
+                      cv_inner.reviewed_at,
+                      cv_inner.created_at
+                    ) desc nulls last,
+                    cv_inner.version_number desc
+                  limit 1
+                ) pv on true
+                where ci.lifecycle_status = 'active'
+                  and ci.review_status = 'approved'
+                  and ci.audience_app in (:audience_app, 'shared')
+                  and (
+                    ci.age_cohort = 'all'
+                    or cast(:age_cohort as text) is null
+                    or ci.age_cohort = cast(:age_cohort as text)
+                  )
+                  and (
+                    cast(:content_type as text) is null
+                    or ci.content_type = :content_type
+                  )
+                order by pv.published_at desc nulls last, ci.updated_at desc, ci.title
+                limit :limit
+                """
+            ),
+            {
+                "audience_app": audience_app,
+                "age_cohort": age_cohort,
+                "content_type": content_type,
+                "limit": limit,
+            },
+        )
+        return [dict(row) for row in result.mappings().all()]
+
+    async def get_published_content_detail(
+        self,
+        *,
+        content_item_id: UUID,
+        audience_app: str,
+        age_cohort: str | None,
+    ) -> dict[str, Any] | None:
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  ci.id,
+                  ci.slug,
+                  ci.title,
+                  ci.content_type,
+                  ci.audience_app,
+                  ci.age_cohort,
+                  ci.theme,
+                  ci.topic,
+                  ci.subtopic,
+                  ci.summary,
+                  ci.metadata,
+                  pv.version_id,
+                  pv.version_number,
+                  pv.body,
+                  pv.plain_text,
+                  pv.reviewed_by,
+                  pv.reviewed_at,
+                  pv.published_at
+                from content_items ci
+                join lateral (
+                  select
+                    cv_inner.id as version_id,
+                    cv_inner.version_number,
+                    cv_inner.body,
+                    cv_inner.plain_text,
+                    cv_inner.reviewed_by,
+                    cv_inner.reviewed_at,
+                    coalesce(
+                      cpt_inner.effective_from,
+                      cv_inner.effective_from,
+                      cv_inner.reviewed_at,
+                      cv_inner.created_at
+                    ) as published_at
+                  from content_versions cv_inner
+                  join content_publish_targets cpt_inner
+                    on cpt_inner.content_version_id = cv_inner.id
+                  where cv_inner.content_item_id = ci.id
+                    and cv_inner.version_status in ('published', 'approved')
+                    and cpt_inner.activation_status = 'active'
+                    and cpt_inner.platform in ('android', 'all')
+                    and cpt_inner.audience_app in (:audience_app, 'shared')
+                    and (
+                      cpt_inner.age_cohort = 'all'
+                      or cast(:age_cohort as text) is null
+                      or cpt_inner.age_cohort = cast(:age_cohort as text)
+                    )
+                  order by
+                    coalesce(
+                      cpt_inner.effective_from,
+                      cv_inner.effective_from,
+                      cv_inner.reviewed_at,
+                      cv_inner.created_at
+                    ) desc nulls last,
+                    cv_inner.version_number desc
+                  limit 1
+                ) pv on true
+                where ci.id = :content_item_id
+                  and ci.lifecycle_status = 'active'
+                  and ci.review_status = 'approved'
+                  and ci.audience_app in (:audience_app, 'shared')
+                  and (
+                    ci.age_cohort = 'all'
+                    or cast(:age_cohort as text) is null
+                    or ci.age_cohort = cast(:age_cohort as text)
+                  )
+                limit 1
+                """
+            ),
+            {
+                "content_item_id": content_item_id,
+                "audience_app": audience_app,
+                "age_cohort": age_cohort,
+            },
+        )
+        row = result.mappings().first()
+        return dict(row) if row else None
+
+    async def list_support_contacts(
+        self,
+        *,
+        audience_app: str,
+        school_id: UUID | None,
+    ) -> list[dict[str, Any]]:
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  id,
+                  school_id,
+                  contact_type,
+                  audience_app,
+                  label,
+                  phone,
+                  email,
+                  contact_url,
+                  service_hours,
+                  priority,
+                  metadata
+                from support_contacts
+                where active = true
+                  and audience_app in (:audience_app, 'shared')
+                  and (
+                    school_id is null
+                    or cast(:school_id as uuid) is null
+                    or school_id = cast(:school_id as uuid)
+                  )
+                order by
+                  case
+                    when cast(:school_id as uuid) is not null and school_id = cast(:school_id as uuid) then 0
+                    when school_id is null then 1
+                    else 2
+                  end,
+                  priority asc,
+                  label asc
+                """
+            ),
+            {"audience_app": audience_app, "school_id": school_id},
+        )
+        return [dict(row) for row in result.mappings().all()]
 
     async def list_teacher_classes(self, *, teacher_profile_id: UUID) -> list[dict[str, Any]]:
         result = await self.session.execute(
@@ -1458,6 +1707,36 @@ class MobileAppRepository:
           "events": [dict(row) for row in events_result.mappings().all()],
           "assignments": [dict(row) for row in assignments_result.mappings().all()],
         }
+
+    async def get_latest_baha_dashboard_metric(
+        self,
+        *,
+        metric_scope: str = "global",
+        scope_key: str = "all",
+    ) -> dict[str, Any] | None:
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  id,
+                  metric_scope,
+                  scope_key,
+                  period_start,
+                  period_end,
+                  metrics,
+                  generation_version,
+                  generated_at
+                from baha_pilot_dashboard_metrics
+                where metric_scope = :metric_scope
+                  and scope_key = :scope_key
+                order by period_end desc, generated_at desc
+                limit 1
+                """
+            ),
+            {"metric_scope": metric_scope, "scope_key": scope_key},
+        )
+        row = result.mappings().first()
+        return dict(row) if row else None
 
     async def add_case_note(
         self,

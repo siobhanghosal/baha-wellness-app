@@ -45,6 +45,7 @@ from baha_rag.schemas import (
     CheckinSubmissionRequest,
     ConditionSummary,
     CounselorCaseDetailResponse,
+    CounselorDashboardMetricResponse,
     CounselorCaseNote,
     CounselorCaseNoteCreateRequest,
     CounselorQueueResponse,
@@ -58,8 +59,11 @@ from baha_rag.schemas import (
     MobileActorResponse,
     MobileCheckinTemplateDetail,
     MobileCheckinTemplateSummary,
+    MobileContentDetail,
+    MobileContentSummary,
     MobileLinkedStudentSummary,
     MobileModuleSummary,
+    MobileSupportContact,
     ModuleProgressUpsertRequest,
     ModuleProgressUpsertResponse,
     ParentWeeklySummaryResponse,
@@ -70,6 +74,7 @@ from baha_rag.schemas import (
     ReviewDecisionRequest,
     StudentCheckinDetail,
     StudentCheckinSummary,
+    StudentWeeklySummaryResponse,
     TeacherClassStudentSummary,
     TeacherClassSummary,
     TeacherCohortSummaryResponse,
@@ -142,6 +147,21 @@ def _counselor_scope(actor: ActorContext) -> tuple[UUID | None, bool]:
     if actor.school_id is None:
         raise HTTPException(status_code=403, detail="Counselor access requires a school-scoped profile")
     return (actor.school_id, False)
+
+
+def _resolve_mobile_content_audience(
+    *,
+    actor: ActorContext,
+    requested_audience: str | None,
+) -> str:
+    if requested_audience is None:
+        return actor.app_audience
+    allowed = {"student", "parent", "teacher", "counselor", "shared"}
+    if requested_audience not in allowed:
+        raise HTTPException(status_code=400, detail="Unsupported content audience")
+    if requested_audience != actor.app_audience and not ({"counselor", "baha_admin", "administrator"} & set(actor.roles)):
+        raise HTTPException(status_code=403, detail="Audience override is only available to counselor or BAHA admin roles")
+    return requested_audience
 
 
 def _assistant_body(response: ChatResponse) -> str:
@@ -839,6 +859,82 @@ async def mobile_me(actor: ActorContext = Depends(get_actor_context)) -> MobileA
     )
 
 
+@router.get("/mobile/support-contacts", response_model=list[MobileSupportContact])
+async def mobile_support_contacts(
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> list[MobileSupportContact]:
+    rows = await MobileAppRepository(session).list_support_contacts(
+        audience_app=actor.app_audience,
+        school_id=actor.school_id,
+    )
+    return [MobileSupportContact.model_validate(row) for row in rows]
+
+
+@router.get("/mobile/content/feed", response_model=list[MobileContentSummary])
+async def mobile_content_feed(
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+    audience_app: str | None = None,
+    content_type: str | None = None,
+    age_cohort: str | None = None,
+    limit: int = 20,
+) -> list[MobileContentSummary]:
+    resolved_audience = _resolve_mobile_content_audience(
+        actor=actor,
+        requested_audience=audience_app,
+    )
+    resolved_age_cohort = age_cohort
+    if resolved_audience == "student" and "student" in actor.roles and resolved_age_cohort is None:
+        resolved_age_cohort = actor.age_cohort
+    rows = await MobileAppRepository(session).list_published_content(
+        audience_app=resolved_audience,
+        age_cohort=resolved_age_cohort,
+        content_type=content_type,
+        limit=max(1, min(limit, 50)),
+    )
+    return [MobileContentSummary.model_validate(row) for row in rows]
+
+
+@router.get("/mobile/content/{content_item_id}", response_model=MobileContentDetail)
+async def mobile_content_detail(
+    content_item_id: UUID,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+    audience_app: str | None = None,
+    age_cohort: str | None = None,
+) -> MobileContentDetail:
+    resolved_audience = _resolve_mobile_content_audience(
+        actor=actor,
+        requested_audience=audience_app,
+    )
+    resolved_age_cohort = age_cohort
+    if resolved_audience == "student" and "student" in actor.roles and resolved_age_cohort is None:
+        resolved_age_cohort = actor.age_cohort
+    row = await MobileAppRepository(session).get_published_content_detail(
+        content_item_id=content_item_id,
+        audience_app=resolved_audience,
+        age_cohort=resolved_age_cohort,
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Content item not found")
+    return MobileContentDetail.model_validate(row)
+
+
+@router.get("/mobile/student/weekly-summary/latest", response_model=StudentWeeklySummaryResponse)
+async def mobile_student_latest_weekly_summary(
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> StudentWeeklySummaryResponse:
+    _require_student(actor)
+    row = await MobileAppRepository(session).get_latest_student_weekly_summary(
+        student_profile_id=actor.student_profile_id,
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Student weekly summary not found")
+    return StudentWeeklySummaryResponse.model_validate(row)
+
+
 @router.get("/mobile/student/checkin-templates", response_model=list[MobileCheckinTemplateSummary])
 async def mobile_student_checkin_templates(
     actor: ActorContext = Depends(get_actor_context),
@@ -1261,6 +1357,29 @@ async def mobile_counselor_queue(
         unrestricted=unrestricted,
     )
     return CounselorQueueResponse.model_validate(queue)
+
+
+@router.get("/mobile/counselor/dashboard/latest", response_model=CounselorDashboardMetricResponse)
+async def mobile_counselor_dashboard_latest(
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> CounselorDashboardMetricResponse:
+    school_id, unrestricted = _counselor_scope(actor)
+    repository = MobileAppRepository(session)
+    row = None
+    if not unrestricted and school_id is not None:
+        row = await repository.get_latest_baha_dashboard_metric(
+            metric_scope="school",
+            scope_key=str(school_id),
+        )
+    if row is None:
+        row = await repository.get_latest_baha_dashboard_metric(
+            metric_scope="global",
+            scope_key="all",
+        )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Counselor dashboard metrics not found")
+    return CounselorDashboardMetricResponse.model_validate(row)
 
 
 @router.get("/mobile/counselor/cases/{case_id}", response_model=CounselorCaseDetailResponse)

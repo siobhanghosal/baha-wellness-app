@@ -319,8 +319,22 @@ class MobileCheckinTemplateDetail(BaseModel):
     questions: list[MobileCheckinQuestion] = Field(default_factory=list)
 
 
+class StudentWeeklySummaryResponse(BaseModel):
+    id: UUID
+    student_profile_id: UUID
+    week_start: date
+    week_end: date
+    privacy_tier_applied: str
+    summary_status: str
+    summary: dict[str, Any] = Field(default_factory=dict)
+    source_window: dict[str, Any] = Field(default_factory=dict)
+    generation_version: str
+    generated_at: datetime
+
+
 class MobileModuleSummary(BaseModel):
     id: UUID
+    content_item_id: UUID
     module_code: str
     title: str
     theme: str
@@ -374,6 +388,45 @@ class MobileLinkedStudentSummary(BaseModel):
     relationship_to_student: str
     is_primary: bool
     school_name: str | None = None
+
+
+class MobileContentSummary(BaseModel):
+    id: UUID
+    slug: str
+    title: str
+    content_type: str
+    audience_app: str
+    age_cohort: str
+    theme: str | None = None
+    topic: str | None = None
+    subtopic: str | None = None
+    summary: str | None = None
+    version_id: UUID
+    version_number: int
+    plain_text: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    published_at: datetime | None = None
+
+
+class MobileContentDetail(BaseModel):
+    id: UUID
+    slug: str
+    title: str
+    content_type: str
+    audience_app: str
+    age_cohort: str
+    theme: str | None = None
+    topic: str | None = None
+    subtopic: str | None = None
+    summary: str | None = None
+    version_id: UUID
+    version_number: int
+    body: dict[str, Any] = Field(default_factory=dict)
+    plain_text: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    published_at: datetime | None = None
+    reviewed_by: str | None = None
+    reviewed_at: datetime | None = None
 
 
 class ParentAccessSummary(BaseModel):
@@ -468,6 +521,20 @@ class HelpRequestResponse(BaseModel):
     details: dict[str, Any] = Field(default_factory=dict)
     visibility_scope: str
     created_at: datetime
+
+
+class MobileSupportContact(BaseModel):
+    id: UUID
+    school_id: UUID | None = None
+    contact_type: str
+    audience_app: str
+    label: str
+    phone: str | None = None
+    email: str | None = None
+    contact_url: str | None = None
+    service_hours: str | None = None
+    priority: int
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class CheckinAnswerInput(BaseModel):
@@ -589,6 +656,17 @@ class CounselorQueueResponse(BaseModel):
     open_cases: list[CounselorQueueCase] = Field(default_factory=list)
     unassigned_signals: list[CounselorQueueSignal] = Field(default_factory=list)
     open_help_requests: list[CounselorQueueHelpRequest] = Field(default_factory=list)
+
+
+class CounselorDashboardMetricResponse(BaseModel):
+    id: UUID
+    metric_scope: str
+    scope_key: str
+    period_start: date
+    period_end: date
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    generation_version: str
+    generated_at: datetime
 
 
 class CounselorCaseNote(BaseModel):

@@ -20,6 +20,30 @@ It builds on the current `Baha_Data` platform and recommends a hybrid model:
 
 This is not a recommendation to immediately delete or move the current raw data. It is a target architecture and operating model for organizing it cleanly over time.
 
+## 1.1 Current Physical Repo Layout
+
+The current `Baha_Data/` folder is about `4.5G` locally and is organized into a few distinct physical areas:
+
+- `storage/raw/`
+  This is the main raw source corpus. It is organized first by source/provider name, then by hashed bucket folders for large-volume storage fanout.
+- `storage/reports/`
+  Generated reports and intermediate output artifacts.
+- `migrations/`
+  PostgreSQL schema and seed data for the operational and content-serving backend.
+- `src/baha_rag/`
+  The backend application code, including ingestion, retrieval, embeddings, API routes, and database access layers.
+- `docs/`
+  Product, architecture, deployment, and handoff documentation.
+- `.venv/` and `.pytest_cache/`
+  Local development/runtime artifacts, not product data.
+
+So in practical terms:
+
+- the actual source data primarily lives under `storage/raw/`
+- the app/runtime database shape lives under `migrations/`
+- the product logic that consumes curated database data lives under `src/baha_rag/`
+- the documentation describing the intended long-term organization lives under `docs/`
+
 ## 2. Design Principles
 
 ### 2.1 Separate evidence from product content

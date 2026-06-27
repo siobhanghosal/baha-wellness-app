@@ -88,7 +88,35 @@ Returns:
 - mapped app audience
 - active student profile ID if present
 
+### Shared app content and support
+
+`GET /mobile/support-contacts`
+
+Returns active support contacts visible to the current app audience, ordered with school-specific contacts first when the actor is school-scoped.
+
+`GET /mobile/content/feed`
+
+Returns published, role-safe content items for the current app audience.
+
+Supported query parameters:
+
+- `content_type`
+- `limit`
+
+Counselor and BAHA admin roles can also inspect other audiences through:
+
+- `audience_app`
+- `age_cohort`
+
+`GET /mobile/content/{content_item_id}`
+
+Returns the published content detail payload for one content item, including the stored content body and review metadata.
+
 ### Student app
+
+`GET /mobile/student/weekly-summary/latest`
+
+Returns the latest private student weekly summary for the authenticated student, which is the read model intended to back the personal trend dashboard.
 
 `GET /mobile/student/checkin-templates`
 
@@ -101,6 +129,10 @@ Returns one student check-in template including ordered question definitions so 
 `GET /mobile/student/modules`
 
 Returns active approved student learning modules plus latest progress for the current student.
+
+Important response field:
+
+- `content_item_id` is included so the mobile client can open `GET /mobile/content/{content_item_id}` without title-based matching
 
 `POST /mobile/student/modules/{module_id}/progress`
 
@@ -226,6 +258,16 @@ Current validation:
 - the case must already be visible to the actor
 - notes cannot be added to `resolved`, `closed`, or `cancelled` cases
 
+`GET /mobile/counselor/dashboard/latest`
+
+Returns the latest BAHA pilot dashboard metric snapshot.
+
+Current access behavior:
+
+- school-scoped counselors first try to read the latest school metric
+- if no school metric exists, the endpoint falls back to the latest global metric
+- `baha_admin` can read the latest global metric directly
+
 ## 4. Current Limitations
 
 These endpoints do not yet provide:
@@ -234,6 +276,8 @@ These endpoints do not yet provide:
 - guardian-to-student context switching beyond the active link model
 - teacher/student individual override views
 - complete counselor assignment workflows
+- content review queue mutation workflows
+- threshold-configuration workflows
 - final hosted object-storage wiring
 - consent history/audit views beyond the latest guardian-managed state
 

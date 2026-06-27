@@ -8,3 +8,21 @@ __pycache__/
 
 Baha_Data/.venv/
 Baha_Data/storage/raw/
+
+.mobile_tooling_home/
+.tool-home/
+.pub-cache/
+/$PWD/
+/tools/flutter/
+
+Baha_Mobile/**/.dart_tool/
+Baha_Mobile/**/build/
+Baha_Mobile/**/.gradle-home/
+Baha_Mobile/**/.flutter-plugins
+Baha_Mobile/**/.flutter-plugins-dependencies
+Baha_Mobile/**/.idea/
+Baha_Mobile/**/.metadata
+Baha_Mobile/**/.mobile_tooling_home/
+Baha_Mobile/**/android/local.properties
+Baha_Mobile/**/*.iml
+Baha_Mobile/**/pubspec.lock

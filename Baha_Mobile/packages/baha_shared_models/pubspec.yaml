@@ -1,0 +1,14 @@
+name: baha_shared_models
+description: Shared BAHA mobile contract models and value objects.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  meta: ^1.17.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6

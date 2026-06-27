@@ -1,0 +1,5 @@
+name: baha_mobile_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.12.2

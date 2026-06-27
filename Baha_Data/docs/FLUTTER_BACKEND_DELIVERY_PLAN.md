@@ -166,6 +166,10 @@ Current implementation status:
 - default Docker runtime is now slimmed down for Flutter/backend handoff instead of always shipping the acquisition/ML stack
 - first mobile endpoints now exist for:
   - `/mobile/me`
+  - `/mobile/support-contacts`
+  - `/mobile/content/feed`
+  - `/mobile/content/{content_item_id}`
+  - `/mobile/student/weekly-summary/latest`
   - `/mobile/student/checkin-templates`
   - `/mobile/student/checkin-templates/{template_id}`
   - `/mobile/student/checkins`
@@ -181,6 +185,7 @@ Current implementation status:
   - `/mobile/chat/sessions`
   - `/mobile/chat/sessions/{session_id}/messages`
   - `/mobile/counselor/queue`
+  - `/mobile/counselor/dashboard/latest`
   - `/mobile/counselor/cases/{case_id}`
   - `/mobile/counselor/cases/{case_id}/notes`
 
@@ -195,6 +200,7 @@ Detailed route notes live in:
 - [MOBILE_API_SURFACES.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/MOBILE_API_SURFACES.md)
 - [BACKEND_HANDOFF_FOR_FLUTTER.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/BACKEND_HANDOFF_FOR_FLUTTER.md)
 - [ACCOUNT_ONBOARDING_SYSTEM.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/ACCOUNT_ONBOARDING_SYSTEM.md)
+- [UI_BACKEND_INTEGRATION_PLAN.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/UI_BACKEND_INTEGRATION_PLAN.md)
 
 Hosting cost and scale notes live in:
 
@@ -212,6 +218,37 @@ Best practical next step:
 - prepare the repo for hosted deployment now
 - treat `Supabase + Render` as the default target pilot stack
 - optionally use `Cloudflare R2` for raw corpus storage if cost minimization matters
+
+## 10. Current Delivery State
+
+The Flutter side is no longer just planned. The repo now contains:
+
+- a real Flutter monorepo under [Baha_Mobile/README.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Mobile/README.md)
+- shared packages for:
+  - API client
+  - session/onboarding routing
+  - shared models
+  - design system
+  - content rendering
+- a verified student startup slice wired to the real backend
+
+What is already proven:
+
+- onboarding-state and mobile-actor contracts are consumable from Flutter
+- the seeded student identity `supabase-student-demo` resolves to `ready`
+- the student weekly summary and check-in contracts are consumable from Flutter
+- a real student check-in submission round-trip succeeds against the backend
+- the learn/modules contracts are consumable from Flutter
+- the student modules response now exposes `content_item_id`, removing brittle title-based content mapping
+- the student Android debug build succeeds locally
+
+Best next product-development step from here:
+
+1. finish the remaining student core surfaces:
+   - help request
+   - Buddy/chat
+2. keep testing against the same local backend contract
+3. only after the student core path is stable, move to parent flow implementation
 - defer real external cloud credentials and provisioning until the remaining backend work is complete
 
 That gives the Flutter app a clean client-server architecture immediately, without forcing the mobile code to be rewritten later.

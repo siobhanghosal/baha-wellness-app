@@ -1,0 +1,29 @@
+name: student_app
+description: Student app entry point for the BAHA mobile suite.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  baha_api_client:
+    path: ../../packages/baha_api_client
+  baha_auth_session:
+    path: ../../packages/baha_auth_session
+  baha_content_renderer:
+    path: ../../packages/baha_content_renderer
+  baha_design_system:
+    path: ../../packages/baha_design_system
+  baha_shared_models:
+    path: ../../packages/baha_shared_models
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
