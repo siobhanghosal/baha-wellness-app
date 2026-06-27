@@ -60,9 +60,9 @@ class _AdminShellState extends State<AdminShell> {
             HeroHeader(
                 palette: palette,
                 kicker: 'BAHA Command Center',
-                title: 'Clinical operations, content, schools, and safety.',
+                title: 'Clinical operations, queue, approvals, and safety.',
                 subtitle:
-                    'Enterprise dark dashboard with fake analytics and live-feeling controls.',
+                    'Enterprise dark dashboard aligned to the BAHA/Counselor app flow.',
                 actions: const [
                   Pill(icon: Icons.dark_mode_rounded, label: 'Dark enterprise'),
                   Pill(icon: Icons.security_rounded, label: 'Governance')
@@ -83,6 +83,61 @@ class _AdminShellState extends State<AdminShell> {
                             onTap: () =>
                                 context.go(detailPath(AppRole.admin, m.label))))
                         .toList())),
+            const SizedBox(height: 14),
+            GlassPanel(
+                palette: palette,
+                onTap: () =>
+                    context.go(detailPath(AppRole.admin, 'Support Queue')),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
+                          title: 'Support queue',
+                          subtitle:
+                              'Open cases, unresolved signals, and help requests.'),
+                      ...[
+                        '1 open case · Escalation review',
+                        '1 unassigned signal · Emergency language',
+                        '1 help request · Student support',
+                      ].map((line) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(line,
+                              style:
+                                  Theme.of(context).textTheme.bodyLarge))),
+                    ])),
+            const SizedBox(height: 14),
+            LayoutBuilder(
+                builder: (context, constraints) => GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: adaptiveGridCount(constraints.maxWidth),
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: .92,
+                    children: [
+                      ActionCard(
+                          palette: palette,
+                          item: const UiCardItem(
+                              title: 'Case Detail',
+                              subtitle:
+                                  'Open a local case record with notes and status actions.',
+                              tag: 'Case',
+                              icon: Icons.folder_shared_rounded,
+                              color: Color(0xFF38BDF8)),
+                          onTap: () =>
+                              context.go(detailPath(AppRole.admin, 'Case Detail'))),
+                      ActionCard(
+                          palette: palette,
+                          item: const UiCardItem(
+                              title: 'Threshold Configuration',
+                              subtitle:
+                                  'Adjust safety-review sensitivity in local demo mode.',
+                              tag: 'Safety',
+                              icon: Icons.tune_rounded,
+                              color: Color(0xFFFBBF24)),
+                          onTap: () => context.go(detailPath(
+                              AppRole.admin, 'Threshold Configuration'))),
+                    ])),
             const SizedBox(height: 14),
             GlassPanel(
                 palette: palette,
@@ -112,7 +167,8 @@ class _AdminShellState extends State<AdminShell> {
                 padding: const EdgeInsets.only(bottom: 12),
                 child: GlassPanel(
                     palette: palette,
-                    onTap: () => context.go(detailPath(AppRole.admin, s)),
+                    onTap: () =>
+                        context.go(detailPath(AppRole.admin, 'Approval Decision')),
                     child: ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: const Icon(Icons.pending_actions_rounded),
@@ -121,8 +177,22 @@ class _AdminShellState extends State<AdminShell> {
                             'Tap to inspect and approve in demo mode.'),
                         trailing: FilledButton(
                             onPressed: () =>
-                                context.go(detailPath(AppRole.admin, s)),
+                                context.go(detailPath(
+                                    AppRole.admin, 'Approval Decision')),
                             child: const Text('Review'))))))
+            ,
+            const SizedBox(height: 12),
+            ActionCard(
+                palette: palette,
+                item: const UiCardItem(
+                    title: 'Approval Requests',
+                    subtitle:
+                        'Open the full local approval workflow and simulated decisions.',
+                    tag: 'Review',
+                    icon: Icons.verified_rounded,
+                    color: Color(0xFFF59E0B)),
+                onTap: () =>
+                    context.go(detailPath(AppRole.admin, 'Approval Requests')))
           ]);
   Widget _content(PrototypePalette palette) => LayoutBuilder(
         builder: (context, constraints) => GridView.count(
@@ -132,7 +202,24 @@ class _AdminShellState extends State<AdminShell> {
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
             childAspectRatio: .8,
-            children: [...learning, ...roleActions]
+            children: [
+              const UiCardItem(
+                  title: 'Operational Content',
+                  subtitle:
+                      'Read-only counselor-safe content and operational materials.',
+                  tag: 'Partial',
+                  icon: Icons.library_books_rounded,
+                  color: Color(0xFF38BDF8)),
+              const UiCardItem(
+                  title: 'Content Review Workflow',
+                  subtitle:
+                      'Review and approve content locally without cloud dependency.',
+                  tag: 'Review',
+                  icon: Icons.fact_check_rounded,
+                  color: Color(0xFFA78BFA)),
+              ...learning,
+              ...roleActions
+            ]
                 .map((item) => ActionCard(
                     palette: palette,
                     item: item,
@@ -149,12 +236,46 @@ class _AdminShellState extends State<AdminShell> {
                 kicker: 'System health',
                 title: 'Everything looks operational.',
                 subtitle:
-                    'Fake queues, uptime, AI insights, notifications, and reports.',
+                    'Queue health, support contacts, governance, and system controls.',
                 actions: const [
                   Pill(icon: Icons.check_circle_rounded, label: '99.96%'),
                   Pill(icon: Icons.bolt_rounded, label: 'Fast')
                 ]),
             const SizedBox(height: 18),
+            GlassPanel(
+                palette: palette,
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
+                          title: 'Local BAHA tools',
+                          subtitle:
+                              'These operational flows are now reachable as local prototype pages.'),
+                      ...[
+                        'Support queue and case detail',
+                        'Approval requests and decisions',
+                        'Content review workflow',
+                        'Threshold configuration and crisis contacts',
+                      ].map((contract) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(contract,
+                              style:
+                                  Theme.of(context).textTheme.bodyLarge))),
+                    ])),
+            const SizedBox(height: 18),
+            Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: ActionCard(
+                    palette: palette,
+                    item: const UiCardItem(
+                        title: 'Expert Routing and Crisis Contacts',
+                        subtitle:
+                            'Open local support-routing and crisis reference details.',
+                        tag: 'Safe',
+                        icon: Icons.support_agent_rounded,
+                        color: Color(0xFF38BDF8)),
+                    onTap: () => context.go(detailPath(
+                        AppRole.admin, 'Expert Routing and Crisis Contacts')))),
             ...roleActions.map((item) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: ActionCard(

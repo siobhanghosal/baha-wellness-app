@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../dummy_data/screen_blueprints.dart';
 import '../../models/prototype_models.dart';
 import '../../navigation/app_router.dart';
 import '../../themes/app_theme.dart';
@@ -20,7 +21,8 @@ class LoginScreen extends StatelessWidget {
             role: role,
             palette: palette,
             title: 'Welcome back',
-            subtitle: 'Demo login only. No auth is performed.',
+            subtitle:
+                'Prototype login only. In production this would restore session, verify identity, and fetch onboarding state.',
             children: [
               const TextField(
                   decoration: InputDecoration(labelText: 'Email address')),
@@ -55,7 +57,8 @@ class SignupScreen extends StatelessWidget {
             role: role,
             palette: palette,
             title: 'Create your profile',
-            subtitle: 'A complete fake signup flow for stakeholder demos.',
+            subtitle:
+                'This local signup mirrors the planned onboarding path for ${role.label.toLowerCase()}.',
             children: [
               const TextField(
                   decoration: InputDecoration(labelText: 'Full name')),
@@ -92,7 +95,8 @@ class ForgotPasswordScreen extends StatelessWidget {
             role: role,
             palette: palette,
             title: 'Reset access',
-            subtitle: 'Fake password reset screen with animated confirmation.',
+            subtitle:
+                'Local recovery flow only. The production app would hand off to verified account recovery.',
             children: [
               const TextField(
                   decoration: InputDecoration(labelText: 'Email address')),
@@ -158,8 +162,8 @@ class OnboardingScreen extends StatelessWidget {
                   palette: palette,
                   kicker: 'Onboarding',
                   title: role == AppRole.student
-                      ? 'Set your vibe, privacy, and avatar.'
-                      : 'Prepare your ${role.label} workspace.',
+                      ? 'Set your vibe, consent path, privacy, and avatar.'
+                      : 'Prepare your ${role.label.toLowerCase()} workspace.',
                   subtitle: palette.story,
                   actions: [
                     Pill(icon: role.icon, label: role.label),
@@ -167,18 +171,11 @@ class OnboardingScreen extends StatelessWidget {
                         icon: Icons.privacy_tip_rounded, label: 'Privacy-first')
                   ]),
               const SizedBox(height: 20),
-              ...[
-                'Choose avatar',
-                'Review privacy',
-                'Enable reminders',
-                'Preview dashboard'
-              ].indexed.map((entry) => Padding(
+              ...onboardingStepsFor(role).indexed.map((entry) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: GlassPanel(
                       palette: palette,
-                      onTap: () => entry.$1 == 0
-                          ? context.go('/avatar/${role.slug}')
-                          : context.go(detailPath(role, entry.$2)),
+                      onTap: () => context.go(detailPath(role, entry.$2)),
                       child: Row(children: [
                         CircleAvatar(
                             backgroundColor:
@@ -193,6 +190,47 @@ class OnboardingScreen extends StatelessWidget {
                                     ?.copyWith(fontWeight: FontWeight.w800))),
                         const Icon(Icons.chevron_right_rounded)
                       ])))),
+              if (role == AppRole.student)
+                Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: GlassPanel(
+                        palette: palette,
+                        onTap: () => context.go('/avatar/${role.slug}'),
+                        child: Row(children: [
+                          CircleAvatar(
+                              backgroundColor:
+                                  palette.primary.withValues(alpha: .14),
+                              child: const Icon(Icons.face_rounded)),
+                          const SizedBox(width: 14),
+                          Expanded(
+                              child: Text('Pick demo avatar',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
+                                          fontWeight: FontWeight.w800))),
+                          const Icon(Icons.chevron_right_rounded)
+                        ]))),
+              const SizedBox(height: 10),
+              GlassPanel(
+                  palette: palette,
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SectionTitle(
+                            title: 'What this simulates',
+                            subtitle:
+                                'These steps are aligned to the screen and connection plan.'),
+                        Text(
+                            role == AppRole.student
+                                ? 'Student onboarding branches into guardian-consent pending or self-consent ready states.'
+                                : role == AppRole.parent
+                                    ? 'Parent onboarding emphasizes student linking, relationship confirmation, and summary sharing consent.'
+                                    : role == AppRole.teacher
+                                        ? 'Teacher onboarding includes approval-pending status before classes and pastoral tools are unlocked.'
+                                        : 'BAHA onboarding focuses on operational access, approvals, and queue-driven workflows.',
+                            style: Theme.of(context).textTheme.bodyLarge),
+                      ])),
               const SizedBox(height: 10),
               AnimatedPrimaryButton(
                   label: 'Open ${role.label}',

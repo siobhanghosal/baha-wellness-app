@@ -11,7 +11,7 @@ extension AppRoleX on AppRole {
         AppRole.student => 'Student App',
         AppRole.parent => 'Parent App',
         AppRole.teacher => 'Teacher App',
-        AppRole.admin => 'BAHA Admin App',
+        AppRole.admin => 'BAHA Dashboard',
       };
 
   String get slug => switch (this) {
@@ -33,7 +33,7 @@ extension AppRoleX on AppRole {
         AppRole.parent => 'Consent-aware summaries and family guidance.',
         AppRole.teacher => 'Class wellbeing, pastoral actions, and reports.',
         AppRole.admin =>
-          'Enterprise oversight, approvals, content, and analytics.',
+          'Counselor operations, approvals, content, and analytics.',
       };
 }
 

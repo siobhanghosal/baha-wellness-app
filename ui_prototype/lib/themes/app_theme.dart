@@ -80,21 +80,20 @@ PrototypePalette studentPalette(
     if (age == StudentAgeGroup.teen && gender == StudentGender.male) {
       return const PrototypePalette(
         name: 'Neon Quest',
-        background: Color(0xFF0B1020),
-        surface: Color(0xFF151B31),
-        text: Color(0xFFF8FAFC),
-        muted: Color(0xFF94A3B8),
+        background: Color(0xFFF4F8FF),
+        surface: Color(0xFFFFFFFF),
+        text: Color(0xFF132238),
+        muted: Color(0xFF5E7492),
         primary: Color(0xFF3B82F6),
         secondary: Color(0xFF8B5CF6),
         accent: Color(0xFF22D3EE),
         gradient: LinearGradient(
-            colors: [Color(0xFF1D4ED8), Color(0xFF7C3AED), Color(0xFF06B6D4)],
+            colors: [Color(0xFF60A5FA), Color(0xFF818CF8), Color(0xFF22D3EE)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight),
         heroIcon: Icons.sports_esports_rounded,
         story:
             'Gaming-inspired energy with neon gradients, XP cards, and smooth motion.',
-        isDark: true,
       );
     }
     if (age == StudentAgeGroup.teen && gender == StudentGender.female) {

@@ -75,6 +75,41 @@ class _TeacherShellState extends State<TeacherShell> {
                     metric: m,
                     onTap: () =>
                         context.go(detailPath(AppRole.teacher, m.label)))))
+            ,
+            const SizedBox(height: 12),
+            GlassPanel(
+                palette: palette,
+                onTap: () => context.go(detailPath(AppRole.teacher, 'Class List')),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
+                          title: 'Assigned classes',
+                          subtitle:
+                              'This prototype now treats class assignment as the primary teacher context.'),
+                      ...[
+                        'Class 9B · 32 students · Active assignment',
+                        'Class 10A · 29 students · Pastoral access',
+                      ].map((line) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(line,
+                              style:
+                                  Theme.of(context).textTheme.bodyLarge))),
+                    ])),
+            const SizedBox(height: 12),
+            Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: ActionCard(
+                    palette: palette,
+                    item: const UiCardItem(
+                        title: 'Class Summary',
+                        subtitle:
+                            'Open a local cohort summary and class-level wellbeing view.',
+                        tag: 'Summary',
+                        icon: Icons.bar_chart_rounded,
+                        color: Color(0xFF0EA5E9)),
+                    onTap: () =>
+                        context.go(detailPath(AppRole.teacher, 'Class Summary'))))
           ]);
   Widget _students(PrototypePalette palette) => ListView(
           key: const ValueKey('teacher-students'),
@@ -88,19 +123,44 @@ class _TeacherShellState extends State<TeacherShell> {
               'Student B · Attendance drop',
               'Student C · Peer conflict',
               'Student D · Improved check-ins'
-            ].map((s) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: GlassPanel(
-                    palette: palette,
-                    onTap: () => context.go(detailPath(AppRole.teacher, s)),
-                    child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const CircleAvatar(
-                            child: Icon(Icons.person_rounded)),
-                        title: Text(s),
-                        subtitle: const Text(
-                            'Tap for recommendations and communication options.'),
-                        trailing: const Icon(Icons.chevron_right_rounded)))))
+            ].map((s) {
+              return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: GlassPanel(
+                      palette: palette,
+                      onTap: () =>
+                          context.go(detailPath(AppRole.teacher, 'Pastoral Flag')),
+                      child: Column(children: [
+                        ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const CircleAvatar(
+                                child: Icon(Icons.person_rounded)),
+                            title: Text(s),
+                            subtitle: const Text(
+                                'Tap for recommendations and communication options.'),
+                            trailing: const Icon(Icons.chevron_right_rounded)),
+                        Align(
+                            alignment: Alignment.centerLeft,
+                            child: FilledButton.tonalIcon(
+                                onPressed: () => context.go(
+                                    detailPath(AppRole.teacher, 'Pastoral Flag')),
+                                icon: const Icon(Icons.flag_rounded),
+                                label: const Text('Draft pastoral flag'))),
+                      ])));
+            })
+            ,
+            const SizedBox(height: 12),
+            ActionCard(
+                palette: palette,
+                item: const UiCardItem(
+                    title: 'Referral Workflow',
+                    subtitle:
+                        'Walk through a local teacher-to-counselor referral flow.',
+                    tag: 'Flow',
+                    icon: Icons.compare_arrows_rounded,
+                    color: Color(0xFFF59E0B)),
+                onTap: () =>
+                    context.go(detailPath(AppRole.teacher, 'Referral Workflow')))
           ]);
   Widget _tasks(PrototypePalette palette) => LayoutBuilder(
         builder: (context, constraints) => GridView.count(
@@ -110,7 +170,38 @@ class _TeacherShellState extends State<TeacherShell> {
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
             childAspectRatio: .8,
-            children: [...roleActions, ...learning.take(2)]
+            children: [
+              const UiCardItem(
+                  title: 'Teacher Resources',
+                  subtitle:
+                      'Role-safe learning and intervention supports for staff.',
+                  tag: 'Ready',
+                  icon: Icons.menu_book_rounded,
+                  color: Color(0xFF0EA5E9)),
+              const UiCardItem(
+                  title: 'Pastoral Flag',
+                  subtitle:
+                      'Observation workflow that avoids diagnostic language.',
+                  tag: 'Workflow',
+                  icon: Icons.flag_rounded,
+                  color: Color(0xFFF97316)),
+              const UiCardItem(
+                  title: 'Referral Workflow',
+                  subtitle:
+                      'Practice the handoff flow using fully local actions.',
+                  tag: 'Flow',
+                  icon: Icons.compare_arrows_rounded,
+                  color: Color(0xFFF59E0B)),
+              const UiCardItem(
+                  title: 'Teacher Notifications',
+                  subtitle:
+                      'A local operational reminder center for staff.',
+                  tag: 'Updates',
+                  icon: Icons.notifications_rounded,
+                  color: Color(0xFF14B8A6)),
+              ...roleActions,
+              ...learning.take(2)
+            ]
                 .map((item) => ActionCard(
                     palette: palette,
                     item: item,
@@ -129,10 +220,44 @@ class _TeacherShellState extends State<TeacherShell> {
                     children: [
                       const SectionTitle(
                           title: 'Class report',
-                          subtitle: 'Animated fake analytics.'),
+                          subtitle:
+                              'Animated analytics aligned to the teacher cohort summary concept.'),
                       MiniLineChart(palette: palette)
                     ])),
             const SizedBox(height: 14),
+            GlassPanel(
+                palette: palette,
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
+                          title: 'Local flow coverage',
+                          subtitle:
+                              'The key teacher flows are now reachable without any backend dependency.'),
+                      ...[
+                        'Class list and local cohort summary',
+                        'Student wellbeing signals and pastoral flag',
+                        'Referral workflow and teacher notifications',
+                      ].map((contract) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(contract,
+                              style:
+                                  Theme.of(context).textTheme.bodyLarge))),
+                    ])),
+            const SizedBox(height: 14),
+            Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: ActionCard(
+                    palette: palette,
+                    item: const UiCardItem(
+                        title: 'Teacher Notifications',
+                        subtitle:
+                            'View reminders, summaries, and pastoral follow-up prompts.',
+                        tag: 'Local',
+                        icon: Icons.notifications_rounded,
+                        color: Color(0xFF14B8A6)),
+                    onTap: () => context.go(
+                        detailPath(AppRole.teacher, 'Teacher Notifications')))),
             ...timeline.map((e) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: GlassPanel(

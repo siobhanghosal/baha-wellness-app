@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:salomon_bottom_bar/salomon_bottom_bar.dart';
 
 import '../../dummy_data/mock_data.dart';
+import '../../dummy_data/screen_blueprints.dart';
 import '../../models/prototype_models.dart';
 import '../../navigation/app_router.dart';
 import '../../themes/app_theme.dart';
@@ -35,7 +36,8 @@ class _StudentShellState extends State<StudentShell> {
         studentPalette(age, gender, isDark: ThemeScope.of(context).isDark);
     final pages = [
       _dashboard(palette),
-      _discover(palette),
+      _checkins(palette),
+      _learn(palette),
       _buddy(palette),
       _profile(palette)
     ];
@@ -53,11 +55,14 @@ class _StudentShellState extends State<StudentShell> {
           bottomNavigationBar: SalomonBottomBar(
               currentIndex: tab,
               onTap: (i) => setState(() => tab = i),
-              items: [
+                items: [
                 SalomonBottomBarItem(
                     icon: Icon(Icons.home_rounded), title: Text('Home')),
                 SalomonBottomBarItem(
-                    icon: Icon(Icons.explore_rounded), title: Text('Explore')),
+                    icon: Icon(Icons.favorite_rounded), title: Text('Check-In')),
+                SalomonBottomBarItem(
+                    icon: Icon(Icons.auto_stories_rounded),
+                    title: Text('Learn')),
                 SalomonBottomBarItem(
                     icon: Icon(Icons.chat_rounded), title: Text('Buddy')),
                 SalomonBottomBarItem(
@@ -110,6 +115,59 @@ class _StudentShellState extends State<StudentShell> {
                     onTap: () =>
                         context.go(detailPath(AppRole.student, m.label))))),
             const SizedBox(height: 10),
+            LayoutBuilder(
+                builder: (context, constraints) => GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: adaptiveGridCount(constraints.maxWidth),
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: .9,
+                    children: [
+                      ActionCard(
+                          palette: palette,
+                          item: const UiCardItem(
+                              title: 'Daily Check-in',
+                              subtitle:
+                                  'Open the check-in list and recent submissions.',
+                              tag: 'Flow',
+                              icon: Icons.favorite_rounded,
+                              color: Color(0xFF14B8A6)),
+                          onTap: () => setState(() => tab = 1)),
+                      ActionCard(
+                          palette: palette,
+                          item: const UiCardItem(
+                              title: 'Learn Feed',
+                              subtitle:
+                                  'Browse approved modules and discovery content.',
+                              tag: 'Modules',
+                              icon: Icons.auto_stories_rounded,
+                              color: Color(0xFF6366F1)),
+                          onTap: () => setState(() => tab = 2)),
+                      ActionCard(
+                          palette: palette,
+                          item: const UiCardItem(
+                              title: 'Games Hub',
+                              subtitle:
+                                  'Open calming mini-activities and reflection games.',
+                              tag: 'Play',
+                              icon: Icons.games_rounded,
+                              color: Color(0xFF8B5CF6)),
+                          onTap: () =>
+                              context.go(detailPath(AppRole.student, 'Games Hub'))),
+                      ActionCard(
+                          palette: palette,
+                          item: const UiCardItem(
+                              title: 'Support Contacts',
+                              subtitle:
+                                  'See safe next steps and local support options.',
+                              tag: 'Help',
+                              icon: Icons.support_agent_rounded,
+                              color: Color(0xFFEF4444)),
+                          onTap: () => context
+                              .go(detailPath(AppRole.student, 'Support Contacts'))),
+                    ])),
+            const SizedBox(height: 10),
             GlassPanel(
                 palette: palette,
                 child: Column(
@@ -120,20 +178,102 @@ class _StudentShellState extends State<StudentShell> {
                           subtitle: 'A beautiful private graph.'),
                       MiniLineChart(palette: palette)
                     ])),
+            const SizedBox(height: 12),
+            GlassPanel(
+                palette: palette,
+                onTap: () => context.go(detailPath(AppRole.student, 'SOS Help')),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
+                          title: 'Support path',
+                          subtitle:
+                              'This local build opens a fully simulated support flow.'),
+                      Text('Open a fake support request, emergency guidance, or local contact card.',
+                          style: Theme.of(context).textTheme.bodyLarge),
+                    ])),
           ]);
 
-  Widget _discover(PrototypePalette palette) => LayoutBuilder(
+  Widget _checkins(PrototypePalette palette) => ListView(
+          key: const ValueKey('student-checkins'),
+          padding: const EdgeInsets.all(22),
+          children: [
+            HeroHeader(
+                palette: palette,
+                kicker: 'Check-In',
+                title: 'Your private check-in flow',
+                subtitle:
+                    'This tab now matches the planned student check-in list rather than a generic explore feed.',
+                actions: const [
+                  Pill(icon: Icons.favorite_rounded, label: 'Templates'),
+                  Pill(icon: Icons.history_rounded, label: 'Recent')
+                ]),
+            const SizedBox(height: 18),
+            ...[
+              'Daily Check-in',
+              'Sleep Reflection',
+              'Exam Stress Pulse',
+              'Friendship Check'
+            ].map((title) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: GlassPanel(
+                    palette: palette,
+                    onTap: () => context.go(detailPath(AppRole.student, title)),
+                    child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                            backgroundColor:
+                                palette.primary.withValues(alpha: .14),
+                            child: Icon(Icons.edit_note_rounded,
+                                color: palette.primary)),
+                        title: Text(title),
+                        subtitle: Text(
+                            'Would connect to ${findBlueprint(AppRole.student, 'Daily Check-in')?.backendContracts.first ?? 'planned endpoints'}.'),
+                        trailing: const Icon(Icons.chevron_right_rounded))))),
+            const SizedBox(height: 10),
+            GlassPanel(
+                palette: palette,
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
+                          title: 'Recent submissions',
+                          subtitle:
+                              'Mock history aligned to the screen matrix.'),
+                      ...timeline.take(3).map((event) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Text(
+                              '${event.time} · ${event.title} · ${event.detail}',
+                              style: Theme.of(context).textTheme.bodyLarge))),
+                    ])),
+          ]);
+
+  Widget _learn(PrototypePalette palette) => LayoutBuilder(
         builder: (context, constraints) => GridView.builder(
-            key: const ValueKey('student-discover'),
+            key: const ValueKey('student-learn'),
             padding: const EdgeInsets.all(22),
-            itemCount: studentCards.length + learning.length,
+            itemCount: learning.length + 2,
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: adaptiveGridCount(constraints.maxWidth),
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
                 childAspectRatio: .78),
             itemBuilder: (context, index) {
-              final items = [...studentCards, ...learning];
+              final items = [
+                const UiCardItem(
+                    title: 'Learn Feed',
+                    subtitle: 'Entry point for approved student content.',
+                    tag: 'Ready',
+                    icon: Icons.menu_book_rounded,
+                    color: Color(0xFF14B8A6)),
+                const UiCardItem(
+                    title: 'Module Detail',
+                    subtitle: 'Would open an approved content item with progress.',
+                    tag: 'Progress',
+                    icon: Icons.auto_stories_rounded,
+                    color: Color(0xFF3B82F6)),
+                ...learning
+              ];
               return ActionCard(
                       palette: palette,
                       item: items[index],
@@ -149,7 +289,7 @@ class _StudentShellState extends State<StudentShell> {
           key: const ValueKey('student-buddy'),
           padding: const EdgeInsets.all(22),
           children: [
-            HeroHeader(
+          HeroHeader(
                 palette: palette,
                 kicker: 'BAHA Buddy',
                 title: 'A companion, not a clinician.',
@@ -186,6 +326,26 @@ class _StudentShellState extends State<StudentShell> {
                   child: const Icon(Icons.send_rounded))
             ]),
             const SizedBox(height: 16),
+            GlassPanel(
+                palette: palette,
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
+                          title: 'Planned runtime',
+                          subtitle:
+                              'This local build keeps the Buddy flow interactive without any backend dependency.'),
+                      ...[
+                        'Messages stay inside the Flutter session.',
+                        'Send opens a fake guided response immediately.',
+                        'SOS help stays reachable at all times.',
+                      ].map((line) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(line,
+                              style:
+                                  Theme.of(context).textTheme.bodyLarge))),
+                    ])),
+            const SizedBox(height: 16),
             AnimatedPrimaryButton(
                 label: 'Open SOS help',
                 icon: Icons.health_and_safety_rounded,
@@ -202,7 +362,7 @@ class _StudentShellState extends State<StudentShell> {
                 kicker: 'Profile',
                 title: 'Your style and progress',
                 subtitle:
-                    'Editable demo profile with achievements, badges, journal, and privacy.',
+                    'Editable demo profile with achievements, privacy reminders, and session preferences.',
                 actions: [
                   Pill(icon: Icons.palette_rounded, label: palette.name),
                   const Pill(
@@ -223,6 +383,52 @@ class _StudentShellState extends State<StudentShell> {
                       style: TextStyle(color: palette.muted))
                 ])),
             const SizedBox(height: 14),
+            GlassPanel(
+                palette: palette,
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
+                          title: 'Privacy and consent reminders',
+                          subtitle:
+                              'This profile area now mirrors the planned settings focus from the screen matrix.'),
+                      ...[
+                        'Weekly summary is private by default.',
+                        'Guardian access depends on consent and privacy rules.',
+                        'High-risk support pathways are operationally governed.',
+                      ].map((line) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(line,
+                              style:
+                                  Theme.of(context).textTheme.bodyLarge))),
+                    ])),
+            const SizedBox(height: 14),
+            Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: ActionCard(
+                    palette: palette,
+                    item: const UiCardItem(
+                        title: 'Games Hub',
+                        subtitle:
+                            'Breathing, emotion naming, and social practice activities.',
+                        tag: 'Fun',
+                        icon: Icons.games_rounded,
+                        color: Color(0xFF8B5CF6)),
+                    onTap: () =>
+                        context.go(detailPath(AppRole.student, 'Games Hub')))),
+            Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: ActionCard(
+                    palette: palette,
+                    item: const UiCardItem(
+                        title: 'Support Contacts',
+                        subtitle:
+                            'Quick access to local help options and guidance.',
+                        tag: 'Safe',
+                        icon: Icons.support_agent_rounded,
+                        color: Color(0xFFEF4444)),
+                    onTap: () => context
+                        .go(detailPath(AppRole.student, 'Support Contacts')))),
             ...roleActions.map((item) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: ActionCard(
