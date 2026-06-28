@@ -8,6 +8,8 @@ environment:
   flutter: '>=1.17.0'
 
 dependencies:
+  baha_shared_models:
+    path: ../baha_shared_models
   baha_design_system:
     path: ../baha_design_system
   flutter:

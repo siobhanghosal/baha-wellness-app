@@ -1,6 +1,10 @@
 import 'package:baha_shared_models/baha_shared_models.dart';
 import 'package:flutter/material.dart';
 
+import '../prototype/app_theme.dart';
+import '../prototype/prototype_models.dart';
+import '../prototype/prototype_widgets.dart';
+
 class StudentIdentityScreen extends StatefulWidget {
   const StudentIdentityScreen({
     required this.defaultExternalAuthId,
@@ -27,7 +31,9 @@ class _StudentIdentityScreenState extends State<StudentIdentityScreen> {
   @override
   void initState() {
     super.initState();
-    _externalAuthIdController = TextEditingController(text: widget.defaultExternalAuthId);
+    _externalAuthIdController = TextEditingController(
+      text: widget.defaultExternalAuthId,
+    );
     _emailController = TextEditingController(text: widget.defaultAuthEmail);
   }
 
@@ -44,7 +50,9 @@ class _StudentIdentityScreenState extends State<StudentIdentityScreen> {
       await widget.onSubmit(
         DevelopmentIdentity(
           externalAuthId: _externalAuthIdController.text.trim(),
-          authEmail: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
+          authEmail: _emailController.text.trim().isEmpty
+              ? null
+              : _emailController.text.trim(),
         ),
       );
     } finally {
@@ -56,64 +64,82 @@ class _StudentIdentityScreenState extends State<StudentIdentityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context).textTheme;
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
-              Text('Student app bootstrap', style: theme.headlineMedium),
-              const SizedBox(height: 12),
-              Text(
-                'This build uses the backend development identity bridge until hosted auth is provisioned.',
-                style: theme.bodyLarge,
-              ),
-              const SizedBox(height: 24),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('API target', style: theme.titleLarge),
-                      const SizedBox(height: 8),
-                      Text(widget.apiBaseUrl, style: theme.bodyLarge),
-                      const SizedBox(height: 20),
-                      TextField(
-                        controller: _externalAuthIdController,
-                        decoration: const InputDecoration(
-                          labelText: 'External auth ID',
-                          hintText: 'supabase-student-demo',
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'Auth email (optional)',
-                          hintText: 'student.demo@baha.local',
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: _submitting ? null : _submit,
-                        child: Text(_submitting ? 'Connecting...' : 'Continue'),
-                      ),
-                    ],
+    final palette = studentPalette(StudentAgeGroup.teen, StudentGender.female);
+    return Theme(
+      data: buildTheme(palette),
+      child: AnimatedGradientScaffold(
+        palette: palette,
+        child: ListView(
+          padding: const EdgeInsets.all(22),
+          children: [
+            HeroHeader(
+              palette: palette,
+              kicker: AppRole.student.label,
+              title: 'Welcome back',
+              subtitle:
+                  'Connect the real student app using the development identity bridge until hosted auth is provisioned.',
+              actions: const [
+                Pill(icon: Icons.lock_open_rounded, label: 'Dev auth'),
+                Pill(icon: Icons.cloud_done_rounded, label: 'Real backend'),
+              ],
+            ),
+            const SizedBox(height: 22),
+            GlassPanel(
+              palette: palette,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Connect to BAHA Student',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Use the seeded student identity for the fastest path into the live backend.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _externalAuthIdController,
+                    decoration: const InputDecoration(
+                      labelText: 'External auth ID',
+                      hintText: 'supabase-student-demo',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Auth email (optional)',
+                      hintText: 'student.demo@baha.local',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'API target: ${widget.apiBaseUrl}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 18),
+                  AnimatedPrimaryButton(
+                    label: _submitting ? 'Connecting...' : 'Enter Student App',
+                    icon: Icons.login_rounded,
+                    onPressed: _submitting ? () {} : _submit,
+                  ),
+                ],
               ),
-              const SizedBox(height: 20),
-              Text(
-                'Use a seeded ID like `supabase-student-demo` to land on the seeded demo student immediately, or enter a new ID to test the bootstrap path.',
-                style: theme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            GlassPanel(
+              palette: palette,
+              child: Text(
+                'Use `supabase-student-demo` for the seeded student, or enter a new external ID to test the bootstrap path.',
+                style: Theme.of(context).textTheme.bodyLarge,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

@@ -60,12 +60,18 @@ void main() {
       'sort_order': 1,
       'progress_status': 'in_progress',
       'completion_percent': 50,
+      'current_section_ordinal': 1,
+      'current_step_ordinal': 1,
       'last_activity_at': '2026-06-27T08:40:00.365232Z',
       'module_progress_id': 'e1647779-c19a-40ed-8443-6f8fd237a3b2',
+      'total_sections': 2,
+      'total_steps': 3,
     });
 
     expect(module.contentItemId, '60000000-0000-0000-0000-000000000001');
     expect(module.completionPercent, 50);
+    expect(module.currentSectionOrdinal, 1);
+    expect(module.totalSteps, 3);
   });
 
   test('maps content detail blocks', () {
@@ -97,5 +103,158 @@ void main() {
 
     expect(detail.blocks.single.type, 'text');
     expect(detail.blocks.single.value, contains('sleep routines'));
+  });
+
+  test('maps support contact payload', () {
+    final contact = MobileSupportContact.fromJson(const {
+      'id': '70000000-0000-0000-0000-000000000001',
+      'school_id': '10000000-0000-0000-0000-000000000001',
+      'contact_type': 'counselor',
+      'audience_app': 'shared',
+      'label': 'BAHA Demo Counselor Line',
+      'phone': '+91-90000-00001',
+      'email': 'counselor.demo@baha.local',
+      'contact_url': null,
+      'service_hours': 'Mon-Fri 9am-6pm',
+      'priority': 1,
+      'metadata': {'demo': true},
+    });
+
+    expect(contact.contactType, 'counselor');
+    expect(contact.phone, '+91-90000-00001');
+  });
+
+  test('maps help request response payload', () {
+    final response = HelpRequestResponse.fromJson(const {
+      'id': '1cfd6ca0-6af0-40b4-a6cd-8e74ff5a1a47',
+      'student_profile_id': '30000000-0000-0000-0000-000000000001',
+      'requested_by_user_id': '20000000-0000-0000-0000-000000000001',
+      'requested_for_user_id': '20000000-0000-0000-0000-000000000001',
+      'request_channel': 'student_app',
+      'category': 'academic_stress',
+      'urgency': 'standard',
+      'status': 'open',
+      'summary': 'Need help balancing school work.',
+      'details': {'note': 'Demo request from integration check'},
+      'visibility_scope': 'private',
+      'created_at': '2026-06-27T09:12:31.057939Z',
+    });
+
+    expect(response.status, 'open');
+    expect(response.details['note'], contains('integration'));
+  });
+
+  test('maps chat session summary payload', () {
+    final session = ChatSessionSummary.fromJson(const {
+      'id': '5fdff4be-a671-4571-8701-4a3cd420a5f2',
+      'session_type': 'general_support',
+      'status': 'active',
+      'safety_disposition': 'none',
+      'started_at': '2026-06-27T09:18:17.709664Z',
+      'ended_at': null,
+      'last_message_at': null,
+      'message_count': 0,
+      'summary_visibility_scope': 'private',
+    });
+
+    expect(session.sessionType, 'general_support');
+    expect(session.messageCount, 0);
+  });
+
+  test('maps chat exchange response payload', () {
+    final exchange = MobileChatExchangeResponse.fromJson(const {
+      'user_message': {
+        'id': '1',
+        'chat_session_id': '2',
+        'sender_type': 'user',
+        'message_type': 'user_query',
+        'ordinal': 1,
+        'body': 'I feel stressed.',
+        'structured_payload': {},
+        'retrieval_filters': {},
+        'safety_labels': [],
+        'created_at': '2026-06-27T09:18:17.716179Z',
+        'updated_at': '2026-06-27T09:18:17.716179Z',
+      },
+      'assistant_message': {
+        'id': '3',
+        'chat_session_id': '2',
+        'sender_type': 'assistant',
+        'message_type': 'assistant_answer',
+        'ordinal': 2,
+        'body': 'Talk to a trusted adult.',
+        'structured_payload': {},
+        'retrieval_filters': {},
+        'safety_labels': [],
+        'created_at': '2026-06-27T09:18:17.716179Z',
+        'updated_at': '2026-06-27T09:18:17.716179Z',
+      },
+      'answer': {'condition': 'Exam Stress'},
+      'retrieved': [],
+    });
+
+    expect(exchange.assistantMessage.senderType, 'assistant');
+    expect(exchange.answer['condition'], 'Exam Stress');
+  });
+
+  test('maps linked parent student summary payload', () {
+    final student = MobileLinkedStudentSummary.fromJson(const {
+      'student_profile_id': '30000000-0000-0000-0000-000000000001',
+      'student_name': 'Aarav Student',
+      'age_cohort': '13_14',
+      'relationship_to_student': 'mother',
+      'is_primary': true,
+      'school_name': 'BAHA Pilot School',
+    });
+
+    expect(student.studentName, 'Aarav Student');
+    expect(student.relationshipToStudent, 'mother');
+    expect(student.isPrimary, isTrue);
+  });
+
+  test('maps parent weekly summary payload', () {
+    final summary = ParentWeeklySummary.fromJson(const {
+      'id': '73000000-0000-0000-0000-000000000001',
+      'student_profile_id': '30000000-0000-0000-0000-000000000001',
+      'guardian_id': '30000000-0000-0000-0000-000000000101',
+      'week_start': '2026-06-22',
+      'week_end': '2026-06-28',
+      'consent_status': 'approved',
+      'visible_tiers': ['tier1', 'tier2'],
+      'summary': {
+        'headline': 'Your child showed consistent check-in participation.',
+        'safe_talking_point': 'Ask what part of the week felt easiest.',
+      },
+      'generated_at': '2026-06-27T10:15:00Z',
+      'access': {
+        'allowed': true,
+        'mode': 'approved',
+        'visible_tiers': ['tier1', 'tier2'],
+        'reason': null,
+      },
+    });
+
+    expect(summary.access.allowed, isTrue);
+    expect(summary.summary['headline'], contains('consistent'));
+    expect(summary.visibleTiers, ['tier1', 'tier2']);
+  });
+
+  test('maps parent summary consent payload', () {
+    final consent = ParentSummaryConsentStatus.fromJson(const {
+      'consent_type': 'parent_summary_sharing',
+      'consent_version_id': '76000000-0000-0000-0000-000000000001',
+      'student_profile_id': '30000000-0000-0000-0000-000000000001',
+      'guardian_id': '30000000-0000-0000-0000-000000000101',
+      'status': 'granted',
+      'scope': 'weekly_summaries',
+      'actor_relationship': 'parent',
+      'granted_at': '2026-06-27T10:15:00Z',
+      'withdrawn_at': null,
+      'created_at': '2026-06-27T10:00:00Z',
+    });
+
+    expect(consent.status, 'granted');
+    expect(consent.scope, 'weekly_summaries');
+    expect(consent.actorRelationship, 'parent');
   });
 }

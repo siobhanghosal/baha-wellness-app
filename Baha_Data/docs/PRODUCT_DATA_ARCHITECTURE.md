@@ -20,6 +20,11 @@ It builds on the current `Baha_Data` platform and recommends a hybrid model:
 
 This is not a recommendation to immediately delete or move the current raw data. It is a target architecture and operating model for organizing it cleanly over time.
 
+For the student-facing learning transformation of this corpus into app material,
+see:
+
+- [STUDENT_LEARNING_CONTENT_STRATEGY.md](./STUDENT_LEARNING_CONTENT_STRATEGY.md)
+
 ## 1.1 Current Physical Repo Layout
 
 The current `Baha_Data/` folder is about `4.5G` locally and is organized into a few distinct physical areas:
@@ -43,6 +48,12 @@ So in practical terms:
 - the app/runtime database shape lives under `migrations/`
 - the product logic that consumes curated database data lives under `src/baha_rag/`
 - the documentation describing the intended long-term organization lives under `docs/`
+
+Important current constraint:
+
+- the large raw corpus exists on disk, but the live mobile backend serves only
+  the curated publishable content layer
+- that is intentional and should remain the product-serving model
 
 ## 2. Design Principles
 

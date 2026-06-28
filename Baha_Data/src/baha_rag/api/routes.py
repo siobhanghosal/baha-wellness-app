@@ -878,6 +878,9 @@ async def mobile_content_feed(
     audience_app: str | None = None,
     content_type: str | None = None,
     age_cohort: str | None = None,
+    theme: str | None = None,
+    topic: str | None = None,
+    subtopic: str | None = None,
     limit: int = 20,
 ) -> list[MobileContentSummary]:
     resolved_audience = _resolve_mobile_content_audience(
@@ -891,6 +894,9 @@ async def mobile_content_feed(
         audience_app=resolved_audience,
         age_cohort=resolved_age_cohort,
         content_type=content_type,
+        theme=theme,
+        topic=topic,
+        subtopic=subtopic,
         limit=max(1, min(limit, 50)),
     )
     return [MobileContentSummary.model_validate(row) for row in rows]
@@ -965,12 +971,14 @@ async def mobile_student_checkin_template_detail(
 async def mobile_student_modules(
     actor: ActorContext = Depends(get_actor_context),
     session: AsyncSession = Depends(get_session),
+    theme: str | None = None,
 ) -> list[MobileModuleSummary]:
     _require_student(actor)
     rows = await MobileAppRepository(session).list_student_modules(
         user_id=actor.user_id,
         student_profile_id=actor.student_profile_id,
         age_cohort=actor.age_cohort,
+        theme=theme,
     )
     return [MobileModuleSummary.model_validate(row) for row in rows]
 

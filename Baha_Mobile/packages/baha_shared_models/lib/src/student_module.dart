@@ -9,9 +9,13 @@ class StudentModuleSummary {
     required this.sortOrder,
     required this.progressStatus,
     required this.completionPercent,
+    this.currentSectionOrdinal,
+    this.currentStepOrdinal,
     this.estimatedMinutes,
     this.lastActivityAt,
     this.moduleProgressId,
+    this.totalSections = 0,
+    this.totalSteps = 0,
   });
 
   final String id;
@@ -24,8 +28,12 @@ class StudentModuleSummary {
   final int sortOrder;
   final String progressStatus;
   final double completionPercent;
+  final int? currentSectionOrdinal;
+  final int? currentStepOrdinal;
   final DateTime? lastActivityAt;
   final String? moduleProgressId;
+  final int totalSections;
+  final int totalSteps;
 
   factory StudentModuleSummary.fromJson(Map<String, dynamic> json) {
     return StudentModuleSummary(
@@ -39,8 +47,12 @@ class StudentModuleSummary {
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
       progressStatus: json['progress_status'] as String? ?? 'not_started',
       completionPercent: (json['completion_percent'] as num?)?.toDouble() ?? 0,
+      currentSectionOrdinal: (json['current_section_ordinal'] as num?)?.toInt(),
+      currentStepOrdinal: (json['current_step_ordinal'] as num?)?.toInt(),
       lastActivityAt: _parseDateTime(json['last_activity_at']),
       moduleProgressId: json['module_progress_id'] as String?,
+      totalSections: (json['total_sections'] as num?)?.toInt() ?? 0,
+      totalSteps: (json['total_steps'] as num?)?.toInt() ?? 0,
     );
   }
 }

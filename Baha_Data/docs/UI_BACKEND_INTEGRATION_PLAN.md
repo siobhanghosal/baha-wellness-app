@@ -147,15 +147,72 @@ It should not be treated as the final navigation, auth, or backend integration s
 #### Remaining frontend-local behavior
 
 - avatar selection
-- animated wellness tiles
+- animated wellness tiles and celebratory motion
+- local wellness tools:
+  - emotion wheel
+  - calm breathing
+  - friendship scenario practice
+- notification center composition
 - badge and level visuals
 - theme switching
+
+#### Implemented so far in the real Flutter workspace
+
+- student startup screens are now rebuilt in the `Solomon_UI_Version1` visual language instead of the earlier plain backend harness
+- the student ready shell now uses the reference dashboard, explore grid, Buddy surface, and profile shell
+- prototype taps are now routed either into real backend screens or into finished student-specific utility screens, rather than dead buttons
+- the main student backend flows now also use the same reference visual treatment:
+  - check-ins
+  - learning detail
+  - support request flow
+  - live Buddy chat
+- the Learn hub is now moving from a flat list into a product-style content experience:
+  - continue-learning lane
+  - recommended modules lane
+  - recently opened lane
+  - quick guides and prompts
+  - theme-based browsing
+- the student reference Learn cards should now be treated as theme entries, not
+  generic links:
+  - Sleep Reset -> `theme=Sleep`
+  - Digital Wellness -> `theme=Digital Wellness`
+  - Peer Pressure -> `theme=Peer Pressure`
+  - Exam Stress -> `theme=Exam Stress`
+- student module and content detail rendering now supports richer block-driven presentation from the backend:
+  - headings
+  - bullet lists
+  - checklists
+  - callouts
+  - reflection prompts
+- module progress is now moving away from arbitrary percentages toward
+  section-aware progress metadata from the backend
+- the remaining student reference surfaces that do not yet have backend ownership now still behave like complete app features:
+  - weekly insight drill-down screens for dashboard metrics
+  - a student notification center
+  - a backend-informed calendar/planning view
+  - a real settings screen wired to onboarding state, theme mode, and identity switching
+  - finished local wellness tool screens for emotion naming, breathing reset, and friendship scenarios
+- deep student feature pages now have retryable, screen-specific error states rather than raw fallback errors
+- theme mode now propagates across pushed student routes instead of stopping at the home shell
+- student-selected age/gender presentation preferences are now stored locally for repeat app launches
+
+#### Current integration gap
+
+- the student app now broadly tracks the reference branch across startup, shell, and core working flows
+- remaining gap is mostly polish-level rather than architecture-level: device-specific spacing, motion tuning, and any still-unimplemented prototype-only behaviors such as richer avatar and badge systems
 
 #### Remaining backend gaps after this slice
 
 - game runtime endpoints
 - richer student profile editing
 - finer-grained trend history beyond latest summary
+- dedicated module sections/steps read endpoint if the app later needs backend-authored section navigation instead of content-block-driven flow
+
+Content strategy note:
+
+- the deeper rationale for how the raw corpus should become engaging student
+  learning material is documented in
+  [STUDENT_LEARNING_CONTENT_STRATEGY.md](./STUDENT_LEARNING_CONTENT_STRATEGY.md)
 
 ### 5.2 Parent App
 
@@ -180,6 +237,20 @@ It should not be treated as the final navigation, auth, or backend integration s
   - `GET /mobile/content/{content_item_id}`
 - support/help references:
   - `GET /mobile/support-contacts`
+
+#### Implemented so far in the real Flutter workspace
+
+- development identity bootstrap
+- guardian linked-student picker
+- parent-safe weekly summary view
+- parent resource list and detail view
+- summary-sharing consent read and update flow
+- platform participation consent action
+- settings view with support contacts
+
+Implementation note:
+
+- the current backend response for guardian platform-participation consent is a linked-student onboarding snapshot, so the app should use this as an action-and-refresh flow, not as a guardian identity refresh
 
 #### Notes
 

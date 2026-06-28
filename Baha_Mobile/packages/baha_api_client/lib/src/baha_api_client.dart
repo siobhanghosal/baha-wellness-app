@@ -135,6 +135,9 @@ class BahaApiClient {
     String? audienceApp,
     String? contentType,
     String? ageCohort,
+    String? theme,
+    String? topic,
+    String? subtopic,
     int limit = 20,
   }) async {
     final queryParameters = <String, String>{
@@ -144,6 +147,9 @@ class BahaApiClient {
       if (contentType != null && contentType.isNotEmpty)
         'content_type': contentType,
       if (ageCohort != null && ageCohort.isNotEmpty) 'age_cohort': ageCohort,
+      if (theme != null && theme.isNotEmpty) 'theme': theme,
+      if (topic != null && topic.isNotEmpty) 'topic': topic,
+      if (subtopic != null && subtopic.isNotEmpty) 'subtopic': subtopic,
     };
     final uri = Uri.parse(
       '$_baseUrl/mobile/content/feed',
@@ -175,11 +181,14 @@ class BahaApiClient {
 
   Future<List<StudentModuleSummary>> listStudentModules({
     required DevelopmentIdentity identity,
+    String? theme,
   }) async {
-    final response = await _httpClient.get(
-      Uri.parse('$_baseUrl/mobile/student/modules'),
-      headers: _headers(identity),
+    final uri = Uri.parse('$_baseUrl/mobile/student/modules').replace(
+      queryParameters: <String, String>{
+        if (theme != null && theme.isNotEmpty) 'theme': theme,
+      },
     );
+    final response = await _httpClient.get(uri, headers: _headers(identity));
     final payload = _decodeList(response);
     return payload.map((item) => StudentModuleSummary.fromJson(item)).toList();
   }
@@ -197,6 +206,155 @@ class BahaApiClient {
     final payload = _decodeMap(response);
     _ensureSuccess(response.statusCode, payload);
     return ModuleProgressUpsertResponse.fromJson(payload);
+  }
+
+  Future<List<MobileSupportContact>> listSupportContacts({
+    required DevelopmentIdentity identity,
+  }) async {
+    final response = await _httpClient.get(
+      Uri.parse('$_baseUrl/mobile/support-contacts'),
+      headers: _headers(identity),
+    );
+    final payload = _decodeList(response);
+    return payload.map((item) => MobileSupportContact.fromJson(item)).toList();
+  }
+
+  Future<HelpRequestResponse> createStudentHelpRequest({
+    required DevelopmentIdentity identity,
+    required HelpRequestCreateRequest request,
+  }) async {
+    final response = await _httpClient.post(
+      Uri.parse('$_baseUrl/mobile/student/help-requests'),
+      headers: _headers(identity),
+      body: jsonEncode(request.toJson()),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
+    return HelpRequestResponse.fromJson(payload);
+  }
+
+  Future<List<ChatSessionSummary>> listChatSessions({
+    required DevelopmentIdentity identity,
+    int limit = 20,
+  }) async {
+    final uri = Uri.parse(
+      '$_baseUrl/mobile/chat/sessions',
+    ).replace(queryParameters: <String, String>{'limit': '$limit'});
+    final response = await _httpClient.get(uri, headers: _headers(identity));
+    final payload = _decodeList(response);
+    return payload.map((item) => ChatSessionSummary.fromJson(item)).toList();
+  }
+
+  Future<ChatSessionSummary> createChatSession({
+    required DevelopmentIdentity identity,
+    ChatSessionCreateRequest request = const ChatSessionCreateRequest(),
+  }) async {
+    final response = await _httpClient.post(
+      Uri.parse('$_baseUrl/mobile/chat/sessions'),
+      headers: _headers(identity),
+      body: jsonEncode(request.toJson()),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
+    return ChatSessionSummary.fromJson(payload);
+  }
+
+  Future<List<MobileChatMessage>> listChatMessages({
+    required DevelopmentIdentity identity,
+    required String sessionId,
+  }) async {
+    final response = await _httpClient.get(
+      Uri.parse('$_baseUrl/mobile/chat/sessions/$sessionId/messages'),
+      headers: _headers(identity),
+    );
+    final payload = _decodeList(response);
+    return payload.map((item) => MobileChatMessage.fromJson(item)).toList();
+  }
+
+  Future<MobileChatExchangeResponse> createChatMessage({
+    required DevelopmentIdentity identity,
+    required String sessionId,
+    required MobileChatMessageCreateRequest request,
+  }) async {
+    final response = await _httpClient.post(
+      Uri.parse('$_baseUrl/mobile/chat/sessions/$sessionId/messages'),
+      headers: _headers(identity),
+      body: jsonEncode(request.toJson()),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
+    return MobileChatExchangeResponse.fromJson(payload);
+  }
+
+  Future<List<MobileLinkedStudentSummary>> listParentStudents({
+    required DevelopmentIdentity identity,
+  }) async {
+    final response = await _httpClient.get(
+      Uri.parse('$_baseUrl/mobile/parent/students'),
+      headers: _headers(identity),
+    );
+    final payload = _decodeList(response);
+    return payload
+        .map((item) => MobileLinkedStudentSummary.fromJson(item))
+        .toList();
+  }
+
+  Future<ParentWeeklySummary> getParentWeeklySummary({
+    required DevelopmentIdentity identity,
+    required String studentProfileId,
+  }) async {
+    final response = await _httpClient.get(
+      Uri.parse(
+        '$_baseUrl/mobile/parent/students/$studentProfileId/weekly-summary/latest',
+      ),
+      headers: _headers(identity),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
+    return ParentWeeklySummary.fromJson(payload);
+  }
+
+  Future<ParentSummaryConsentStatus> getParentSummaryConsentStatus({
+    required DevelopmentIdentity identity,
+    required String studentProfileId,
+  }) async {
+    final response = await _httpClient.get(
+      Uri.parse(
+        '$_baseUrl/auth/guardian/consent/parent-summary-sharing/$studentProfileId',
+      ),
+      headers: _headers(identity),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
+    return ParentSummaryConsentStatus.fromJson(payload);
+  }
+
+  Future<ParentSummaryConsentStatus> updateParentSummaryConsent({
+    required DevelopmentIdentity identity,
+    required ParentSummaryConsentRequest request,
+  }) async {
+    final response = await _httpClient.post(
+      Uri.parse('$_baseUrl/auth/guardian/consent/parent-summary-sharing'),
+      headers: _headers(identity),
+      body: jsonEncode(request.toJson()),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
+    return ParentSummaryConsentStatus.fromJson(payload);
+  }
+
+  Future<AuthOnboardingState> updatePlatformParticipationConsent({
+    required DevelopmentIdentity identity,
+    required PlatformParticipationConsentRequest request,
+  }) async {
+    final response = await _httpClient.post(
+      Uri.parse('$_baseUrl/auth/guardian/consent/platform-participation'),
+      headers: _headers(identity),
+      body: jsonEncode(request.toJson()),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
+    return AuthOnboardingState.fromJson(payload);
   }
 
   Map<String, String> _headers(DevelopmentIdentity identity) {

@@ -1,6 +1,10 @@
 import 'package:baha_shared_models/baha_shared_models.dart';
 import 'package:flutter/material.dart';
 
+import '../prototype/app_theme.dart';
+import '../prototype/prototype_models.dart';
+import '../prototype/prototype_widgets.dart';
+
 class StudentBootstrapScreen extends StatefulWidget {
   const StudentBootstrapScreen({
     required this.initialEmail,
@@ -21,7 +25,9 @@ class StudentBootstrapScreen extends StatefulWidget {
 
 class _StudentBootstrapScreenState extends State<StudentBootstrapScreen> {
   final _displayNameController = TextEditingController();
-  final _schoolNameController = TextEditingController(text: 'BAHA Pilot School');
+  final _schoolNameController = TextEditingController(
+    text: 'BAHA Pilot School',
+  );
   late final TextEditingController _emailController;
   String _ageCohort = '13_14';
   String _legalConsentBand = 'minor';
@@ -50,7 +56,9 @@ class _StudentBootstrapScreenState extends State<StudentBootstrapScreen> {
           schoolName: _schoolNameController.text.trim(),
           ageCohort: _ageCohort,
           legalConsentBand: _legalConsentBand,
-          email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
+          email: _emailController.text.trim().isEmpty
+              ? null
+              : _emailController.text.trim(),
         ),
       );
     } finally {
@@ -62,99 +70,130 @@ class _StudentBootstrapScreenState extends State<StudentBootstrapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context).textTheme;
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 16),
-              Text('Finish student setup', style: theme.headlineMedium),
-              const SizedBox(height: 10),
-              Text(
-                'The backend returned `bootstrap`, so this identity does not yet have a BAHA student profile.',
-                style: theme.bodyLarge,
-              ),
-              const SizedBox(height: 20),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Development identity', style: theme.titleLarge),
-                      const SizedBox(height: 8),
-                      Text(widget.externalAuthId, style: theme.bodyLarge),
-                      const SizedBox(height: 20),
-                      TextField(
-                        controller: _displayNameController,
-                        decoration: const InputDecoration(labelText: 'Display name'),
+    final palette = studentPalette(StudentAgeGroup.teen, StudentGender.female);
+    return Theme(
+      data: buildTheme(palette),
+      child: AnimatedGradientScaffold(
+        palette: palette,
+        child: ListView(
+          padding: const EdgeInsets.all(22),
+          children: [
+            HeroHeader(
+              palette: palette,
+              kicker: 'Onboarding',
+              title: 'Set your vibe, privacy, and avatar.',
+              subtitle:
+                  'This is the real bootstrap form for a student identity that does not yet have a BAHA profile.',
+              actions: const [
+                Pill(icon: Icons.privacy_tip_rounded, label: 'Consent-first'),
+                Pill(
+                  icon: Icons.verified_user_rounded,
+                  label: 'Real bootstrap',
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            GlassPanel(
+              palette: palette,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Development identity',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(widget.externalAuthId),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _displayNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Display name',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _schoolNameController,
+                    decoration: const InputDecoration(labelText: 'School name'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Email (optional)',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: _ageCohort,
+                    items: const [
+                      DropdownMenuItem(value: '9_12', child: Text('Age 9-12')),
+                      DropdownMenuItem(
+                        value: '13_14',
+                        child: Text('Age 13-14'),
                       ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _schoolNameController,
-                        decoration: const InputDecoration(labelText: 'School name'),
+                      DropdownMenuItem(
+                        value: '15_18',
+                        child: Text('Age 15-18'),
                       ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'Email (optional)',
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        initialValue: _ageCohort,
-                        items: const [
-                          DropdownMenuItem(value: '9_12', child: Text('Age 9-12')),
-                          DropdownMenuItem(value: '13_14', child: Text('Age 13-14')),
-                          DropdownMenuItem(value: '15_18', child: Text('Age 15-18')),
-                          DropdownMenuItem(value: '18_plus', child: Text('Age 18+')),
-                        ],
-                        onChanged: (value) {
-                          if (value == null) {
-                            return;
-                          }
-                          setState(() {
-                            _ageCohort = value;
-                            _legalConsentBand = value == '18_plus' ? 'adult' : 'minor';
-                          });
-                        },
-                        decoration: const InputDecoration(labelText: 'Age cohort'),
-                      ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        initialValue: _legalConsentBand,
-                        items: const [
-                          DropdownMenuItem(value: 'minor', child: Text('Minor flow')),
-                          DropdownMenuItem(value: 'adult', child: Text('Adult self-consent flow')),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() => _legalConsentBand = value);
-                          }
-                        },
-                        decoration: const InputDecoration(labelText: 'Consent band'),
-                      ),
-                      const SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: _submitting ? null : _submit,
-                        child: Text(_submitting ? 'Submitting...' : 'Create student profile'),
+                      DropdownMenuItem(
+                        value: '18_plus',
+                        child: Text('Age 18+'),
                       ),
                     ],
+                    onChanged: (value) {
+                      if (value == null) {
+                        return;
+                      }
+                      setState(() {
+                        _ageCohort = value;
+                        _legalConsentBand = value == '18_plus'
+                            ? 'adult'
+                            : 'minor';
+                      });
+                    },
+                    decoration: const InputDecoration(labelText: 'Age cohort'),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: _legalConsentBand,
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'minor',
+                        child: Text('Minor flow'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'adult',
+                        child: Text('Adult self-consent flow'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _legalConsentBand = value);
+                      }
+                    },
+                    decoration: const InputDecoration(
+                      labelText: 'Consent band',
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  AnimatedPrimaryButton(
+                    label: _submitting ? 'Submitting...' : 'Open Student App',
+                    icon: Icons.arrow_forward_rounded,
+                    onPressed: _submitting ? () {} : _submit,
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: widget.onChangeIdentity,
-                child: const Text('Switch development identity'),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: widget.onChangeIdentity,
+              child: const Text('Switch development identity'),
+            ),
+          ],
         ),
       ),
     );

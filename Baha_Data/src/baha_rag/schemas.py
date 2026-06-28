@@ -343,8 +343,12 @@ class MobileModuleSummary(BaseModel):
     sort_order: int
     progress_status: ModuleProgressStatus
     completion_percent: float
+    current_section_ordinal: int | None = None
+    current_step_ordinal: int | None = None
     last_activity_at: datetime | None = None
     module_progress_id: UUID | None = None
+    total_sections: int = 0
+    total_steps: int = 0
 
 
 class ModuleProgressUpsertRequest(BaseModel):

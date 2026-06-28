@@ -135,7 +135,7 @@ The seeded demo environment includes:
 - privacy settings
 - consent records
 - student check-in template and questions
-- one approved student learning module
+- multiple approved student learning modules, cards, checklists, and prompts
 - one parent content object
 - one teacher content object
 - support contacts
@@ -181,6 +181,21 @@ The implemented mobile-facing routes are:
 - `POST /mobile/student/modules/{module_id}/progress`
 - `POST /mobile/student/help-requests`
 
+Current student learning specifics:
+
+- `GET /mobile/content/feed` now supports filtering by:
+  - `theme`
+  - `topic`
+  - `subtopic`
+- `GET /mobile/student/modules` now supports filtering by:
+  - `theme`
+- student module summaries now expose:
+  - `content_item_id`
+  - `current_section_ordinal`
+  - `current_step_ordinal`
+  - `total_sections`
+  - `total_steps`
+
 ### Parent
 
 - `GET /mobile/parent/students`
@@ -207,6 +222,7 @@ These behaviors are already enforced server-side:
 - parent summary access checks guardian linkage
 - parent summary access checks consent state
 - guardians can explicitly read and update parent-summary sharing consent through auth endpoints
+- guardian platform-participation consent currently returns the linked student's onboarding snapshot, so clients should treat it as an action endpoint rather than a guardian-session refresh contract
 - parent summary access checks privacy-tier configuration
 - published role-safe content is served through app-facing content read models instead of direct table access
 - support contacts are served through app-facing read models instead of hardcoded client copy
@@ -248,18 +264,57 @@ The Flutter workspace now exists under:
 Implemented mobile status right now:
 
 - the monorepo has four real Flutter apps plus shared packages
-- the student app already implements the first startup slice against this backend
-- that slice uses:
+- the student app already implements the startup, check-in, learn, support, and Buddy/chat slices against this backend
+- the student app uses:
   - development identity capture
   - `GET /auth/onboarding-state`
   - `POST /auth/bootstrap`
   - `GET /mobile/me`
-- parent, teacher, and counselor apps are scaffolded as role-specific placeholder shells
-- the student app now also implements the learn/modules slice on the real backend:
+- the student app also implements:
   - `GET /mobile/content/feed`
   - `GET /mobile/content/{content_item_id}`
+  - theme-focused Learn routing for:
+    - Sleep
+    - Digital Wellness
+    - Peer Pressure
+    - Exam Stress
+  - richer block-rendered student learning content
+  - structure-aware module progress display
+
+Current content strategy reference:
+
+- [STUDENT_LEARNING_CONTENT_STRATEGY.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/STUDENT_LEARNING_CONTENT_STRATEGY.md)
   - `GET /mobile/student/modules`
   - `POST /mobile/student/modules/{module_id}/progress`
+  - `GET /mobile/support-contacts`
+  - `POST /mobile/student/help-requests`
+  - `GET /mobile/chat/sessions`
+  - `POST /mobile/chat/sessions`
+  - `GET /mobile/chat/sessions/{session_id}/messages`
+  - `POST /mobile/chat/sessions/{session_id}/messages`
+- the parent app now implements the first real guardian slice:
+  - development identity capture
+  - `GET /auth/onboarding-state`
+  - `GET /mobile/me`
+  - `GET /mobile/parent/students`
+  - `GET /mobile/parent/students/{student_profile_id}/weekly-summary/latest`
+  - `GET /mobile/content/feed`
+  - `GET /mobile/content/{content_item_id}`
+  - `GET /auth/guardian/consent/parent-summary-sharing/{student_profile_id}`
+  - `POST /auth/guardian/consent/parent-summary-sharing`
+  - `POST /auth/guardian/consent/platform-participation`
+  - `GET /mobile/support-contacts`
+- teacher and counselor apps are still scaffolded shells awaiting their first real slices
+  - `GET /mobile/student/modules`
+  - `POST /mobile/student/modules/{module_id}/progress`
+- the student app now also implements the support slice on the real backend:
+  - `GET /mobile/support-contacts`
+  - `POST /mobile/student/help-requests`
+- the student app now also implements the Buddy/chat slice on the real backend:
+  - `GET /mobile/chat/sessions`
+  - `POST /mobile/chat/sessions`
+  - `GET /mobile/chat/sessions/{session_id}/messages`
+  - `POST /mobile/chat/sessions/{session_id}/messages`
 
 Latest verified mobile/backend handshake:
 
@@ -271,9 +326,15 @@ Latest verified mobile/backend handshake:
 - `POST /mobile/student/checkins` successfully stored a real seeded demo response set
 - `GET /mobile/student/checkins/{response_set_id}` successfully returned stored answers
 - `GET /mobile/content/feed` returned the seeded student learning content feed
-- `GET /mobile/student/modules` returned the seeded student module with direct `content_item_id` linkage
-- `GET /mobile/content/{content_item_id}` returned the seeded module detail body
+- `GET /mobile/student/modules` returned the expanded seeded student module set with direct `content_item_id` linkage
+- `GET /mobile/content/{content_item_id}` returned the richer seeded module detail body with structured blocks
 - `POST /mobile/student/modules/{module_id}/progress` successfully updated the seeded student module progress
+- `GET /mobile/support-contacts` returned the seeded student-visible support contacts
+- `POST /mobile/student/help-requests` successfully created a new help request visible in the counselor queue
+- `GET /mobile/chat/sessions` returned the student session list after the chat query fix
+- `POST /mobile/chat/sessions` successfully created a new student Buddy session
+- `GET /mobile/chat/sessions/{session_id}/messages` returned persisted chat history
+- `POST /mobile/chat/sessions/{session_id}/messages` successfully stored a user message and assistant reply
 
 Latest verified Android app build:
 
@@ -287,7 +348,7 @@ Recent backend fix applied during Flutter integration:
 - the student modules response now includes `content_item_id` so Flutter can open module content directly through `/mobile/content/{content_item_id}`
 - the repaired code lives in [mobile_repository.py](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/src/baha_rag/db/mobile_repository.py)
 
-- migrations applied cleanly through `022_mobile_ui_alignment_seed.sql`
+- migrations applied cleanly through `023_student_content_polish_seed.sql`
 - `GET /health` returned `ok`
 - `GET /health/ready` returned `ready`
 - `GET /mobile/student/weekly-summary/latest` returned the seeded student dashboard summary
@@ -319,8 +380,6 @@ The Flutter developer can already build:
 
 In practical order, the next implementation work is:
 
-- student help request UI flow
-- student Buddy/chat UI flow
 - parent app real screens on top of the existing backend contract
 - teacher app real screens on top of the existing backend contract
 - counselor app real screens on top of the existing backend contract

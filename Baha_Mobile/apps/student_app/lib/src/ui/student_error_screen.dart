@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../prototype/app_theme.dart';
+import '../prototype/prototype_models.dart';
+import '../prototype/prototype_widgets.dart';
+
 class StudentErrorScreen extends StatelessWidget {
   const StudentErrorScreen({
     required this.errorMessage,
@@ -14,33 +18,38 @@ class StudentErrorScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context).textTheme;
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 30),
-              Text('Session failed', style: theme.headlineMedium),
-              const SizedBox(height: 12),
-              Text(
-                errorMessage ?? 'The app could not complete the startup flow.',
-                style: theme.bodyLarge,
-              ),
-              const Spacer(),
-              ElevatedButton(
-                onPressed: onRetry,
-                child: const Text('Retry'),
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: onResetIdentity,
-                child: const Text('Reset development identity'),
-              ),
-            ],
-          ),
+    final palette = studentPalette(StudentAgeGroup.teen, StudentGender.female);
+    return Theme(
+      data: buildTheme(palette),
+      child: AnimatedGradientScaffold(
+        palette: palette,
+        child: ListView(
+          padding: const EdgeInsets.all(22),
+          children: [
+            HeroHeader(
+              palette: palette,
+              kicker: 'Session error',
+              title: 'The student app could not open cleanly.',
+              subtitle:
+                  errorMessage ??
+                  'The app could not complete the startup flow.',
+              actions: const [
+                Pill(icon: Icons.warning_rounded, label: 'Retry needed'),
+                Pill(icon: Icons.medical_information_rounded, label: 'Backend'),
+              ],
+            ),
+            const SizedBox(height: 18),
+            AnimatedPrimaryButton(
+              label: 'Retry',
+              icon: Icons.refresh_rounded,
+              onPressed: onRetry,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: onResetIdentity,
+              child: const Text('Reset development identity'),
+            ),
+          ],
         ),
       ),
     );

@@ -240,15 +240,30 @@ What is already proven:
 - a real student check-in submission round-trip succeeds against the backend
 - the learn/modules contracts are consumable from Flutter
 - the student modules response now exposes `content_item_id`, removing brittle title-based content mapping
+- the learning contracts now support theme-focused student lanes instead of one generic feed
+- the content feed now supports `theme`, `topic`, and `subtopic` filters
+- the student modules endpoint now supports `theme` filtering
+- the student learning seeds now cover:
+  - Sleep
+  - Digital Wellness
+  - Peer Pressure
+  - Exam Stress
+- the support contacts and student help-request contracts are consumable from Flutter
+- the Buddy/chat session and message contracts are consumable from Flutter
+- the guardian linked-student, summary, and summary-consent contracts are consumable from Flutter
+- the parent content feed and content detail contracts are consumable from Flutter
 - the student Android debug build succeeds locally
 
 Best next product-development step from here:
 
-1. finish the remaining student core surfaces:
-   - help request
-   - Buddy/chat
-2. keep testing against the same local backend contract
-3. only after the student core path is stable, move to parent flow implementation
+1. keep testing against the same local backend contract
+2. deepen the student learning lanes, especially Digital Wellness and Sleep
+3. then implement the teacher app first real slice
+4. then implement the counselor app first real slice
 - defer real external cloud credentials and provisioning until the remaining backend work is complete
+
+Content-system reference:
+
+- [STUDENT_LEARNING_CONTENT_STRATEGY.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/STUDENT_LEARNING_CONTENT_STRATEGY.md)
 
 That gives the Flutter app a clean client-server architecture immediately, without forcing the mobile code to be rewritten later.

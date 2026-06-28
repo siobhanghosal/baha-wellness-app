@@ -1,6 +1,10 @@
 import 'package:baha_shared_models/baha_shared_models.dart';
 import 'package:flutter/material.dart';
 
+import '../prototype/app_theme.dart';
+import '../prototype/prototype_models.dart';
+import '../prototype/prototype_widgets.dart';
+
 class StudentWaitingScreen extends StatelessWidget {
   const StudentWaitingScreen({
     required this.onboardingState,
@@ -15,54 +19,60 @@ class StudentWaitingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context).textTheme;
     final state = onboardingState;
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 24),
-              Text('Waiting on the next step', style: theme.headlineMedium),
-              const SizedBox(height: 12),
-              Text(_titleForState(state), style: theme.titleLarge),
-              const SizedBox(height: 12),
-              Text(_detailForState(state), style: theme.bodyLarge),
-              const SizedBox(height: 24),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Backend status', style: theme.titleLarge),
-                      const SizedBox(height: 12),
-                      Text('next_step: ${state?.nextStep ?? 'unknown'}', style: theme.bodyLarge),
-                      const SizedBox(height: 6),
-                      Text('consent_status: ${state?.consentStatus ?? 'unknown'}', style: theme.bodyLarge),
-                      const SizedBox(height: 6),
-                      Text(
-                        'guardian_link_status: ${state?.guardianLinkStatus ?? 'unknown'}',
-                        style: theme.bodyLarge,
-                      ),
-                    ],
+    final palette = studentPalette(StudentAgeGroup.teen, StudentGender.female);
+    return Theme(
+      data: buildTheme(palette),
+      child: AnimatedGradientScaffold(
+        palette: palette,
+        child: ListView(
+          padding: const EdgeInsets.all(22),
+          children: [
+            HeroHeader(
+              palette: palette,
+              kicker: 'Onboarding',
+              title: _titleForState(state),
+              subtitle: _detailForState(state),
+              actions: const [
+                Pill(icon: Icons.hourglass_top_rounded, label: 'Waiting'),
+                Pill(icon: Icons.verified_user_rounded, label: 'Server gated'),
+              ],
+            ),
+            const SizedBox(height: 18),
+            GlassPanel(
+              palette: palette,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Backend status',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  Text('next_step: ${state?.nextStep ?? 'unknown'}'),
+                  const SizedBox(height: 6),
+                  Text('consent_status: ${state?.consentStatus ?? 'unknown'}'),
+                  const SizedBox(height: 6),
+                  Text(
+                    'guardian_link_status: ${state?.guardianLinkStatus ?? 'unknown'}',
+                  ),
+                ],
               ),
-              const Spacer(),
-              ElevatedButton(
-                onPressed: onRefresh,
-                child: const Text('Refresh onboarding state'),
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: onChangeIdentity,
-                child: const Text('Switch development identity'),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 18),
+            AnimatedPrimaryButton(
+              label: 'Refresh onboarding state',
+              icon: Icons.refresh_rounded,
+              onPressed: onRefresh,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: onChangeIdentity,
+              child: const Text('Switch development identity'),
+            ),
+          ],
         ),
       ),
     );

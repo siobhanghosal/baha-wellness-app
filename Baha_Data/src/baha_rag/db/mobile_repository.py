@@ -254,6 +254,7 @@ class MobileAppRepository:
         user_id: UUID,
         student_profile_id: UUID | None,
         age_cohort: str | None,
+        theme: str | None = None,
     ) -> list[dict[str, Any]]:
         result = await self.session.execute(
             text(
@@ -269,11 +270,27 @@ class MobileAppRepository:
                   lm.sort_order,
                   coalesce(mp.status, 'not_started') as progress_status,
                   coalesce(mp.completion_percent, 0) as completion_percent,
+                  mp.current_section_ordinal,
+                  mp.current_step_ordinal,
                   mp.last_activity_at,
-                  mp.id as module_progress_id
+                  mp.id as module_progress_id,
+                  coalesce(section_stats.total_sections, 0) as total_sections,
+                  coalesce(step_stats.total_steps, 0) as total_steps
                 from learning_modules lm
                 join content_items ci
                   on ci.id = lm.content_item_id
+                left join lateral (
+                  select count(*)::int as total_sections
+                  from learning_module_sections lms
+                  where lms.module_id = lm.id
+                ) section_stats on true
+                left join lateral (
+                  select count(*)::int as total_steps
+                  from learning_module_sections lms
+                  join learning_module_steps lmst
+                    on lmst.section_id = lms.id
+                  where lms.module_id = lm.id
+                ) step_stats on true
                 left join lateral (
                   select mp_inner.*
                   from module_progress mp_inner
@@ -296,6 +313,11 @@ class MobileAppRepository:
                     or cast(:age_cohort as text) is null
                     or lm.age_cohort = cast(:age_cohort as text)
                   )
+                  and (
+                    cast(:theme as text) is null
+                    or lower(lm.theme) = lower(cast(:theme as text))
+                    or lower(coalesce(ci.theme, '')) = lower(cast(:theme as text))
+                  )
                 order by lm.sort_order, lm.module_code
                 """
             ),
@@ -303,6 +325,7 @@ class MobileAppRepository:
                 "user_id": user_id,
                 "student_profile_id": student_profile_id,
                 "age_cohort": age_cohort,
+                "theme": theme,
             },
         )
         return [dict(row) for row in result.mappings().all()]
@@ -449,8 +472,8 @@ class MobileAppRepository:
                 where user_id = :user_id
                   and audience_app = :audience_app
                   and (
-                    (:student_profile_id is null and context_student_profile_id is null)
-                    or context_student_profile_id = :student_profile_id
+                    (cast(:student_profile_id as uuid) is null and context_student_profile_id is null)
+                    or context_student_profile_id = cast(:student_profile_id as uuid)
                   )
                 order by coalesce(last_message_at, started_at) desc
                 limit :limit
@@ -765,6 +788,9 @@ class MobileAppRepository:
         audience_app: str,
         age_cohort: str | None,
         content_type: str | None,
+        theme: str | None,
+        topic: str | None,
+        subtopic: str | None,
         limit: int,
     ) -> list[dict[str, Any]]:
         result = await self.session.execute(
@@ -833,6 +859,18 @@ class MobileAppRepository:
                     cast(:content_type as text) is null
                     or ci.content_type = :content_type
                   )
+                  and (
+                    cast(:theme as text) is null
+                    or lower(coalesce(ci.theme, '')) = lower(cast(:theme as text))
+                  )
+                  and (
+                    cast(:topic as text) is null
+                    or lower(coalesce(ci.topic, '')) = lower(cast(:topic as text))
+                  )
+                  and (
+                    cast(:subtopic as text) is null
+                    or lower(coalesce(ci.subtopic, '')) = lower(cast(:subtopic as text))
+                  )
                 order by pv.published_at desc nulls last, ci.updated_at desc, ci.title
                 limit :limit
                 """
@@ -841,6 +879,9 @@ class MobileAppRepository:
                 "audience_app": audience_app,
                 "age_cohort": age_cohort,
                 "content_type": content_type,
+                "theme": theme,
+                "topic": topic,
+                "subtopic": subtopic,
                 "limit": limit,
             },
         )
@@ -1186,8 +1227,8 @@ class MobileAppRepository:
                   and user_id = :user_id
                   and audience_app = :audience_app
                   and (
-                    (:student_profile_id is null and context_student_profile_id is null)
-                    or context_student_profile_id = :student_profile_id
+                    (cast(:student_profile_id as uuid) is null and context_student_profile_id is null)
+                    or context_student_profile_id = cast(:student_profile_id as uuid)
                   )
                 limit 1
                 """
