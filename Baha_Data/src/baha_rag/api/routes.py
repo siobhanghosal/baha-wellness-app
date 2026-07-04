@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import hashlib
 import json
 import shutil
 import tempfile
@@ -8,7 +9,7 @@ from datetime import date
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,12 +17,19 @@ from baha_rag.auth import ActorContext, TokenIdentity, get_actor_context, get_pr
 from baha_rag.config import Settings, get_settings
 from baha_rag.dashboard.metrics import DashboardService
 from baha_rag.db.auth_repository import AuthRepository
+from baha_rag.db.game_repository import GameRepository
 from baha_rag.db.mobile_repository import MobileAppRepository
 from baha_rag.db.repository import KnowledgeRepository
 from baha_rag.db.session import get_session
 from baha_rag.embeddings.bge import EmbeddingService
 from baha_rag.extraction.condition_profile import ConditionProfileExtractor
 from baha_rag.generation.composer import EvidenceComposer
+from baha_rag.gameplay import (
+    GAME_LOCATIONS,
+    consequence_for,
+    observed_signals,
+    scene_for,
+)
 from baha_rag.identity import ROLE_PRIORITY
 from baha_rag.privacy import PrivacyService
 from baha_rag.retrieval.hybrid import HybridRetriever
@@ -64,6 +72,14 @@ from baha_rag.schemas import (
     MobileLinkedStudentSummary,
     MobileModuleSummary,
     MobileSupportContact,
+    GameChoiceRequest,
+    GameChoiceResponse,
+    GameCompanionRequest,
+    GameCompanionResponse,
+    GamePlayerBootstrapRequest,
+    GameProfileUpdateRequest,
+    GamePlayerStateResponse,
+    GameSceneResponse,
     ModuleProgressUpsertRequest,
     ModuleProgressUpsertResponse,
     ParentWeeklySummaryResponse,
@@ -80,9 +96,38 @@ from baha_rag.schemas import (
     TeacherCohortSummaryResponse,
     ViewRequest,
 )
+from baha_rag.story_engine import OpenAIStoryEngine
 from baha_rag.taxonomy import TAXONOMY, find_conditions
 
 router = APIRouter()
+
+
+def _game_key_hash(player_key: str) -> str:
+    return hashlib.sha256(player_key.encode("utf-8")).hexdigest()
+
+
+async def _game_player_id(
+    *,
+    player_key: str,
+    repository: GameRepository,
+) -> UUID:
+    player_id = await repository.player_id_for_key(_game_key_hash(player_key))
+    if player_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Game profile not found. Bootstrap this device first.",
+        )
+    return player_id
+
+
+def _active_game_player_key(
+    story_player_key: str | None,
+    legacy_player_key: str | None,
+) -> str:
+    player_key = story_player_key or legacy_player_key
+    if player_key is None or len(player_key) < 24 or len(player_key) > 200:
+        raise HTTPException(status_code=422, detail="Missing or invalid story player key")
+    return player_key
 
 
 def get_embedding_service(settings: Settings = Depends(get_settings)) -> EmbeddingService:
@@ -446,6 +491,306 @@ async def chat(request: ChatRequest, retriever: HybridRetriever = Depends(get_re
         evidence=results,
     )
     return ChatResponse(answer=answer, retrieved=results)
+
+
+@router.post("/game/players/bootstrap", response_model=GamePlayerStateResponse)
+async def game_bootstrap_player(
+    request: GamePlayerBootstrapRequest,
+    session: AsyncSession = Depends(get_session),
+) -> GamePlayerStateResponse:
+    repository = GameRepository(session)
+    player_id = await repository.bootstrap_player(
+        player_key_hash=_game_key_hash(request.player_key),
+        display_name=request.display_name.strip(),
+        age_years=request.age_years,
+    )
+    await session.commit()
+    state = await repository.get_state(player_id)
+    if state is None:
+        raise HTTPException(status_code=500, detail="Game profile could not be loaded")
+    return GamePlayerStateResponse(**state)
+
+
+@router.get("/game/state", response_model=GamePlayerStateResponse)
+async def game_state(
+    story_player_key: str | None = Header(default=None, alias="X-Story-Player-Key"),
+    legacy_player_key: str | None = Header(default=None, alias="X-BAHA-Game-Key"),
+    session: AsyncSession = Depends(get_session),
+) -> GamePlayerStateResponse:
+    repository = GameRepository(session)
+    player_key = _active_game_player_key(story_player_key, legacy_player_key)
+    player_id = await _game_player_id(player_key=player_key, repository=repository)
+    state = await repository.get_state(player_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Game profile not found")
+    return GamePlayerStateResponse(**state)
+
+
+@router.put("/game/profile", response_model=GamePlayerStateResponse)
+async def game_update_profile(
+    request: GameProfileUpdateRequest,
+    story_player_key: str | None = Header(default=None, alias="X-Story-Player-Key"),
+    legacy_player_key: str | None = Header(default=None, alias="X-BAHA-Game-Key"),
+    session: AsyncSession = Depends(get_session),
+) -> GamePlayerStateResponse:
+    repository = GameRepository(session)
+    player_key = _active_game_player_key(story_player_key, legacy_player_key)
+    player_id = await _game_player_id(player_key=player_key, repository=repository)
+    await repository.update_profile(
+        player_id=player_id,
+        display_name=request.display_name,
+        pet=request.pet,
+        avatar=request.avatar,
+    )
+    await session.commit()
+    state = await repository.get_state(player_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Game profile not found")
+    return GamePlayerStateResponse(**state)
+
+
+@router.get("/game/stories/{location_id}", response_model=GameSceneResponse)
+async def game_story(
+    location_id: str,
+    story_player_key: str | None = Header(default=None, alias="X-Story-Player-Key"),
+    legacy_player_key: str | None = Header(default=None, alias="X-BAHA-Game-Key"),
+    session: AsyncSession = Depends(get_session),
+    retriever: HybridRetriever = Depends(get_retriever),
+    settings: Settings = Depends(get_settings),
+) -> GameSceneResponse:
+    if location_id not in GAME_LOCATIONS:
+        raise HTTPException(status_code=404, detail="Unknown game location")
+    repository = GameRepository(session)
+    player_key = _active_game_player_key(story_player_key, legacy_player_key)
+    player_id = await _game_player_id(player_key=player_key, repository=repository)
+    state = await repository.get_state(player_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Game profile not found")
+    chapter = next(
+        (
+            item["chapter"]
+            for item in state["locations"]
+            if item["location_id"] == location_id
+        ),
+        1,
+    )
+    last_choice = next(
+        (
+            item["last_choice"]
+            for item in state["locations"]
+            if item["location_id"] == location_id
+        ),
+        None,
+    )
+    npc_id = GAME_LOCATIONS[location_id].npc_id
+    npc_state = next(
+        (
+            item
+            for item in state["npcs"]
+            if item["npc_id"] == npc_id
+        ),
+        None,
+    )
+    friendship_level = next(
+        (
+            item["friendship_level"]
+            for item in state["npcs"]
+            if item["npc_id"] == npc_id
+        ),
+        1,
+    )
+    recent_location_events = await repository.list_recent_story_events(
+        player_id=player_id,
+        location_id=location_id,
+        limit=6,
+    )
+    recent_global_events = await repository.list_recent_story_events(
+        player_id=player_id,
+        location_id=None,
+        limit=10,
+    )
+    evidence = await retriever.search(
+        GAME_LOCATIONS[location_id].evidence_query,
+        top_k=5,
+        filters={},
+    )
+    story_engine = OpenAIStoryEngine(settings)
+    llm_scene = await story_engine.generate_scene(
+        player_fingerprint=str(state["player_id"]),
+        player_name=state["display_name"],
+        age_years=state["age_years"],
+        pet=state["pet"],
+        avatar=state.get("avatar") or {},
+        location=GAME_LOCATIONS[location_id],
+        chapter=chapter,
+        friendship_level=friendship_level,
+        memories=(npc_state or {}).get("memories", []),
+        last_choice=last_choice,
+        recent_location_events=recent_location_events,
+        recent_global_events=recent_global_events,
+        evidence=evidence,
+    )
+    fallback_scene = scene_for(
+        location_id=location_id,
+        chapter=chapter,
+        remembered=friendship_level > 1,
+        last_choice=last_choice,
+    )
+    return GameSceneResponse(
+        **{
+            **fallback_scene,
+            **(
+                {
+                    "title": llm_scene.title,
+                    "body": llm_scene.body,
+                    "prompt": llm_scene.prompt,
+                }
+                if llm_scene is not None
+                else {}
+            ),
+        },
+        evidence_count=len(evidence),
+    )
+
+
+@router.post("/game/choices", response_model=GameChoiceResponse)
+async def game_choice(
+    request: GameChoiceRequest,
+    story_player_key: str | None = Header(default=None, alias="X-Story-Player-Key"),
+    legacy_player_key: str | None = Header(default=None, alias="X-BAHA-Game-Key"),
+    session: AsyncSession = Depends(get_session),
+    retriever: HybridRetriever = Depends(get_retriever),
+    settings: Settings = Depends(get_settings),
+) -> GameChoiceResponse:
+    if request.location_id not in GAME_LOCATIONS:
+        raise HTTPException(status_code=404, detail="Unknown game location")
+    repository = GameRepository(session)
+    player_key = _active_game_player_key(story_player_key, legacy_player_key)
+    player_id = await _game_player_id(player_key=player_key, repository=repository)
+    state = await repository.get_state(player_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Game profile not found")
+    location = GAME_LOCATIONS[request.location_id]
+    evidence = await retriever.search(
+        location.evidence_query,
+        top_k=5,
+        filters={},
+    )
+    safety = assess_safety(request.answer)
+    if safety.emergency_indicators:
+        message = (
+            "I’m really glad you said that. Please go to a trusted grown-up near "
+            "you right now and say, “I need help staying safe.” If there is "
+            "immediate danger, call your local emergency number together."
+        )
+    else:
+        npc_state = next(
+            (
+                item
+                for item in state["npcs"]
+                if item["npc_id"] == location.npc_id
+            ),
+            None,
+        )
+        recent_location_events = await repository.list_recent_story_events(
+            player_id=player_id,
+            location_id=request.location_id,
+            limit=6,
+        )
+        recent_global_events = await repository.list_recent_story_events(
+            player_id=player_id,
+            location_id=None,
+            limit=10,
+        )
+        story_engine = OpenAIStoryEngine(settings)
+        llm_outcome = await story_engine.generate_outcome(
+            player_fingerprint=str(state["player_id"]),
+            player_name=state["display_name"],
+            age_years=state["age_years"],
+            pet=state["pet"],
+            avatar=state.get("avatar") or {},
+            location=location,
+            chapter=request.expected_chapter,
+            answer=request.answer.strip(),
+            memories=(npc_state or {}).get("memories", []),
+            recent_location_events=recent_location_events,
+            recent_global_events=recent_global_events,
+            evidence=evidence,
+        )
+        message = (
+            llm_outcome.message
+            if llm_outcome is not None
+            else consequence_for(
+                request.location_id,
+                request.answer,
+                request.expected_chapter,
+            )
+        )
+    try:
+        xp, coins, stars, memory = await repository.record_choice(
+            player_id=player_id,
+            location_id=request.location_id,
+            npc_id=location.npc_id,
+            answer=request.answer.strip(),
+            is_custom=request.is_custom,
+            expected_chapter=request.expected_chapter,
+            consequence=message,
+            observed_signals=observed_signals(request.answer),
+            evidence_chunk_ids=[str(item.chunk_id) for item in evidence],
+        )
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await session.commit()
+    state = await repository.get_state(player_id)
+    if state is None:
+        raise HTTPException(status_code=500, detail="Updated game state was not found")
+    return GameChoiceResponse(
+        state=GamePlayerStateResponse(**state),
+        message=message,
+        memory=memory,
+        xp_earned=xp,
+        coins_earned=coins,
+        stars_earned=stars,
+    )
+
+
+@router.post("/game/companion", response_model=GameCompanionResponse)
+async def game_companion(
+    request: GameCompanionRequest,
+    story_player_key: str | None = Header(default=None, alias="X-Story-Player-Key"),
+    legacy_player_key: str | None = Header(default=None, alias="X-BAHA-Game-Key"),
+    session: AsyncSession = Depends(get_session),
+    retriever: HybridRetriever = Depends(get_retriever),
+) -> GameCompanionResponse:
+    repository = GameRepository(session)
+    player_key = _active_game_player_key(story_player_key, legacy_player_key)
+    await _game_player_id(player_key=player_key, repository=repository)
+    safety = assess_safety(request.message)
+    evidence = await retriever.search(
+        request.message,
+        top_k=5,
+        filters={},
+    )
+    answer = EvidenceComposer().compose(
+        condition=next(iter(find_conditions(request.message)), "General Wellbeing"),
+        perspective="adolescent",
+        query=request.message,
+        evidence=evidence,
+    )
+    if safety.emergency_indicators:
+        body = (
+            "I’m really glad you told me. Please go to a trusted grown-up near "
+            "you right now and say, “I need help staying safe.” If there is "
+            "immediate danger, call your local emergency number together."
+        )
+    else:
+        body = _assistant_body(ChatResponse(answer=answer, retrieved=[]))
+    return GameCompanionResponse(
+        answer=body,
+        emergency=bool(safety.emergency_indicators),
+        evidence_sources=answer.evidence_sources,
+    )
 
 
 @router.post("/auth/bootstrap", response_model=AuthOnboardingStateResponse)

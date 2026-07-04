@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     crawl_concurrent_requests: int = 8
     crawl_download_delay_seconds: float = 1.0
     crawl_depth_limit: int = 3
+    openai_api_key: str | None = None
+    openai_api_base: str = "https://api.openai.com/v1/responses"
+    openai_story_model: str = "gpt-4.1-mini"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

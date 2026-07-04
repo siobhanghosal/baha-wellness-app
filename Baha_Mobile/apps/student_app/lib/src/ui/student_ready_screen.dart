@@ -15,6 +15,7 @@ import '../prototype/mock_data.dart';
 import '../prototype/prototype_models.dart';
 import '../prototype/prototype_widgets.dart';
 import '../prototype/theme_manager.dart';
+import '../story_game/story_world_screen.dart';
 import 'student_buddy_screen.dart';
 import 'student_help_request_screen.dart';
 import 'student_learn_screen.dart';
@@ -98,6 +99,16 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
       builder: (context) => StudentBuddyScreen(
         apiClient: widget.apiClient,
         identity: widget.identity,
+      ),
+    );
+  }
+
+  Future<void> _openStoryWorld() async {
+    await _pushRoute(
+      builder: (context) => StoryWorldScreen(
+        baseUrl: widget.environment.apiBaseUrl,
+        initialAgeGroup: _age,
+        initialGender: _gender,
       ),
     );
   }
@@ -225,6 +236,9 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
 
   void _handleCardAction(UiCardItem item) {
     switch (item.title) {
+      case 'Story World':
+        unawaited(_openStoryWorld());
+        return;
       case 'Daily Check-in':
         unawaited(_openCheckins());
         return;

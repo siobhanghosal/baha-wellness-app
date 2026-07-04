@@ -60,6 +60,25 @@ python3 -m compileall src tests
 
 Every answer is composed from retrieved evidence. The system always includes citations, avoids diagnostic language, avoids clinical treatment instructions, and recommends urgent local emergency or crisis support when emergency indicators appear.
 
+## Standalone Game Runtime
+
+`migrations/025_game_runtime.sql` adds anonymous, no-login game profiles and
+durable state for chapters, rewards, NPC memory, story events, evidence
+references, and confidence-weighted behavioural observations.
+
+Game routes:
+
+- `POST /game/players/bootstrap`
+- `GET /game/state`
+- `PUT /game/profile`
+- `GET /game/stories/{location_id}`
+- `POST /game/choices`
+- `POST /game/companion`
+
+The client creates a random device key. Only its SHA-256 hash is stored by the
+backend. Story and companion retrieval uses Top K = 5, raw research is never
+returned to the child-facing game, and behavioural signals are non-diagnostic.
+
 ## Documentation
 
 See [docs/ARCHITECTURE.md](/Users/solomonkaruppiah/Desktop/Baha_Data/docs/ARCHITECTURE.md) for the full system design, deployment model, and implementation roadmap.

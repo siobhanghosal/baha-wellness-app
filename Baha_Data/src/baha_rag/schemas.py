@@ -725,3 +725,78 @@ class CounselorCaseNoteCreateRequest(BaseModel):
     note_type: Literal["internal", "summary", "guardian_safe", "teacher_safe", "student_safe"] = "internal"
     visibility_scope: SummaryVisibilityScope = "safeguarding_only"
     body: str = Field(min_length=3, max_length=4000)
+
+
+class GamePlayerBootstrapRequest(BaseModel):
+    player_key: str = Field(min_length=24, max_length=200)
+    display_name: str = Field(default="Adventurer", min_length=1, max_length=40)
+    age_years: int = Field(default=10, ge=9, le=19)
+
+
+class GameLocationProgress(BaseModel):
+    location_id: str
+    chapter: int = 1
+    last_choice: str | None = None
+
+
+class GameNpcState(BaseModel):
+    npc_id: str
+    friendship_level: int = 1
+    current_mood: str = "curious"
+    memories: list[str] = Field(default_factory=list)
+
+
+class GamePlayerStateResponse(BaseModel):
+    player_id: UUID
+    display_name: str
+    age_years: int
+    xp: int
+    coins: int
+    stars: int
+    current_day: int
+    pet: str
+    avatar: dict[str, Any] = Field(default_factory=dict)
+    locations: list[GameLocationProgress] = Field(default_factory=list)
+    npcs: list[GameNpcState] = Field(default_factory=list)
+
+
+class GameProfileUpdateRequest(BaseModel):
+    display_name: str | None = Field(default=None, min_length=1, max_length=40)
+    pet: Literal["Fox", "Dragon", "Owl", "Panda"] | None = None
+    avatar: dict[str, Any] | None = None
+
+
+class GameSceneResponse(BaseModel):
+    location_id: str
+    chapter: int
+    title: str
+    body: str
+    prompt: str
+    npc_id: str
+    evidence_count: int = 0
+
+
+class GameChoiceRequest(BaseModel):
+    location_id: str = Field(min_length=2, max_length=60)
+    answer: str = Field(min_length=1, max_length=600)
+    is_custom: bool = False
+    expected_chapter: int = Field(ge=1)
+
+
+class GameChoiceResponse(BaseModel):
+    state: GamePlayerStateResponse
+    message: str
+    memory: str
+    xp_earned: int
+    coins_earned: int
+    stars_earned: int
+
+
+class GameCompanionRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=1200)
+
+
+class GameCompanionResponse(BaseModel):
+    answer: str
+    emergency: bool = False
+    evidence_sources: list[Citation] = Field(default_factory=list)

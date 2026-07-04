@@ -25,6 +25,9 @@ services:
       DATABASE_URL: postgresql+asyncpg://baha:baha@postgres:5432/baha_rag
       STORAGE_ROOT: /app/storage/raw
       EMBEDDING_BACKEND: hash
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_STORY_MODEL: ${OPENAI_STORY_MODEL:-gpt-4.1-mini}
+      OPENAI_API_BASE: ${OPENAI_API_BASE:-https://api.openai.com/v1/responses}
     ports:
       - "8000:8000"
     volumes:

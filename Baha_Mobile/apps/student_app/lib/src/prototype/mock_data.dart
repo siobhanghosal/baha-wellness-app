@@ -4,6 +4,14 @@ import 'prototype_models.dart';
 
 const studentCards = [
   UiCardItem(
+    title: 'Story World',
+    subtitle:
+        'A chat-style life game where every typed answer changes the next turn.',
+    tag: 'New',
+    icon: Icons.auto_stories_rounded,
+    color: Color(0xFF6366F1),
+  ),
+  UiCardItem(
     title: 'Daily Check-in',
     subtitle: 'Mood, sleep, stress, energy, and one gentle reflection.',
     tag: '2 min',
