@@ -1,0 +1,24 @@
+name: baha_mini_games
+description: Offline mini-games module for the BAHA Wellness Companion.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.12.2
+  flutter: '>=1.17.0'
+
+dependencies:
+  baha_design_system:
+    path: ../baha_design_system
+  flutter:
+    sdk: flutter
+  path: ^1.9.1
+  shared_preferences: ^2.5.5
+  sqflite: ^2.4.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:

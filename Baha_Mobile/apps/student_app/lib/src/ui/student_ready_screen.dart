@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:baha_api_client/baha_api_client.dart';
 import 'package:baha_design_system/baha_design_system.dart';
+import 'package:baha_mini_games/baha_mini_games.dart';
 import 'package:baha_shared_models/baha_shared_models.dart';
 import 'package:flutter/material.dart';
 
@@ -54,6 +55,7 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
         apiClient: widget.apiClient,
         identity: widget.identity,
       ),
+      const MiniGamesModuleScreen(),
     ];
 
     return Scaffold(
@@ -78,6 +80,11 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
             icon: Icon(Icons.auto_stories_outlined),
             selectedIcon: Icon(Icons.auto_stories),
             label: 'Learn',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.sports_esports_outlined),
+            selectedIcon: Icon(Icons.sports_esports),
+            label: 'Games',
           ),
         ],
       ),
