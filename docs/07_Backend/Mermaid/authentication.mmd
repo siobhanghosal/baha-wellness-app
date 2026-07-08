@@ -1,0 +1,10 @@
+sequenceDiagram
+    participant U as User
+    participant A as App
+    participant API as Auth API
+    participant DB as Identity Store
+    U->>A: submit credentials
+    A->>API: login request
+    API->>DB: validate identity and role
+    DB-->>API: role, scopes, school context
+    API-->>A: access and refresh tokens

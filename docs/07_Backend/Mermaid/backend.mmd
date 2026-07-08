@@ -1,0 +1,20 @@
+flowchart LR
+    A["Flutter Apps"] --> B["API Gateway"]
+    B --> C["Identity Service"]
+    B --> D["Consent Service"]
+    B --> E["Student Wellbeing Service"]
+    B --> F["Learning Service"]
+    B --> G["Chatbot Service"]
+    B --> H["Game Service"]
+    B --> I["Escalation Service"]
+    B --> J["Analytics Service"]
+    B --> K["Audit Service"]
+    C --> L["PostgreSQL"]
+    D --> L
+    E --> L
+    F --> L
+    G --> M["Vector Index"]
+    G --> N["Content Store"]
+    I --> L
+    J --> L
+    K --> L

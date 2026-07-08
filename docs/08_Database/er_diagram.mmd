@@ -1,0 +1,22 @@
+erDiagram
+    USERS ||--o{ USER_ROLE_ASSIGNMENTS : has
+    ROLES ||--o{ USER_ROLE_ASSIGNMENTS : grants
+    SCHOOLS ||--o{ USERS : enrolls
+    USERS ||--o{ CONSENT_RECORDS : signs
+    USERS ||--o{ ASSENT_RECORDS : signs
+    USERS ||--o{ STUDENT_PROFILES : owns
+    STUDENT_PROFILES ||--o{ CHECK_IN_SESSIONS : submits
+    CHECK_IN_SESSIONS ||--o{ CHECK_IN_RESPONSES : contains
+    STUDENT_PROFILES ||--o{ TREND_SNAPSHOTS : generates
+    STUDENT_PROFILES ||--o{ MODULE_PROGRESS : tracks
+    CONTENT_ITEMS ||--o{ CONTENT_REVISIONS : versions
+    CONTENT_ITEMS ||--o{ CONTENT_TAGS : tagged
+    STUDENT_PROFILES ||--o{ CHATBOT_SESSIONS : starts
+    CHATBOT_SESSIONS ||--o{ CHATBOT_MESSAGES : contains
+    STUDENT_PROFILES ||--o{ GAME_SESSIONS : plays
+    GAME_SESSIONS ||--o{ GAME_SIGNAL_SNAPSHOTS : produces
+    STUDENT_PROFILES ||--o{ SUPPORT_CASES : relates_to
+    SUPPORT_CASES ||--o{ CASE_EVENTS : logs
+    USERS ||--o{ CASE_ASSIGNMENTS : owns
+    USERS ||--o{ PASTORAL_FLAGS : submits
+    USERS ||--o{ AUDIT_EVENTS : triggers

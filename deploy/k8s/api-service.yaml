@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: baha-rag-api
+  namespace: baha-rag
+spec:
+  type: ClusterIP
+  selector:
+    app: baha-rag-api
+  ports:
+    - port: 80
+      targetPort: 8000

@@ -1,0 +1,9 @@
+flowchart TD
+    A["Student identity resolved"] --> B{"Consent band"}
+    B -->|"Minor"| C["Guardian consent required"]
+    B -->|"18-19"| D["Self-consent required"]
+    C --> E["Privacy tier agreement"]
+    D --> E
+    E --> F["Consent active"]
+    F --> G["Policy version watch"]
+    G --> H["Re-acknowledge if policy changes"]

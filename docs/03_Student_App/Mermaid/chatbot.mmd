@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant S as Student
+    participant UI as Student App
+    participant CB as BAHA Buddy
+    participant R as Retrieval Service
+    participant Q as BAHA Queue
+    S->>UI: Ask question
+    UI->>CB: send prompt with consent and profile context
+    CB->>R: retrieve approved answer set
+    R-->>CB: cited results
+    CB-->>UI: grounded response or safe refusal
+    alt escalation signal crosses threshold
+      CB->>Q: create support case
+      UI-->>S: explain support handoff and hotline
+    end

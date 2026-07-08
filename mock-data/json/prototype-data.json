@@ -1,0 +1,451 @@
+{
+  "shared": {
+    "languages": [
+      "en-IN",
+      "hi-IN"
+    ],
+    "ageGroups": [
+      "9-13",
+      "14-16",
+      "17-19"
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ]
+  },
+  "student": {
+    "profile": {
+      "name": "Aarav N.",
+      "ageGroup": "14-16",
+      "streak": 6,
+      "energy": "Steady",
+      "consentTier": "Guardian summary enabled",
+      "focusTheme": "Managing school stress"
+    },
+    "moodHistory": [
+      {
+        "week": "Week 1",
+        "mood": 3,
+        "sleep": 6,
+        "stress": 4,
+        "energy": 3
+      },
+      {
+        "week": "Week 2",
+        "mood": 4,
+        "sleep": 7,
+        "stress": 3,
+        "energy": 4
+      },
+      {
+        "week": "Week 3",
+        "mood": 3,
+        "sleep": 6,
+        "stress": 5,
+        "energy": 3
+      },
+      {
+        "week": "Week 4",
+        "mood": 4,
+        "sleep": 7,
+        "stress": 3,
+        "energy": 4
+      }
+    ],
+    "modules": [
+      {
+        "id": "mod-1",
+        "title": "Stress and Study Balance",
+        "duration": "8 min",
+        "progress": 72,
+        "format": "interactive lesson"
+      },
+      {
+        "id": "mod-2",
+        "title": "Sleep That Helps Your Mood",
+        "duration": "6 min",
+        "progress": 40,
+        "format": "audio + reflection"
+      },
+      {
+        "id": "mod-3",
+        "title": "Asking for Help Early",
+        "duration": "5 min",
+        "progress": 0,
+        "format": "cards + quiz"
+      }
+    ],
+    "games": [
+      {
+        "id": "game-1",
+        "title": "Emotion Explorer",
+        "duration": "4 min",
+        "status": "Ready"
+      },
+      {
+        "id": "game-2",
+        "title": "Friendship Choices",
+        "duration": "5 min",
+        "status": "Resume"
+      },
+      {
+        "id": "game-3",
+        "title": "Calm Breathing",
+        "duration": "3 min",
+        "status": "Quick start"
+      }
+    ],
+    "chat": [
+      {
+        "id": "m1",
+        "author": "buddy",
+        "text": "You handled a heavy week. Want to unpack stress, sleep, or school pressure first?",
+        "citation": "BAHA Safe Questions v2.3"
+      },
+      {
+        "id": "m2",
+        "author": "user",
+        "text": "School pressure."
+      },
+      {
+        "id": "m3",
+        "author": "buddy",
+        "text": "We can look at one thing you can control today, one thing you can ask help with, and one thing to pause for now.",
+        "citation": "Cognitive coping tip reviewed 2026-06"
+      }
+    ],
+    "notifications": [
+      {
+        "id": "sn1",
+        "title": "Weekly check-in ready",
+        "body": "Take 2 minutes to update your mood and energy.",
+        "tone": "info",
+        "time": "Today, 7:30 AM"
+      },
+      {
+        "id": "sn2",
+        "title": "New learning recommendation",
+        "body": "A short sleep lesson matches your recent trend.",
+        "tone": "success",
+        "time": "Yesterday"
+      }
+    ],
+    "achievements": [
+      {
+        "id": "a1",
+        "title": "6-week reflection streak",
+        "status": "earned"
+      },
+      {
+        "id": "a2",
+        "title": "First calm session",
+        "status": "earned"
+      },
+      {
+        "id": "a3",
+        "title": "Support seeker",
+        "status": "locked"
+      }
+    ],
+    "safeQuestions": [
+      {
+        "id": "q1",
+        "title": "Why does stress feel physical?",
+        "tag": "stress"
+      },
+      {
+        "id": "q2",
+        "title": "How do I ask an adult for help?",
+        "tag": "support"
+      },
+      {
+        "id": "q3",
+        "title": "Does sleep change how I think?",
+        "tag": "sleep"
+      }
+    ],
+    "challenges": [
+      {
+        "id": "c1",
+        "title": "Phone-free 20 minutes before sleep",
+        "status": "in-progress"
+      },
+      {
+        "id": "c2",
+        "title": "3-day hydration check",
+        "status": "available"
+      }
+    ]
+  },
+  "parent": {
+    "guardian": {
+      "name": "Meera N.",
+      "relationship": "Mother",
+      "consent": "Active",
+      "privacyTier": "Weekly summaries only"
+    },
+    "linkedStudents": [
+      {
+        "id": "child-1",
+        "name": "Aarav N.",
+        "summaryStatus": "Available",
+        "focusTheme": "School stress improving"
+      }
+    ],
+    "summary": {
+      "headline": "Aarav showed steadier sleep and slightly lower stress this week.",
+      "sleepTrend": 7,
+      "moodTrend": 4,
+      "guideTheme": "Supportive conversations about exams"
+    },
+    "guides": [
+      {
+        "id": "g1",
+        "title": "Talking about pressure without judgment",
+        "duration": "4 min"
+      },
+      {
+        "id": "g2",
+        "title": "What summary trends do and do not mean",
+        "duration": "3 min"
+      }
+    ],
+    "modules": [
+      {
+        "id": "pm1",
+        "title": "Adolescent wellbeing basics",
+        "progress": 84,
+        "duration": "9 min"
+      },
+      {
+        "id": "pm2",
+        "title": "What consent tiers mean",
+        "progress": 35,
+        "duration": "6 min"
+      }
+    ],
+    "notifications": [
+      {
+        "id": "pn1",
+        "title": "Weekly summary available",
+        "body": "A new wellbeing summary is ready to review.",
+        "tone": "info",
+        "time": "Today"
+      },
+      {
+        "id": "pn2",
+        "title": "Privacy tier updated",
+        "body": "Summary access remains within approved boundaries.",
+        "tone": "warning",
+        "time": "2 days ago"
+      }
+    ]
+  },
+  "teacher": {
+    "teacher": {
+      "name": "Riya Thomas",
+      "school": "Greenfield Public School",
+      "training": "Completed"
+    },
+    "classTrends": [
+      {
+        "theme": "Sleep",
+        "score": 67
+      },
+      {
+        "theme": "Stress",
+        "score": 58
+      },
+      {
+        "theme": "Energy",
+        "score": 72
+      },
+      {
+        "theme": "Help seeking",
+        "score": 49
+      }
+    ],
+    "referrals": [
+      {
+        "id": "r1",
+        "studentCode": "GF-11-A-24",
+        "status": "In review",
+        "submitted": "Today, 11:20 AM"
+      },
+      {
+        "id": "r2",
+        "studentCode": "GF-10-C-03",
+        "status": "Closed",
+        "submitted": "Yesterday"
+      }
+    ],
+    "pastoralNotes": [
+      {
+        "id": "p1",
+        "title": "Observed exam-related withdrawal",
+        "status": "Draft"
+      },
+      {
+        "id": "p2",
+        "title": "Attendance and peer concerns",
+        "status": "Submitted"
+      }
+    ],
+    "modules": [
+      {
+        "id": "tm1",
+        "title": "Reading anonymized wellbeing trends",
+        "progress": 100,
+        "duration": "7 min"
+      },
+      {
+        "id": "tm2",
+        "title": "Pastoral referrals: do and don't",
+        "progress": 68,
+        "duration": "5 min"
+      }
+    ],
+    "notifications": [
+      {
+        "id": "tn1",
+        "title": "Referral updated",
+        "body": "One referral changed status to In review.",
+        "tone": "info",
+        "time": "Today"
+      },
+      {
+        "id": "tn2",
+        "title": "Policy update",
+        "body": "Pastoral note retention guidance updated.",
+        "tone": "warning",
+        "time": "This week"
+      }
+    ]
+  },
+  "baha": {
+    "operator": {
+      "name": "Dr. Kavya Rao",
+      "role": "Clinical Reviewer",
+      "queueCount": 18
+    },
+    "queue": [
+      {
+        "id": "case-101",
+        "studentCode": "GF-11-A-24",
+        "severity": "High",
+        "status": "New",
+        "source": "Student help request"
+      },
+      {
+        "id": "case-102",
+        "studentCode": "GF-10-C-03",
+        "severity": "Medium",
+        "status": "Assigned",
+        "source": "Teacher referral"
+      },
+      {
+        "id": "case-103",
+        "studentCode": "LM-09-B-11",
+        "severity": "Monitoring",
+        "status": "Awaiting follow-up",
+        "source": "Trend threshold"
+      }
+    ],
+    "caseTimeline": [
+      {
+        "time": "09:10",
+        "event": "Student requested human support"
+      },
+      {
+        "time": "09:18",
+        "event": "Queue priority set to High"
+      },
+      {
+        "time": "09:27",
+        "event": "Clinical reviewer assigned"
+      },
+      {
+        "time": "09:41",
+        "event": "Guardian contact decision pending"
+      }
+    ],
+    "analytics": [
+      {
+        "metric": "Weekly active students",
+        "value": "1,284"
+      },
+      {
+        "metric": "Check-in completion",
+        "value": "78%"
+      },
+      {
+        "metric": "Cases escalated",
+        "value": "26"
+      },
+      {
+        "metric": "Learning completion",
+        "value": "64%"
+      }
+    ],
+    "content": [
+      {
+        "id": "ct-1",
+        "title": "Sleep lesson for exams",
+        "status": "Published"
+      },
+      {
+        "id": "ct-2",
+        "title": "When Buddy should hand off",
+        "status": "Review"
+      },
+      {
+        "id": "ct-3",
+        "title": "Safe Questions on body image",
+        "status": "Flagged"
+      }
+    ],
+    "audit": [
+      {
+        "id": "au-1",
+        "actor": "Dr. Kavya Rao",
+        "action": "Viewed case detail",
+        "time": "Today, 09:42"
+      },
+      {
+        "id": "au-2",
+        "actor": "System",
+        "action": "Threshold rule triggered",
+        "time": "Today, 09:18"
+      }
+    ],
+    "notifications": [
+      {
+        "id": "bn1",
+        "title": "High-priority case added",
+        "body": "Queue priority requires review within SLA.",
+        "tone": "danger",
+        "time": "Now"
+      },
+      {
+        "id": "bn2",
+        "title": "Content review due",
+        "body": "One Safe Questions item is past review date.",
+        "tone": "warning",
+        "time": "Today"
+      }
+    ],
+    "users": [
+      {
+        "id": "u1",
+        "name": "Dr. Kavya Rao",
+        "scope": "Clinical reviewer"
+      },
+      {
+        "id": "u2",
+        "name": "Arjun Patel",
+        "scope": "Operations admin"
+      }
+    ]
+  }
+}

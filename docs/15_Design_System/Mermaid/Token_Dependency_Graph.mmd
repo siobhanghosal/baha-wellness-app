@@ -1,0 +1,10 @@
+flowchart TD
+  P["Primitive Tokens"] --> S["Semantic Tokens"]
+  S --> TH["Theme Modes"]
+  S --> RO["Role Overrides"]
+  TH --> C["Component Tokens"]
+  RO --> C
+  C --> FG["Figma Variables"]
+  C --> FL["Flutter Constants"]
+  C --> UI["Reusable Components"]
+  UI --> SC["Screen Composition Matrix"]

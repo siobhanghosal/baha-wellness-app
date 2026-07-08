@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant C as Client App
+    participant API as FastAPI
+    participant POL as Policy Layer
+    participant DOM as Domain Service
+    participant DB as PostgreSQL
+    participant AUD as Audit Log
+    C->>API: request
+    API->>POL: role and consent check
+    POL-->>API: decision
+    API->>DOM: execute
+    DOM->>DB: read or write
+    DB-->>DOM: result
+    DOM->>AUD: append sensitive event
+    DOM-->>API: filtered payload
+    API-->>C: response

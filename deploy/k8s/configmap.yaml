@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: baha-rag-config
+  namespace: baha-rag
+data:
+  APP_NAME: "BAHA Wellness RAG"
+  ENVIRONMENT: "production"
+  EMBEDDING_MODEL: "BAAI/bge-large-en-v1.5"
+  EMBEDDING_BACKEND: "bge"
+  EMBEDDING_DIMENSIONS: "1024"
+  RETRIEVAL_TOP_K: "8"
+  MIN_CONFIDENCE: "0.35"
+  STORAGE_ROOT: "/data/raw"
+  CRAWL_CONCURRENT_REQUESTS: "8"
+  CRAWL_DOWNLOAD_DELAY_SECONDS: "1.0"
+  CRAWL_DEPTH_LIMIT: "3"

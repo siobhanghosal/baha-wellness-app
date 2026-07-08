@@ -1,0 +1,12 @@
+stateDiagram-v2
+    [*] --> Loading
+    Loading --> Empty: no eligible data
+    Loading --> Active: data ready
+    Loading --> Offline: connectivity unavailable
+    Loading --> Error: fetch or guard failure
+    Empty --> Active: data appears
+    Active --> Success: user action completed
+    Active --> Error: recoverable issue
+    Error --> Loading: retry
+    Offline --> Loading: reconnect
+    Success --> Active

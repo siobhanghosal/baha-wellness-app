@@ -1,0 +1,10 @@
+stateDiagram-v2
+    [*] --> Loading
+    Loading --> Empty: no data
+    Loading --> Active: data ready
+    Loading --> Offline: sync unavailable
+    Empty --> Active: minimum data reached
+    Active --> Detail
+    Detail --> Active
+    Offline --> Active: reconnect
+    Active --> [*]

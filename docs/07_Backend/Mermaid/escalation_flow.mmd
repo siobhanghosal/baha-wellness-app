@@ -1,0 +1,9 @@
+flowchart TD
+    A["Signal source"] --> B["Rule evaluation"]
+    B --> C{"Threshold crossed"}
+    C -->|"No"| D["Store for analytics only"]
+    C -->|"Yes"| E["Create support case"]
+    E --> F["Assign owner"]
+    F --> G{"Acute safety"}
+    G -->|"Yes"| H["Hotline and override notice"]
+    G -->|"No"| I["Review queue"]

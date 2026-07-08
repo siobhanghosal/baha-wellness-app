@@ -1,0 +1,32 @@
+stateDiagram-v2
+    [*] --> Initial
+    Initial --> Loading
+    Loading --> Idle: payload ready
+    Loading --> Empty: no data
+    Loading --> Failure: unclassified failure
+    Loading --> Network_Error: no network
+    Loading --> Timeout: backend timeout
+    Loading --> Permission_Denied: guard blocked
+    Loading --> Session_Expired: session invalid
+    Loading --> Offline: cached fallback
+    Loading --> Maintenance_Mode: service unavailable
+    Idle --> Refreshing: manual or automatic refresh
+    Refreshing --> Success: refresh succeeded
+    Refreshing --> Failure: refresh failed
+    Idle --> Validation_Error: user action invalid
+    Success --> Idle
+    Failure --> Refreshing: retry
+    Validation_Error --> Idle: fix input
+    Network_Error --> Offline: cached state exists
+    Network_Error --> Loading: retry online
+    Timeout --> Loading: retry
+    Permission_Denied --> Disabled
+    Session_Expired --> [*]
+    Offline --> Refreshing: reconnect
+    Maintenance_Mode --> Disabled
+    Idle --> Deleted: entity removed
+    Idle --> Archived: archived state entered
+    Idle --> Disabled: feature disabled by policy
+    Deleted --> [*]
+    Archived --> Idle: reopened where allowed
+    Disabled --> [*]

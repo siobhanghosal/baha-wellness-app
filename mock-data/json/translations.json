@@ -1,0 +1,24 @@
+{
+  "en-IN": {
+    "launch": "Launch prototype",
+    "developerPanel": "Developer Panel",
+    "theme": "Theme",
+    "language": "Language",
+    "network": "Network",
+    "demoMode": "Demo mode",
+    "reset": "Reset prototype",
+    "back": "Back",
+    "next": "Next"
+  },
+  "hi-IN": {
+    "launch": "प्रोटोटाइप खोलें",
+    "developerPanel": "डेवलपर पैनल",
+    "theme": "थीम",
+    "language": "भाषा",
+    "network": "नेटवर्क",
+    "demoMode": "डेमो मोड",
+    "reset": "रीसेट करें",
+    "back": "वापस",
+    "next": "आगे"
+  }
+}

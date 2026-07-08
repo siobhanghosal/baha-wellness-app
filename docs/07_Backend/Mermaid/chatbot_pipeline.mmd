@@ -1,0 +1,8 @@
+flowchart TD
+    A["Prompt"] --> B["Topic and safety classification"]
+    B --> C["Audience and review-status filter"]
+    C --> D["Lexical and vector retrieval"]
+    D --> E["Citation assembly"]
+    E --> F{"Approved answer found"}
+    F -->|"Yes"| G["Grounded response"]
+    F -->|"No"| H["Safe refusal and redirect"]

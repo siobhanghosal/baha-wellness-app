@@ -1,0 +1,10 @@
+flowchart TD
+    A["Welcome"] --> B["Age Band"]
+    B --> C["Consent Band Routing"]
+    C -->|"9-17"| D["Parent Consent Pending"]
+    C -->|"18-19"| E["Self-Consent"]
+    D --> F["Privacy Promise"]
+    E --> F
+    F --> G["Consent Tier Setup"]
+    G --> H["Notification Permission"]
+    H --> I["Home"]

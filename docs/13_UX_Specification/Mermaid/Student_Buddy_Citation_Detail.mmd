@@ -1,0 +1,8 @@
+sequenceDiagram
+    participant U as Student User
+    participant UI as Buddy Citation Detail
+    participant API as Backend API
+    U->>UI: enter screen
+    UI->>API: fetch or submit screen data
+    API-->>UI: role-safe response
+    UI-->>U: render content, states, and next actions

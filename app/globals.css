@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-canvas: #f8f6f2;
+  --color-card: #ffffff;
+  --color-ink: #101828;
+  --color-muted: #475467;
+  --color-line: #d0d5dd;
+  --color-primary: #155eef;
+  --color-support: #0f766e;
+  --color-success: #127a4b;
+  --color-warning: #b54708;
+  --color-danger: #b42318;
+  --color-info: #175cd3;
+  --color-role-accent: #7c9a92;
+}
+
+[data-theme="dark"] {
+  --color-canvas: #101318;
+  --color-card: #161b22;
+  --color-ink: #f5f7fa;
+  --color-muted: #cdd5df;
+  --color-line: #344054;
+  --color-primary: #84adff;
+  --color-support: #5eead4;
+  --color-success: #6ce9a6;
+  --color-warning: #fec84b;
+  --color-danger: #fda29b;
+  --color-info: #84caff;
+  --color-role-accent: #8bb8ff;
+}
+
+[data-role="student"][data-age-group="9-13"] {
+  --color-role-accent: #f7b267;
+}
+
+[data-role="student"][data-age-group="14-16"] {
+  --color-role-accent: #8aa7ff;
+}
+
+[data-role="student"][data-age-group="17-19"] {
+  --color-role-accent: #7b83ff;
+}
+
+[data-role="parent"] {
+  --color-role-accent: #7c9a92;
+}
+
+[data-role="teacher"] {
+  --color-role-accent: #4b5563;
+}
+
+[data-role="baha"], [data-role="counselor"] {
+  --color-role-accent: #344054;
+}
+
+html, body {
+  min-height: 100%;
+  background: radial-gradient(circle at top, rgba(21, 94, 239, 0.09), transparent 34%), var(--color-canvas);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+* {
+  border-color: var(--color-line);
+}
+
+[data-presentation-cursor="true"] body,
+[data-presentation-cursor="true"] body * {
+  cursor: none !important;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

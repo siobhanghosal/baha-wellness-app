@@ -1,0 +1,8 @@
+flowchart TD
+    A["Client events"] --> B["Ingestion"]
+    B --> C["Validation and privacy filters"]
+    C --> D["Operational store"]
+    D --> E["Daily rollups"]
+    E --> F["Parent summaries"]
+    E --> G["Teacher dashboards"]
+    E --> H["BAHA pilot analytics"]

@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant U as Student User
+    participant R as Flutter Router
+    participant G as Route Guards
+    participant S as Screen S-27
+    participant API as Backend API
+    U->>R: open /student/lesson_view
+    R->>G: validate auth, role, permission
+    alt guard passes
+G-->>R: allow
+R->>S: instantiate screen
+S->>API: load screen data
+API-->>S: response or status
+S-->>U: render UI and available navigation actions
+    else guard fails
+G-->>R: redirect target
+R-->>U: reroute to prerequisite or session flow
+    end
