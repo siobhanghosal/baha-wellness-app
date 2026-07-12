@@ -36,8 +36,8 @@ extension StudentGenderX on StudentGender {
 extension StudentAgeGroupX on StudentAgeGroup {
   String get label => switch (this) {
     StudentAgeGroup.child => '9-12',
-    StudentAgeGroup.teen => '13-16',
-    StudentAgeGroup.youngAdult => '17-19',
+    StudentAgeGroup.teen => '13-14',
+    StudentAgeGroup.youngAdult => '15-18',
   };
 }
 

@@ -42,7 +42,7 @@ The app startup and main shell have been rewritten to match the reference branch
   - reflection prompts
 - student-only polish screens now replace the old generic placeholders:
   - weekly insight views for Mood, Sleep, Stress, and Energy
-  - local wellness tools for Emotion Wheel, Calm Breathing, and Friendship Choices
+  - local mini-games/tools for Comet Sequence, Calm Breathing, and Focus Catch
   - a student notification center
   - a backend-informed calendar/planning screen
   - a real settings screen for privacy, theme, onboarding refresh, and identity switching
@@ -64,18 +64,25 @@ Remaining practical gap:
 - expanded student demo course corpus with multiple modules, quick guides, and reflection content
 - support contacts and help-request submission
 - Buddy session list, session creation, message history, and live message send
+- Buddy answer generation through the backend retrieval layer, with local-LLM support available when the backend is configured with `Ollama`
 - calendar planning data from check-in templates and modules
 - profile/settings identity and consent display from current actor and onboarding state
 
 ## What Is Intentionally Local For Now
 
-- emotion wheel interaction
+- comet sequence memory game
 - calm breathing routine
-- friendship scenario practice
+- focus catch coordination game
 - notification center composition
 - avatar, badges, celebratory visuals, and most gamified profile elements
 
 These local pieces are intentional. They preserve the reference UI and give the student app a finished interaction flow while the corresponding backend/game systems are still out of scope for the current slice.
+
+Important game note:
+
+- `Story World` is now rebuilt into this app against the current student auth flow, not the teammate branch's detached game identity or OpenAI-dependent backend
+- the governing implementation/documentation for that slice lives in:
+  - [Baha_Data/docs/STORY_WORLD_AND_GAMES_PLAN.md](/Users/sudharshan/Desktop/PES/RF%20Internship/Baha_Data/docs/STORY_WORLD_AND_GAMES_PLAN.md)
 
 ## Run Locally On Android
 
@@ -130,6 +137,8 @@ This app currently depends on:
 ## Current Quality Notes
 
 - the student app is meant to run against the local backend by default during development
+- the Buddy screen uses the same existing UI, but real local-LLM responses require the backend host machine to have `Ollama` running with `qwen3:4b` pulled
+- when the backend is running via `docker compose`, the API container now reaches host `Ollama` through `http://host.docker.internal:11434`
 - when using a physical Android phone over USB, the app depends on `adb reverse tcp:8000 tcp:8000`
 - if the USB cable is removed, backend-backed screens will stop working unless the phone is pointed to a LAN-accessible or hosted backend
 - deeper student screens now have retryable error states instead of raw exception pages, but they still need real-device QA for spacing and navigation polish

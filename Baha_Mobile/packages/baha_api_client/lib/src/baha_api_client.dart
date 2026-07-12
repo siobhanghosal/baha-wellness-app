@@ -208,6 +208,47 @@ class BahaApiClient {
     return ModuleProgressUpsertResponse.fromJson(payload);
   }
 
+  Future<StoryWorldState> getStoryWorldState({
+    required DevelopmentIdentity identity,
+  }) async {
+    final response = await _httpClient.get(
+      Uri.parse('$_baseUrl/mobile/student/games/story-world/state'),
+      headers: _headers(identity),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
+    return StoryWorldState.fromJson(payload);
+  }
+
+  Future<StoryWorldScene> getStoryWorldScene({
+    required DevelopmentIdentity identity,
+    required String locationId,
+  }) async {
+    final response = await _httpClient.get(
+      Uri.parse(
+        '$_baseUrl/mobile/student/games/story-world/scenes/$locationId',
+      ),
+      headers: _headers(identity),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
+    return StoryWorldScene.fromJson(payload);
+  }
+
+  Future<StoryWorldTurnResponse> submitStoryWorldTurn({
+    required DevelopmentIdentity identity,
+    required StoryWorldTurnRequest request,
+  }) async {
+    final response = await _httpClient.post(
+      Uri.parse('$_baseUrl/mobile/student/games/story-world/turns'),
+      headers: _headers(identity),
+      body: jsonEncode(request.toJson()),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
+    return StoryWorldTurnResponse.fromJson(payload);
+  }
+
   Future<List<MobileSupportContact>> listSupportContacts({
     required DevelopmentIdentity identity,
   }) async {

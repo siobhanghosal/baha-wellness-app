@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:baha_api_client/baha_api_client.dart';
 import 'package:baha_design_system/baha_design_system.dart';
@@ -18,6 +19,10 @@ import '../prototype/theme_manager.dart';
 import 'student_buddy_screen.dart';
 import 'student_help_request_screen.dart';
 import 'student_learn_screen.dart';
+import 'student_profile_setup_screen.dart';
+import 'student_story_world_screen.dart';
+import '../wellbeing/student_checkin_logic.dart';
+import '../wellbeing/student_profile_logic.dart';
 
 class StudentReadyScreen extends StatefulWidget {
   const StudentReadyScreen({
@@ -49,16 +54,21 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
 
   late final ThemeController _themeController;
   late final ConfettiController _confettiController;
+  late final StudentWellbeingProfileStore _profileStore;
   int _currentIndex = 0;
   StudentGender _gender = StudentGender.female;
   StudentAgeGroup _age = StudentAgeGroup.teen;
+  StudentWellbeingProfile? _profile;
+  bool _profileLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _themeController = ThemeController()..load();
     _confettiController = ConfettiController(duration: 900.ms);
+    _profileStore = StudentWellbeingProfileStore();
     unawaited(_restoreDisplayPreferences());
+    unawaited(_restoreProfile());
   }
 
   @override
@@ -69,10 +79,15 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
   }
 
   Future<void> _openCheckins() async {
+    final profile = await _ensureProfileForAdaptiveCheckins();
+    if (profile == null || !mounted) {
+      return;
+    }
     await _pushRoute(
       builder: (context) => StudentCheckinsScreen(
         apiClient: widget.apiClient,
         identity: widget.identity,
+        profile: profile,
       ),
     );
   }
@@ -111,6 +126,16 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
     );
   }
 
+  Future<void> _openStoryWorld() async {
+    await _pushRoute(
+      builder: (context) => StudentStoryWorldScreen(
+        apiClient: widget.apiClient,
+        identity: widget.identity,
+        palette: _currentPalette,
+      ),
+    );
+  }
+
   Future<void> _openInsights(UiMetric metric) async {
     await _pushRoute(
       builder: (context) => StudentInsightScreen(
@@ -118,6 +143,7 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
         metric: metric,
         apiClient: widget.apiClient,
         identity: widget.identity,
+        profile: _profile,
       ),
     );
   }
@@ -156,8 +182,10 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
         actor: widget.actor,
         onboardingState: widget.onboardingState,
         environment: widget.environment,
+        profile: _profile,
         onRefreshOnboarding: widget.onRefresh,
         onOpenSupport: _openSupport,
+        onEditProfile: _openProfileSetup,
         onClearIdentity: _resetIdentityFromChildRoute,
       ),
     );
@@ -166,9 +194,9 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
   PrototypePalette get _currentPalette =>
       studentPalette(_age, _gender, isDark: _themeController.isDark);
 
-  Future<void> _pushRoute({required WidgetBuilder builder}) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+  Future<T?> _pushRoute<T>({required WidgetBuilder builder}) async {
+    return Navigator.of(context).push<T>(
+      MaterialPageRoute<T>(
         builder: (context) => ThemeScope(
           controller: _themeController,
           child: AnimatedBuilder(
@@ -199,6 +227,61 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
     });
   }
 
+  Future<void> _restoreProfile() async {
+    final profile = await _profileStore.load(widget.identity.externalAuthId);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _profile = profile;
+      _profileLoaded = true;
+    });
+  }
+
+  Future<StudentWellbeingProfile?> _openProfileSetup() async {
+    final result = await _pushRoute<StudentWellbeingProfile>(
+      builder: (context) => StudentProfileSetupScreen(
+        palette: _currentPalette,
+        initialProfile: _profile,
+      ),
+    );
+    if (result == null) {
+      return _profile;
+    }
+    await _profileStore.save(
+      externalAuthId: widget.identity.externalAuthId,
+      profile: result,
+    );
+    if (!mounted) {
+      return result;
+    }
+    setState(() {
+      _profile = result;
+      _profileLoaded = true;
+    });
+    final mappedAge = _mapProfileAge(result.ageBand);
+    if (mappedAge != _age) {
+      _updateAge(mappedAge);
+    }
+    if (result.genderIdentity == 'male' && _gender != StudentGender.male) {
+      _updateGender(StudentGender.male);
+    } else if (result.genderIdentity == 'female' &&
+        _gender != StudentGender.female) {
+      _updateGender(StudentGender.female);
+    }
+    return result;
+  }
+
+  Future<StudentWellbeingProfile?> _ensureProfileForAdaptiveCheckins() async {
+    if (!_profileLoaded) {
+      await _restoreProfile();
+    }
+    if (_profile != null) {
+      return _profile;
+    }
+    return _openProfileSetup();
+  }
+
   Future<void> _persistDisplayPreferences() async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_ageStorageKey, _age.name);
@@ -215,6 +298,19 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
     unawaited(_persistDisplayPreferences());
   }
 
+  StudentAgeGroup _mapProfileAge(String ageBand) {
+    switch (ageBand) {
+      case '9_12':
+        return StudentAgeGroup.child;
+      case '15_18':
+      case '18_plus':
+        return StudentAgeGroup.youngAdult;
+      case '13_14':
+      default:
+        return StudentAgeGroup.teen;
+    }
+  }
+
   Future<void> _resetIdentityFromChildRoute() async {
     await widget.onClearIdentity();
     if (!mounted) {
@@ -228,10 +324,13 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
       case 'Daily Check-in':
         unawaited(_openCheckins());
         return;
-      case 'Emotion Wheel':
+      case 'Comet Sequence':
       case 'Calm Breathing':
-      case 'Friendship Choices':
+      case 'Focus Catch':
         unawaited(_openTool(item));
+        return;
+      case 'Story World':
+        unawaited(_openStoryWorld());
         return;
       case 'BAHA Buddy':
         setState(() => _currentIndex = 2);
@@ -314,11 +413,13 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
               identity: widget.identity,
               actor: widget.actor,
               onboardingState: widget.onboardingState,
+              profile: _profile,
               age: _age,
               gender: _gender,
               onAgeChanged: _updateAge,
               onGenderChanged: _updateGender,
               onMetricTap: (metric) => unawaited(_openInsights(metric)),
+              onOpenProfileSetup: _openProfileSetup,
               onOpenCheckins: _openCheckins,
               onOpenSupport: _openSupport,
               onClearIdentity: _resetIdentityFromChildRoute,
@@ -414,11 +515,13 @@ class StudentReferenceHomeTab extends StatefulWidget {
     required this.identity,
     required this.actor,
     required this.onboardingState,
+    required this.profile,
     required this.age,
     required this.gender,
     required this.onAgeChanged,
     required this.onGenderChanged,
     required this.onMetricTap,
+    required this.onOpenProfileSetup,
     required this.onOpenCheckins,
     required this.onOpenSupport,
     required this.onClearIdentity,
@@ -430,11 +533,13 @@ class StudentReferenceHomeTab extends StatefulWidget {
   final DevelopmentIdentity identity;
   final MobileActor? actor;
   final AuthOnboardingState? onboardingState;
+  final StudentWellbeingProfile? profile;
   final StudentAgeGroup age;
   final StudentGender gender;
   final ValueChanged<StudentAgeGroup> onAgeChanged;
   final ValueChanged<StudentGender> onGenderChanged;
   final ValueChanged<UiMetric> onMetricTap;
+  final Future<StudentWellbeingProfile?> Function() onOpenProfileSetup;
   final Future<void> Function() onOpenCheckins;
   final Future<void> Function() onOpenSupport;
   final Future<void> Function() onClearIdentity;
@@ -454,13 +559,30 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
   }
 
   Future<_StudentDashboardData> _load() async {
-    final results = await Future.wait<Object>([
-      widget.apiClient.getStudentWeeklySummary(identity: widget.identity),
-      widget.apiClient.listStudentCheckins(identity: widget.identity, limit: 5),
-    ]);
+    final summary = await widget.apiClient.getStudentWeeklySummary(
+      identity: widget.identity,
+    );
+    final checkins = await widget.apiClient.listStudentCheckins(
+      identity: widget.identity,
+      limit: 7,
+    );
+    final details = await Future.wait<StudentCheckinDetail>(
+      checkins
+          .where((checkin) => checkin.submittedAt != null)
+          .take(7)
+          .map(
+            (checkin) => widget.apiClient.getStudentCheckinDetail(
+              identity: widget.identity,
+              responseSetId: checkin.id,
+            ),
+          ),
+    );
+    final trendPoints = buildTrendPointsFromDetails(details);
     return _StudentDashboardData(
-      summary: results[0] as StudentWeeklySummary,
-      checkins: results[1] as List<StudentCheckinSummary>,
+      summary: summary,
+      checkins: checkins,
+      details: details,
+      trendPoints: trendPoints,
     );
   }
 
@@ -471,48 +593,11 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
     await _future;
   }
 
-  List<UiMetric> _metricsForSummary(StudentWeeklySummary summary) {
-    final headline =
-        summary.summary['headline']?.toString() ?? 'Feeling steady today';
-    final moodTrend = summary.summary['mood_trend']?.toString() ?? headline;
-    final sleepTrend =
-        summary.summary['sleep_trend']?.toString() ?? 'Sleep trend available';
-    final stressTrend =
-        summary.summary['stress_trend']?.toString() ??
-        'Support signals are staying manageable';
-    final energyTrend =
-        summary.summary['energy_trend']?.toString() ??
-        'Energy pattern captured in weekly summary';
-    return [
-      UiMetric(
-        label: 'Mood',
-        value: .78,
-        detail: moodTrend,
-        icon: Icons.sentiment_satisfied_alt_rounded,
-        color: const Color(0xFF14B8A6),
-      ),
-      UiMetric(
-        label: 'Sleep',
-        value: .62,
-        detail: sleepTrend,
-        icon: Icons.bedtime_rounded,
-        color: const Color(0xFF6366F1),
-      ),
-      UiMetric(
-        label: 'Stress',
-        value: .34,
-        detail: stressTrend,
-        icon: Icons.spa_rounded,
-        color: const Color(0xFFF59E0B),
-      ),
-      UiMetric(
-        label: 'Energy',
-        value: .71,
-        detail: energyTrend,
-        icon: Icons.bolt_rounded,
-        color: const Color(0xFFEF4444),
-      ),
-    ];
+  List<UiMetric> _metricsForData(_StudentDashboardData data) {
+    return buildFactorMetrics(
+      points: data.trendPoints,
+      profile: widget.profile,
+    ).map((metric) => metric.toUiMetric()).toList();
   }
 
   @override
@@ -571,7 +656,14 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
 
           final data = snapshot.data!;
           final actor = widget.actor;
-          final metrics = _metricsForSummary(data.summary);
+          final metrics = _metricsForData(data);
+          final labels = chartLabels(data.trendPoints);
+          final overallValues = overallChartValues(data.trendPoints);
+          final dailyHeadline = dailyStateHeadline(data.trendPoints);
+          final flags = riskFlags(
+            points: data.trendPoints,
+            profile: widget.profile,
+          );
           return ListView(
             key: const ValueKey('student-home'),
             padding: const EdgeInsets.all(22),
@@ -612,6 +704,30 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                 ],
               ),
               const SizedBox(height: 18),
+              if (widget.profile == null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 18),
+                  child: GlassPanel(
+                    palette: palette,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SectionTitle(
+                          title: 'Finish your one-time profile',
+                          subtitle:
+                              'This keeps daily check-ins short and makes follow-up questions more relevant.',
+                        ),
+                        const SizedBox(height: 8),
+                        AnimatedPrimaryButton(
+                          label: 'Set up wellbeing profile',
+                          icon: Icons.playlist_add_check_rounded,
+                          onPressed: () =>
+                              unawaited(widget.onOpenProfileSetup()),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               const SectionTitle(
                 title: 'Today',
                 subtitle: 'Tiny signals, no judgement.',
@@ -632,11 +748,31 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SectionTitle(
-                      title: 'Wellness trend',
-                      subtitle: 'A beautiful private graph.',
+                    SectionTitle(
+                      title: 'Tracked factors',
+                      subtitle: dailyHeadline,
                     ),
-                    MiniLineChart(palette: palette),
+                    MiniLineChart(
+                      palette: palette,
+                      values: overallValues,
+                      labels: labels,
+                      lineColor: palette.primary,
+                    ),
+                    if (flags.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: flags
+                            .map(
+                              (flag) => Pill(
+                                icon: Icons.insights_rounded,
+                                label: flag,
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -659,6 +795,13 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                       data.summary.summary['headline']?.toString() ??
                           'Weekly summary available.',
                     ),
+                    if (widget.profile != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        'Profile focus: ${widget.profile!.checkinFocusLabel} • Support style: ${widget.profile!.supportPreferenceLabel}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     Text(
                       'Recent check-ins: ${data.checkins.length} • Privacy tier: ${data.summary.privacyTierApplied}',
@@ -678,6 +821,15 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                     onPressed: widget.onOpenCheckins,
                     icon: const Icon(Icons.favorite_rounded),
                     label: const Text('Daily Check-in'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => unawaited(widget.onOpenProfileSetup()),
+                    icon: const Icon(Icons.tune_rounded),
+                    label: Text(
+                      widget.profile == null
+                          ? 'Set up profile'
+                          : 'Edit profile',
+                    ),
                   ),
                   OutlinedButton.icon(
                     onPressed: widget.onOpenSupport,
@@ -1107,6 +1259,7 @@ class StudentInsightScreen extends StatefulWidget {
     required this.metric,
     required this.apiClient,
     required this.identity,
+    required this.profile,
     super.key,
   });
 
@@ -1114,6 +1267,7 @@ class StudentInsightScreen extends StatefulWidget {
   final UiMetric metric;
   final BahaApiClient apiClient;
   final DevelopmentIdentity identity;
+  final StudentWellbeingProfile? profile;
 
   @override
   State<StudentInsightScreen> createState() => _StudentInsightScreenState();
@@ -1129,15 +1283,34 @@ class _StudentInsightScreenState extends State<StudentInsightScreen> {
   }
 
   Future<_StudentInsightData> _load() async {
-    final results = await Future.wait<Object>([
-      widget.apiClient.getStudentWeeklySummary(identity: widget.identity),
-      widget.apiClient.listStudentCheckins(identity: widget.identity, limit: 7),
-      widget.apiClient.listStudentModules(identity: widget.identity),
-    ]);
+    final summary = await widget.apiClient.getStudentWeeklySummary(
+      identity: widget.identity,
+    );
+    final checkins = await widget.apiClient.listStudentCheckins(
+      identity: widget.identity,
+      limit: 7,
+    );
+    final modules = await widget.apiClient.listStudentModules(
+      identity: widget.identity,
+    );
+    final details = await Future.wait<StudentCheckinDetail>(
+      checkins
+          .where((checkin) => checkin.submittedAt != null)
+          .take(7)
+          .map(
+            (checkin) => widget.apiClient.getStudentCheckinDetail(
+              identity: widget.identity,
+              responseSetId: checkin.id,
+            ),
+          ),
+    );
+    final trendPoints = buildTrendPointsFromDetails(details);
     return _StudentInsightData(
-      summary: results[0] as StudentWeeklySummary,
-      checkins: results[1] as List<StudentCheckinSummary>,
-      modules: results[2] as List<StudentModuleSummary>,
+      summary: summary,
+      checkins: checkins,
+      modules: modules,
+      details: details,
+      trendPoints: trendPoints,
     );
   }
 
@@ -1176,13 +1349,21 @@ class _StudentInsightScreenState extends State<StudentInsightScreen> {
                 );
               }
               final data = snapshot.data!;
+              final factorKey = _factorKeyForMetricLabel(widget.metric.label);
               final summaryText = _summaryForMetric(
-                widget.metric.label,
+                factorKey,
                 data.summary,
+                data.trendPoints,
+                widget.profile,
               );
               final moduleProgress = data.modules.isEmpty
                   ? 'No modules started'
                   : '${data.modules.where((module) => module.completionPercent > 0).length}/${data.modules.length} active modules';
+              final chartValues = chartValuesForFactor(
+                data.trendPoints,
+                factorKey,
+              );
+              final labels = chartLabels(data.trendPoints);
               return ListView(
                 padding: const EdgeInsets.all(22),
                 children: [
@@ -1214,9 +1395,15 @@ class _StudentInsightScreenState extends State<StudentInsightScreen> {
                       children: [
                         const SectionTitle(
                           title: 'Weekly pulse',
-                          subtitle: 'Rendered from the real backend summary.',
+                          subtitle:
+                              'Rendered from real check-ins using the factors we actually track.',
                         ),
-                        MiniLineChart(palette: palette),
+                        MiniLineChart(
+                          palette: palette,
+                          values: chartValues,
+                          labels: labels,
+                          lineColor: widget.metric.color,
+                        ),
                         const SizedBox(height: 12),
                         Text(summaryText),
                       ],
@@ -1294,47 +1481,282 @@ class StudentLocalToolScreen extends StatefulWidget {
 }
 
 class _StudentLocalToolScreenState extends State<StudentLocalToolScreen> {
-  static const _breathingSteps = <String>[
-    'Inhale for 4',
-    'Hold for 4',
-    'Exhale for 6',
+  static const _breathingPhases = <_BreathingPhase>[
+    _BreathingPhase(label: 'Inhale', durationSeconds: 4, scale: 1.14),
+    _BreathingPhase(label: 'Hold', durationSeconds: 4, scale: 1.14),
+    _BreathingPhase(label: 'Exhale', durationSeconds: 6, scale: 0.84),
   ];
 
+  final Random _random = Random();
+
   Timer? _breathingTimer;
+  bool _breathingRunning = false;
   int _breathingIndex = 0;
+  int _breathingPhaseSecondsLeft = _breathingPhases[0].durationSeconds;
+  int _breathingTotalSecondsLeft = 60;
   int _cyclesCompleted = 0;
+
+  int _sequenceToken = 0;
+  List<int> _sequencePattern = const [];
+  List<int> _sequenceInput = const [];
+  bool _sequenceStarted = false;
+  bool _sequencePlayingBack = false;
+  int? _sequenceHighlighted;
+  int _sequenceLevel = 0;
+  int _sequenceBest = 0;
+  String _sequenceStatus = 'Watch the pattern, then tap the same order.';
+
+  Timer? _focusCountdownTimer;
+  bool _focusRunning = false;
+  int _focusTimeLeft = 20;
+  int _focusScore = 0;
+  int _focusBest = 0;
+  int _focusJumps = 0;
+  double _focusTargetX = .18;
+  double _focusTargetY = .22;
+  String _focusStatus = 'Tap the moving comet before it jumps again.';
 
   @override
   void dispose() {
     _breathingTimer?.cancel();
+    _focusCountdownTimer?.cancel();
     super.dispose();
   }
 
   void _toggleBreathing() {
-    if (_breathingTimer != null) {
-      _breathingTimer?.cancel();
-      setState(() {
-        _breathingTimer = null;
-        _breathingIndex = 0;
-      });
+    if (_breathingRunning) {
+      _stopBreathing();
       return;
     }
+    _startBreathing();
+  }
+
+  void _startBreathing() {
+    _breathingTimer?.cancel();
     setState(() {
+      _breathingRunning = true;
       _breathingIndex = 0;
+      _breathingPhaseSecondsLeft = _breathingPhases[0].durationSeconds;
+      _breathingTotalSecondsLeft = 60;
       _cyclesCompleted = 0;
     });
-    _breathingTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+    _breathingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
-      setState(() {
-        _breathingIndex = (_breathingIndex + 1) % _breathingSteps.length;
-        if (_breathingIndex == 0) {
-          _cyclesCompleted += 1;
+      if (_breathingTotalSecondsLeft <= 1) {
+        _stopBreathing(completed: true);
+        return;
+      }
+      var nextPhaseSecondsLeft = _breathingPhaseSecondsLeft - 1;
+      var nextPhaseIndex = _breathingIndex;
+      var nextCyclesCompleted = _cyclesCompleted;
+      if (nextPhaseSecondsLeft <= 0) {
+        nextPhaseIndex = (_breathingIndex + 1) % _breathingPhases.length;
+        nextPhaseSecondsLeft = _breathingPhases[nextPhaseIndex].durationSeconds;
+        if (nextPhaseIndex == 0) {
+          nextCyclesCompleted += 1;
         }
+      }
+      setState(() {
+        _breathingRunning = true;
+        _breathingIndex = nextPhaseIndex;
+        _breathingPhaseSecondsLeft = nextPhaseSecondsLeft;
+        _breathingTotalSecondsLeft -= 1;
+        _cyclesCompleted = nextCyclesCompleted;
       });
     });
+  }
+
+  void _stopBreathing({bool completed = false}) {
+    _breathingTimer?.cancel();
+    _breathingTimer = null;
+    setState(() {
+      _breathingRunning = false;
+      _breathingIndex = 0;
+      _breathingPhaseSecondsLeft = _breathingPhases[0].durationSeconds;
+      _breathingTotalSecondsLeft = completed ? 0 : 60;
+    });
+  }
+
+  Future<void> _startSequenceGame() async {
+    final token = ++_sequenceToken;
+    setState(() {
+      _sequencePattern = const [];
+      _sequenceInput = const [];
+      _sequenceStarted = true;
+      _sequencePlayingBack = false;
+      _sequenceHighlighted = null;
+      _sequenceLevel = 0;
+      _sequenceStatus = 'Watch closely. The pattern gets longer each round.';
+    });
+    await _playNextSequenceRound(token);
+  }
+
+  Future<void> _playNextSequenceRound(int token) async {
+    if (!mounted || token != _sequenceToken) {
+      return;
+    }
+    final nextPattern = [..._sequencePattern, _random.nextInt(4)];
+    setState(() {
+      _sequencePattern = nextPattern;
+      _sequenceInput = const [];
+      _sequencePlayingBack = true;
+      _sequenceHighlighted = null;
+      _sequenceStatus = 'Watch the lights, then repeat them.';
+    });
+    await Future<void>.delayed(const Duration(milliseconds: 320));
+    for (final tileIndex in nextPattern) {
+      if (!mounted || token != _sequenceToken) {
+        return;
+      }
+      setState(() => _sequenceHighlighted = tileIndex);
+      await Future<void>.delayed(const Duration(milliseconds: 460));
+      if (!mounted || token != _sequenceToken) {
+        return;
+      }
+      setState(() => _sequenceHighlighted = null);
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+    }
+    if (!mounted || token != _sequenceToken) {
+      return;
+    }
+    setState(() {
+      _sequencePlayingBack = false;
+      _sequenceLevel = nextPattern.length;
+      _sequenceStatus = 'Your turn. Tap the same order.';
+    });
+  }
+
+  void _handleSequenceTap(int tileIndex) {
+    if (!_sequenceStarted || _sequencePlayingBack) {
+      return;
+    }
+    final expectedIndex = _sequencePattern[_sequenceInput.length];
+    if (tileIndex != expectedIndex) {
+      setState(() {
+        _sequenceStarted = false;
+        _sequencePlayingBack = false;
+        _sequenceHighlighted = tileIndex;
+        _sequenceBest = max(_sequenceBest, _sequenceLevel);
+        _sequenceStatus =
+            'Almost. You reached round $_sequenceLevel. Tap play again to retry.';
+      });
+      Future<void>.delayed(const Duration(milliseconds: 200), () {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _sequenceHighlighted = null);
+      });
+      return;
+    }
+    final nextInput = [..._sequenceInput, tileIndex];
+    setState(() {
+      _sequenceInput = nextInput;
+      _sequenceHighlighted = tileIndex;
+      _sequenceStatus = 'Nice. Keep going.';
+    });
+    Future<void>.delayed(const Duration(milliseconds: 180), () {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _sequenceHighlighted = null);
+    });
+    if (nextInput.length == _sequencePattern.length) {
+      setState(() {
+        _sequenceBest = max(_sequenceBest, _sequencePattern.length);
+        _sequenceStatus = 'Round clear. Next pattern loading...';
+      });
+      final token = _sequenceToken;
+      unawaited(
+        Future<void>.delayed(const Duration(milliseconds: 700), () async {
+          if (!mounted || token != _sequenceToken || !_sequenceStarted) {
+            return;
+          }
+          await _playNextSequenceRound(token);
+        }),
+      );
+    }
+  }
+
+  void _toggleFocusGame() {
+    if (_focusRunning) {
+      _stopFocusGame();
+      return;
+    }
+    _startFocusGame();
+  }
+
+  void _startFocusGame() {
+    _focusCountdownTimer?.cancel();
+    setState(() {
+      _focusRunning = true;
+      _focusTimeLeft = 20;
+      _focusScore = 0;
+      _focusJumps = 0;
+      _focusStatus = 'Catch the comet before it jumps away.';
+    });
+    _moveFocusTarget(incrementJumpCount: false);
+    _focusCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_focusTimeLeft <= 1) {
+        _stopFocusGame(completed: true);
+        return;
+      }
+      setState(() {
+        _focusTimeLeft -= 1;
+        _focusStatus = 'Keep tracking. Fast eyes, calm hands.';
+      });
+      _moveFocusTarget();
+    });
+  }
+
+  void _stopFocusGame({bool completed = false}) {
+    _focusCountdownTimer?.cancel();
+    _focusCountdownTimer = null;
+    setState(() {
+      _focusRunning = false;
+      _focusBest = max(_focusBest, _focusScore);
+      _focusStatus = completed
+          ? 'Round complete. You caught $_focusScore comets.'
+          : 'Round paused. Start again when you are ready.';
+    });
+  }
+
+  void _moveFocusTarget({bool incrementJumpCount = true}) {
+    final nextX = .08 + (_random.nextDouble() * .72);
+    final nextY = .08 + (_random.nextDouble() * .66);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _focusTargetX = nextX;
+      _focusTargetY = nextY;
+      if (incrementJumpCount) {
+        _focusJumps += 1;
+      }
+    });
+  }
+
+  void _handleFocusCatch() {
+    if (!_focusRunning) {
+      return;
+    }
+    setState(() {
+      _focusScore += 1;
+      _focusBest = max(_focusBest, _focusScore);
+      _focusStatus = switch (_focusScore % 4) {
+        0 => 'Great rhythm. Keep your eyes on the next jump.',
+        1 => 'Nice catch.',
+        2 => 'Quick hands.',
+        _ => 'Locked in. Stay steady.',
+      };
+    });
+    _moveFocusTarget(incrementJumpCount: false);
   }
 
   @override
@@ -1366,9 +1788,9 @@ class _StudentLocalToolScreenState extends State<StudentLocalToolScreen> {
             ),
             const SizedBox(height: 18),
             ...switch (widget.item.title) {
-              'Emotion Wheel' => _buildEmotionWheelContent(palette),
+              'Comet Sequence' => _buildSequenceContent(palette),
               'Calm Breathing' => _buildBreathingContent(palette),
-              'Friendship Choices' => _buildFriendshipContent(palette),
+              'Focus Catch' => _buildFocusCatchContent(palette),
               _ => _buildGenericToolContent(palette),
             },
           ],
@@ -1377,20 +1799,12 @@ class _StudentLocalToolScreenState extends State<StudentLocalToolScreen> {
     );
   }
 
-  List<Widget> _buildEmotionWheelContent(PrototypePalette palette) {
-    const feelings = <String>[
-      'Calm',
-      'Nervous',
-      'Overwhelmed',
-      'Hopeful',
-      'Lonely',
-      'Excited',
-      'Frustrated',
-      'Proud',
-      'Embarrassed',
-      'Confused',
-      'Tired',
-      'Relieved',
+  List<Widget> _buildSequenceContent(PrototypePalette palette) {
+    final tiles = <Color>[
+      palette.primary,
+      palette.secondary,
+      const Color(0xFFF97316),
+      const Color(0xFF14B8A6),
     ];
     return [
       GlassPanel(
@@ -1399,16 +1813,90 @@ class _StudentLocalToolScreenState extends State<StudentLocalToolScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SectionTitle(
-              title: 'Name the feeling',
+              title: 'Watch. Remember. Repeat.',
               subtitle:
-                  'A finished local tool while game-style backend support comes later.',
+                  'A short sequence-memory game inspired by classic repeat-the-pattern play, rebuilt to match the BAHA visual shell.',
             ),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: feelings
-                  .map((feeling) => Chip(label: Text(feeling)))
-                  .toList(),
+            Text(_sequenceStatus),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _LocalToolStatCard(
+                    palette: palette,
+                    icon: Icons.layers_rounded,
+                    label: 'Round',
+                    value: _sequenceLevel.toString(),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _LocalToolStatCard(
+                    palette: palette,
+                    icon: Icons.workspace_premium_rounded,
+                    label: 'Best',
+                    value: _sequenceBest.toString(),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: tiles.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 1.05,
+              ),
+              itemBuilder: (context, index) {
+                final highlighted = _sequenceHighlighted == index;
+                return GestureDetector(
+                  onTap: () => _handleSequenceTap(index),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(26),
+                      color: tiles[index].withValues(
+                        alpha: highlighted ? .92 : .22,
+                      ),
+                      border: Border.all(
+                        color: highlighted
+                            ? Colors.white.withValues(alpha: .92)
+                            : tiles[index].withValues(alpha: .58),
+                        width: highlighted ? 3 : 1.5,
+                      ),
+                      boxShadow: highlighted
+                          ? [
+                              BoxShadow(
+                                color: tiles[index].withValues(alpha: .36),
+                                blurRadius: 18,
+                                spreadRadius: 1,
+                              ),
+                            ]
+                          : const [],
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.auto_awesome_rounded,
+                        size: highlighted ? 38 : 32,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 18),
+            AnimatedPrimaryButton(
+              label: _sequenceStarted ? 'Restart sequence' : 'Start sequence',
+              icon: _sequenceStarted
+                  ? Icons.refresh_rounded
+                  : Icons.play_arrow_rounded,
+              onPressed: _startSequenceGame,
             ),
           ],
         ),
@@ -1420,11 +1908,11 @@ class _StudentLocalToolScreenState extends State<StudentLocalToolScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SectionTitle(
-              title: 'Try this',
-              subtitle: 'A simple reflection prompt.',
+              title: 'Why this fits BAHA',
+              subtitle: 'A focused mini-game, not a clinical claim.',
             ),
             Text(
-              'Pick one feeling that matches best, then say where it shows up in your body and what made it stronger today.',
+              'It gives students a short, replayable way to practice visual attention, short-term recall, and steady pacing without turning the app into a generic arcade.',
             ),
           ],
         ),
@@ -1433,7 +1921,8 @@ class _StudentLocalToolScreenState extends State<StudentLocalToolScreen> {
   }
 
   List<Widget> _buildBreathingContent(PrototypePalette palette) {
-    final running = _breathingTimer != null;
+    final running = _breathingRunning;
+    final phase = _breathingPhases[_breathingIndex];
     return [
       GlassPanel(
         palette: palette,
@@ -1443,29 +1932,78 @@ class _StudentLocalToolScreenState extends State<StudentLocalToolScreen> {
             const SectionTitle(
               title: '60-second reset',
               subtitle:
-                  'A complete local breathing tool that preserves the reference look.',
+                  'A full local breathing exercise with animated pacing and a real countdown.',
             ),
             Center(
-              child: Container(
-                width: 180,
-                height: 180,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: palette.primary.withValues(alpha: .14),
-                  border: Border.all(
-                    color: palette.primary.withValues(alpha: .34),
-                    width: 3,
+              child: AnimatedScale(
+                scale: running ? phase.scale : 1,
+                duration: Duration(seconds: phase.durationSeconds),
+                curve: running && _breathingIndex == 2
+                    ? Curves.easeInOutCubicEmphasized
+                    : Curves.easeInOut,
+                child: Container(
+                  width: 188,
+                  height: 188,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        palette.primary.withValues(alpha: .18),
+                        palette.secondary.withValues(alpha: .22),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    border: Border.all(
+                      color: palette.primary.withValues(alpha: .36),
+                      width: 3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: palette.primary.withValues(alpha: .22),
+                        blurRadius: 22,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        phase.label,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        running
+                            ? '${_breathingPhaseSecondsLeft}s in this phase'
+                            : 'Tap start to begin',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
                   ),
                 ),
-                alignment: Alignment.center,
-                child: Text(
-                  _breathingSteps[_breathingIndex],
-                  textAlign: TextAlign.center,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-                ),
               ),
+            ),
+            const SizedBox(height: 18),
+            LinearProgressIndicator(
+              value: running ? _breathingTotalSecondsLeft / 60 : 0,
+              minHeight: 10,
+              borderRadius: BorderRadius.circular(999),
+              backgroundColor: palette.primary.withValues(alpha: .12),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              running
+                  ? '$_breathingTotalSecondsLeft seconds left'
+                  : _breathingTotalSecondsLeft == 0
+                  ? 'Session complete'
+                  : 'Use this before check-ins, support, or sleep modules.',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 18),
             AnimatedPrimaryButton(
@@ -1483,58 +2021,170 @@ class _StudentLocalToolScreenState extends State<StudentLocalToolScreen> {
     ];
   }
 
-  List<Widget> _buildFriendshipContent(PrototypePalette palette) {
-    const scenarios = <Map<String, String>>[
-      {
-        'title': 'Someone pressures you into a joke that feels mean',
-        'response': 'Try: “I’m not into that. Let’s do something else.”',
-      },
-      {
-        'title': 'A friend stops replying and you feel blamed',
-        'response': 'Try: “Hey, I might be reading this wrong. Are we okay?”',
-      },
-      {
-        'title': 'A group chat turns uncomfortable',
-        'response': 'Try: “I’m stepping out for now. Message me later.”',
-      },
-    ];
+  List<Widget> _buildFocusCatchContent(PrototypePalette palette) {
     return [
+      GlassPanel(
+        palette: palette,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SectionTitle(
+              title: 'Track. Tap. Reset.',
+              subtitle:
+                  'A quick hand-eye coordination game inspired by simple mobile tap-and-track loops.',
+            ),
+            Text(_focusStatus),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _LocalToolStatCard(
+                    palette: palette,
+                    icon: Icons.timer_rounded,
+                    label: 'Time',
+                    value: '${_focusTimeLeft}s',
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _LocalToolStatCard(
+                    palette: palette,
+                    icon: Icons.bolt_rounded,
+                    label: 'Score',
+                    value: _focusScore.toString(),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _LocalToolStatCard(
+                    palette: palette,
+                    icon: Icons.rocket_launch_rounded,
+                    label: 'Best',
+                    value: _focusBest.toString(),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final fieldWidth = constraints.maxWidth;
+                final targetSize = 66.0;
+                final usableWidth = max(0.0, fieldWidth - targetSize);
+                final usableHeight = 280.0 - targetSize;
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  child: Container(
+                    height: 280,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          palette.surface.withValues(alpha: .72),
+                          palette.primary.withValues(alpha: .09),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      border: Border.all(
+                        color: palette.primary.withValues(alpha: .16),
+                      ),
+                    ),
+                    child: Stack(
+                      children: [
+                        for (final dot in const [
+                          (18.0, 28.0),
+                          (100.0, 48.0),
+                          (180.0, 90.0),
+                          (54.0, 170.0),
+                          (220.0, 220.0),
+                        ])
+                          Positioned(
+                            left: dot.$1,
+                            top: dot.$2,
+                            child: Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withValues(alpha: .28),
+                              ),
+                            ),
+                          ),
+                        AnimatedPositioned(
+                          duration: const Duration(milliseconds: 240),
+                          curve: Curves.easeOutCubic,
+                          left: _focusTargetX * usableWidth,
+                          top: _focusTargetY * usableHeight,
+                          child: GestureDetector(
+                            onTap: _handleFocusCatch,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: targetSize,
+                              height: targetSize,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [palette.primary, palette.secondary],
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: palette.primary.withValues(
+                                      alpha: .34,
+                                    ),
+                                    blurRadius: 20,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.travel_explore_rounded,
+                                color: Colors.white,
+                                size: 30,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 18),
+      GlassPanel(
+        palette: palette,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AnimatedPrimaryButton(
+              label: _focusRunning ? 'Stop focus round' : 'Start focus round',
+              icon: _focusRunning
+                  ? Icons.pause_rounded
+                  : Icons.play_arrow_rounded,
+              onPressed: _toggleFocusGame,
+            ),
+            const SizedBox(height: 12),
+            Text('Target jumps: $_focusJumps'),
+          ],
+        ),
+      ),
+      const SizedBox(height: 18),
       GlassPanel(
         palette: palette,
         child: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SectionTitle(
-              title: 'Practice options',
-              subtitle:
-                  'A usable local decision-support screen for the current slice.',
+              title: 'Why this fits BAHA',
+              subtitle: 'Useful, quick, and easy to explain in a demo.',
             ),
             Text(
-              'Choose the response that protects your boundaries without escalating the moment.',
+              'This gives the app a simple visual-tracking and touch-response loop without drifting into violent or random arcade mechanics.',
             ),
           ],
-        ),
-      ),
-      const SizedBox(height: 18),
-      ...scenarios.map(
-        (scenario) => Padding(
-          padding: const EdgeInsets.only(bottom: 14),
-          child: GlassPanel(
-            palette: palette,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  scenario['title']!,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(scenario['response']!),
-              ],
-            ),
-          ),
         ),
       ),
     ];
@@ -1558,6 +2208,59 @@ class _StudentLocalToolScreenState extends State<StudentLocalToolScreen> {
         ),
       ),
     ];
+  }
+}
+
+class _BreathingPhase {
+  const _BreathingPhase({
+    required this.label,
+    required this.durationSeconds,
+    required this.scale,
+  });
+
+  final String label;
+  final int durationSeconds;
+  final double scale;
+}
+
+class _LocalToolStatCard extends StatelessWidget {
+  const _LocalToolStatCard({
+    required this.palette,
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final PrototypePalette palette;
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: palette.primary.withValues(alpha: .10),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: palette.primary.withValues(alpha: .14)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: palette.primary, size: 18),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 4),
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ),
+    );
   }
 }
 
@@ -1833,8 +2536,10 @@ class StudentSettingsScreen extends StatefulWidget {
     required this.actor,
     required this.onboardingState,
     required this.environment,
+    required this.profile,
     required this.onRefreshOnboarding,
     required this.onOpenSupport,
+    required this.onEditProfile,
     required this.onClearIdentity,
     super.key,
   });
@@ -1843,8 +2548,10 @@ class StudentSettingsScreen extends StatefulWidget {
   final MobileActor? actor;
   final AuthOnboardingState? onboardingState;
   final StudentAppEnvironment environment;
+  final StudentWellbeingProfile? profile;
   final Future<void> Function() onRefreshOnboarding;
   final Future<void> Function() onOpenSupport;
+  final Future<StudentWellbeingProfile?> Function() onEditProfile;
   final Future<void> Function() onClearIdentity;
 
   @override
@@ -1931,6 +2638,16 @@ class _StudentSettingsScreenState extends State<StudentSettingsScreen> {
                     label: 'Approval',
                     value: onboardingState?.approvalStatus ?? 'approved',
                   ),
+                  if (widget.profile != null) ...[
+                    _ProfileInfoRow(
+                      label: 'Focus',
+                      value: widget.profile!.checkinFocusLabel,
+                    ),
+                    _ProfileInfoRow(
+                      label: 'Support',
+                      value: widget.profile!.supportPreferenceLabel,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1968,6 +2685,16 @@ class _StudentSettingsScreenState extends State<StudentSettingsScreen> {
               label: _refreshing ? 'Refreshing...' : 'Refresh onboarding state',
               icon: Icons.refresh_rounded,
               onPressed: _refreshing ? () {} : _refresh,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => unawaited(widget.onEditProfile()),
+              icon: const Icon(Icons.tune_rounded),
+              label: Text(
+                widget.profile == null
+                    ? 'Set up wellbeing profile'
+                    : 'Edit wellbeing profile',
+              ),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
@@ -2138,11 +2865,15 @@ class _StudentInsightData {
     required this.summary,
     required this.checkins,
     required this.modules,
+    required this.details,
+    required this.trendPoints,
   });
 
   final StudentWeeklySummary summary;
   final List<StudentCheckinSummary> checkins;
   final List<StudentModuleSummary> modules;
+  final List<StudentCheckinDetail> details;
+  final List<WellbeingTrendPoint> trendPoints;
 }
 
 class _StudentCalendarData {
@@ -2152,26 +2883,70 @@ class _StudentCalendarData {
   final List<StudentModuleSummary> modules;
 }
 
-String _summaryForMetric(String metricLabel, StudentWeeklySummary summary) {
-  final lower = metricLabel.toLowerCase();
-  if (lower == 'mood') {
-    return summary.summary['mood_trend']?.toString() ??
-        summary.summary['headline']?.toString() ??
-        'Mood trend available in the latest weekly summary.';
+String _summaryForMetric(
+  String factorKey,
+  StudentWeeklySummary summary,
+  List<WellbeingTrendPoint> points,
+  StudentWellbeingProfile? profile,
+) {
+  switch (factorKey) {
+    case 'mood':
+      return summary.summary['mood_trend']?.toString() ??
+          buildFactorMetrics(
+            points: points,
+            profile: profile,
+          ).firstWhere((metric) => metric.factorKey == 'mood').detail;
+    case 'sleep':
+      return summary.summary['sleep_trend']?.toString() ??
+          buildFactorMetrics(
+            points: points,
+            profile: profile,
+          ).firstWhere((metric) => metric.factorKey == 'sleep').detail;
+    case 'stress':
+      return summary.summary['stress_trend']?.toString() ??
+          buildFactorMetrics(
+            points: points,
+            profile: profile,
+          ).firstWhere((metric) => metric.factorKey == 'stress').detail;
+    case 'energy':
+      return summary.summary['energy_trend']?.toString() ??
+          buildFactorMetrics(
+            points: points,
+            profile: profile,
+          ).firstWhere((metric) => metric.factorKey == 'energy').detail;
+    case 'physical_wellbeing':
+      return summary.summary['physical_trend']?.toString() ??
+          buildFactorMetrics(points: points, profile: profile)
+              .firstWhere((metric) => metric.factorKey == 'physical_wellbeing')
+              .detail;
+    case 'connectedness':
+      return summary.summary['connectedness_trend']?.toString() ??
+          buildFactorMetrics(
+            points: points,
+            profile: profile,
+          ).firstWhere((metric) => metric.factorKey == 'connectedness').detail;
+    default:
+      return summary.summary['headline']?.toString() ??
+          'Weekly insight available.';
   }
-  if (lower == 'sleep') {
-    return summary.summary['sleep_trend']?.toString() ??
-        'Sleep trend available in the latest weekly summary.';
+}
+
+String _factorKeyForMetricLabel(String label) {
+  switch (label.toLowerCase()) {
+    case 'sleep':
+      return 'sleep';
+    case 'energy':
+      return 'energy';
+    case 'stress':
+      return 'stress';
+    case 'body':
+      return 'physical_wellbeing';
+    case 'connection':
+      return 'connectedness';
+    case 'mood':
+    default:
+      return 'mood';
   }
-  if (lower == 'stress') {
-    return summary.summary['stress_trend']?.toString() ??
-        'Stress trend available in the latest weekly summary.';
-  }
-  if (lower == 'energy') {
-    return summary.summary['energy_trend']?.toString() ??
-        'Energy trend available in the latest weekly summary.';
-  }
-  return summary.summary['headline']?.toString() ?? 'Weekly insight available.';
 }
 
 class _PrototypeSelector<T> extends StatelessWidget {
@@ -2249,13 +3024,29 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   }
 
   Future<_StudentDashboardData> _load() async {
-    final results = await Future.wait<Object>([
-      widget.apiClient.getStudentWeeklySummary(identity: widget.identity),
-      widget.apiClient.listStudentCheckins(identity: widget.identity, limit: 5),
-    ]);
+    final summary = await widget.apiClient.getStudentWeeklySummary(
+      identity: widget.identity,
+    );
+    final checkins = await widget.apiClient.listStudentCheckins(
+      identity: widget.identity,
+      limit: 5,
+    );
+    final details = await Future.wait<StudentCheckinDetail>(
+      checkins
+          .where((checkin) => checkin.submittedAt != null)
+          .take(5)
+          .map(
+            (checkin) => widget.apiClient.getStudentCheckinDetail(
+              identity: widget.identity,
+              responseSetId: checkin.id,
+            ),
+          ),
+    );
     return _StudentDashboardData(
-      summary: results[0] as StudentWeeklySummary,
-      checkins: results[1] as List<StudentCheckinSummary>,
+      summary: summary,
+      checkins: checkins,
+      details: details,
+      trendPoints: buildTrendPointsFromDetails(details),
     );
   }
 
@@ -2468,11 +3259,13 @@ class StudentCheckinsScreen extends StatefulWidget {
   const StudentCheckinsScreen({
     required this.apiClient,
     required this.identity,
+    required this.profile,
     super.key,
   });
 
   final BahaApiClient apiClient;
   final DevelopmentIdentity identity;
+  final StudentWellbeingProfile profile;
 
   @override
   State<StudentCheckinsScreen> createState() => _StudentCheckinsScreenState();
@@ -2514,6 +3307,7 @@ class _StudentCheckinsScreenState extends State<StudentCheckinsScreen> {
         apiClient: widget.apiClient,
         identity: widget.identity,
         templateId: template.id,
+        profile: widget.profile,
       ),
     );
     unawaited(_refresh());
@@ -2616,10 +3410,9 @@ class _StudentCheckinsScreenState extends State<StudentCheckinsScreen> {
                   HeroHeader(
                     palette: palette,
                     kicker: 'Daily Check-in',
-                    title:
-                        'Mood, sleep, stress, energy, and one gentle reflection.',
+                    title: 'Sleep, mood, stress, energy, body, and connection.',
                     subtitle:
-                        'Reference check-in UI powered by the live backend templates and submission flow.',
+                        'Adaptive check-ins powered by the live backend template and your saved profile.',
                     actions: [
                       const Pill(icon: Icons.favorite_rounded, label: '2 min'),
                       Pill(
@@ -2636,7 +3429,8 @@ class _StudentCheckinsScreenState extends State<StudentCheckinsScreen> {
                       children: [
                         const SectionTitle(
                           title: 'Available check-ins',
-                          subtitle: 'Live templates from the backend.',
+                          subtitle:
+                              'Live templates from the backend. Follow-up questions appear only when relevant.',
                         ),
                         ...data.templates.map(
                           (template) => Padding(
@@ -2727,12 +3521,14 @@ class StudentCheckinFormScreen extends StatefulWidget {
     required this.apiClient,
     required this.identity,
     required this.templateId,
+    required this.profile,
     super.key,
   });
 
   final BahaApiClient apiClient;
   final DevelopmentIdentity identity;
   final String templateId;
+  final StudentWellbeingProfile profile;
 
   @override
   State<StudentCheckinFormScreen> createState() =>
@@ -2741,7 +3537,7 @@ class StudentCheckinFormScreen extends StatefulWidget {
 
 class _StudentCheckinFormScreenState extends State<StudentCheckinFormScreen> {
   late Future<MobileCheckinTemplateDetail> _future;
-  final Map<String, double> _scaleAnswers = <String, double>{};
+  final Map<String, String> _selectedChoices = <String, String>{};
   bool _submitting = false;
 
   @override
@@ -2756,14 +3552,19 @@ class _StudentCheckinFormScreenState extends State<StudentCheckinFormScreen> {
   Future<void> _submit(MobileCheckinTemplateDetail detail) async {
     setState(() => _submitting = true);
     try {
-      final answers = detail.questions
-          .where((question) => _scaleAnswers.containsKey(question.id))
-          .map(
-            (question) => CheckinAnswerInput(
-              questionId: question.id,
-              numericValue: _scaleAnswers[question.id],
-            ),
+      final visibleQuestions = _visibleQuestions(detail);
+      final answers = visibleQuestions
+          .where(
+            (question) => _selectedChoices.containsKey(question.questionKey),
           )
+          .map((question) {
+            final choiceKey = _selectedChoices[question.questionKey]!;
+            final choice = choicesForQuestion(
+              question,
+              widget.profile,
+            ).firstWhere((item) => item.key == choiceKey);
+            return buildSubmissionAnswer(question: question, choice: choice);
+          })
           .toList();
       if (answers.isEmpty) {
         if (!mounted) {
@@ -2815,6 +3616,29 @@ class _StudentCheckinFormScreenState extends State<StudentCheckinFormScreen> {
         setState(() => _submitting = false);
       }
     }
+  }
+
+  List<MobileCheckinQuestion> _visibleQuestions(
+    MobileCheckinTemplateDetail detail,
+  ) {
+    final visible = <MobileCheckinQuestion>[];
+    for (final question in detail.questions) {
+      if (isQuestionVisible(
+        question: question,
+        selectedAnswers: _selectedChoices,
+        profile: widget.profile,
+      )) {
+        visible.add(question);
+      }
+    }
+    return visible;
+  }
+
+  void _pruneHiddenAnswers(MobileCheckinTemplateDetail detail) {
+    final visibleKeys = _visibleQuestions(
+      detail,
+    ).map((question) => question.questionKey).toSet();
+    _selectedChoices.removeWhere((key, _) => !visibleKeys.contains(key));
   }
 
   @override
@@ -2884,6 +3708,7 @@ class _StudentCheckinFormScreenState extends State<StudentCheckinFormScreen> {
               );
             }
             final detail = snapshot.data!;
+            final visibleQuestions = _visibleQuestions(detail);
             return ListView(
               padding: const EdgeInsets.all(22),
               children: [
@@ -2902,12 +3727,12 @@ class _StudentCheckinFormScreenState extends State<StudentCheckinFormScreen> {
                   kicker: 'Daily Check-in',
                   title: detail.title,
                   subtitle:
-                      'Small signals, no judgement. This form submits to the real backend.',
+                      'Six core signals, then only the follow-up questions that actually matter today.',
                   actions: [
                     const Pill(icon: Icons.favorite_rounded, label: 'Private'),
                     Pill(
                       icon: Icons.help_outline_rounded,
-                      label: '${detail.questions.length} Qs',
+                      label: '${visibleQuestions.length} Qs today',
                     ),
                   ],
                 ),
@@ -2920,16 +3745,16 @@ class _StudentCheckinFormScreenState extends State<StudentCheckinFormScreen> {
                       const SectionTitle(
                         title: 'Check-in flow',
                         subtitle:
-                            'Respond honestly. Only role-safe summaries are shared later.',
+                            'Respond honestly. BAHA keeps the core pulse short and uses your profile only where it improves relevance.',
                       ),
                       Text(
-                        '${detail.cadence} check-in • ${detail.questions.length} questions',
+                        '${detail.cadence} check-in • ${detail.questions.where((question) => question.metadata['is_core'] == true).length} core questions',
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 18),
-                ...detail.questions.map(
+                ...visibleQuestions.map(
                   (question) => Padding(
                     padding: const EdgeInsets.only(bottom: 16),
                     child: GlassPanel(
@@ -2946,21 +3771,29 @@ class _StudentCheckinFormScreenState extends State<StudentCheckinFormScreen> {
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: question.scaleValues.map((value) {
-                              final selected =
-                                  _scaleAnswers[question.id] ==
-                                  value.toDouble();
-                              return ChoiceChip(
-                                label: Text('$value'),
-                                selected: selected,
-                                onSelected: (_) {
-                                  setState(() {
-                                    _scaleAnswers[question.id] = value
-                                        .toDouble();
-                                  });
-                                },
-                              );
-                            }).toList(),
+                            children:
+                                choicesForQuestion(
+                                  question,
+                                  widget.profile,
+                                ).map((choice) {
+                                  final selected =
+                                      _selectedChoices[question.questionKey] ==
+                                      choice.key;
+                                  return ChoiceChip(
+                                    label: Text(choice.label),
+                                    selected: selected,
+                                    selectedColor: palette.primary.withValues(
+                                      alpha: .22,
+                                    ),
+                                    onSelected: (_) {
+                                      setState(() {
+                                        _selectedChoices[question.questionKey] =
+                                            choice.key;
+                                        _pruneHiddenAnswers(detail);
+                                      });
+                                    },
+                                  );
+                                }).toList(),
                           ),
                         ],
                       ),
@@ -3080,6 +3913,7 @@ class _StudentCheckinDetailScreenState
               );
             }
             final detail = snapshot.data!;
+            final trendPoint = buildTrendPointsFromDetails([detail]).single;
             return ListView(
               padding: const EdgeInsets.all(22),
               children: [
@@ -3097,8 +3931,7 @@ class _StudentCheckinDetailScreenState
                   palette: palette,
                   kicker: 'Check-in complete',
                   title: widget.titleOverride,
-                  subtitle:
-                      'Your response set was saved successfully to the backend.',
+                  subtitle: dailyStateHeadline([trendPoint]),
                   actions: const [
                     Pill(icon: Icons.check_circle_rounded, label: 'Saved'),
                     Pill(icon: Icons.lock_rounded, label: 'Private'),
@@ -3117,6 +3950,19 @@ class _StudentCheckinDetailScreenState
                       ),
                       Text(
                         'Submitted ${detail.submittedAt == null ? 'recently' : _formatDateTime(detail.submittedAt!)}',
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: riskFlags(points: [trendPoint], profile: null)
+                            .map(
+                              (flag) => Pill(
+                                icon: Icons.insights_rounded,
+                                label: flag,
+                              ),
+                            )
+                            .toList(),
                       ),
                     ],
                   ),
@@ -3137,7 +3983,7 @@ class _StudentCheckinDetailScreenState
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            _answerLabel(answer),
+                            answerDisplayLabel(answer),
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                         ],
@@ -3233,10 +4079,17 @@ class _CheckinSummaryTile extends StatelessWidget {
 }
 
 class _StudentDashboardData {
-  const _StudentDashboardData({required this.summary, required this.checkins});
+  const _StudentDashboardData({
+    required this.summary,
+    required this.checkins,
+    required this.details,
+    required this.trendPoints,
+  });
 
   final StudentWeeklySummary summary;
   final List<StudentCheckinSummary> checkins;
+  final List<StudentCheckinDetail> details;
+  final List<WellbeingTrendPoint> trendPoints;
 }
 
 class _StudentCheckinHubData {
@@ -3257,22 +4110,4 @@ String _formatDateTime(DateTime date) {
   final local = date.toLocal();
   final minute = local.minute.toString().padLeft(2, '0');
   return '${_formatDate(local)} ${local.hour}:$minute';
-}
-
-String _answerLabel(StudentCheckinAnswer answer) {
-  if (answer.numericValue != null) {
-    return answer.numericValue!.toStringAsFixed(
-      answer.numericValue! % 1 == 0 ? 0 : 1,
-    );
-  }
-  if (answer.textValue != null && answer.textValue!.isNotEmpty) {
-    return answer.textValue!;
-  }
-  if (answer.booleanValue != null) {
-    return answer.booleanValue! ? 'Yes' : 'No';
-  }
-  if (answer.selectedOptions.isNotEmpty) {
-    return answer.selectedOptions.join(', ');
-  }
-  return 'No answer captured';
 }

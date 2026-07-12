@@ -467,9 +467,7 @@ class ActionCard extends StatelessWidget {
             item.subtitle,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: palette.isDark
                   ? palette.text.withValues(alpha: .82)
                   : palette.muted,
@@ -536,38 +534,89 @@ class SectionTitle extends StatelessWidget {
 }
 
 class MiniLineChart extends StatelessWidget {
-  const MiniLineChart({super.key, required this.palette});
+  const MiniLineChart({
+    super.key,
+    required this.palette,
+    this.values,
+    this.labels = const [],
+    this.lineColor,
+  });
 
   final PrototypePalette palette;
+  final List<double>? values;
+  final List<String> labels;
+  final Color? lineColor;
 
   @override
   Widget build(BuildContext context) {
+    final series = (values == null || values!.isEmpty)
+        ? const [2, 2.8, 2.4, 3.7, 3.2, 4.2, 4]
+        : values!;
+    final spots = <FlSpot>[
+      for (var index = 0; index < series.length; index++)
+        FlSpot(index.toDouble(), series[index].toDouble()),
+    ];
+    final chartColor = lineColor ?? palette.primary;
     return SizedBox(
       height: 160,
       child: LineChart(
         LineChartData(
-          gridData: const FlGridData(show: false),
-          titlesData: const FlTitlesData(show: false),
+          minY: 0,
+          maxY: 4,
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: 1,
+            getDrawingHorizontalLine: (_) => FlLine(
+              color: palette.muted.withValues(alpha: .12),
+              strokeWidth: 1,
+            ),
+          ),
+          titlesData: FlTitlesData(
+            leftTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: labels.isNotEmpty,
+                reservedSize: 28,
+                getTitlesWidget: (value, meta) {
+                  final index = value.toInt();
+                  if (index < 0 || index >= labels.length) {
+                    return const SizedBox.shrink();
+                  }
+                  return SideTitleWidget(
+                    meta: meta,
+                    child: Text(
+                      labels[index],
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: palette.muted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
           borderData: FlBorderData(show: false),
           lineBarsData: [
             LineChartBarData(
               isCurved: true,
               barWidth: 4,
-              color: palette.primary,
+              color: chartColor,
               dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                color: palette.primary.withValues(alpha: .14),
+                color: chartColor.withValues(alpha: .14),
               ),
-              spots: const [
-                FlSpot(0, 2),
-                FlSpot(1, 2.8),
-                FlSpot(2, 2.4),
-                FlSpot(3, 3.7),
-                FlSpot(4, 3.2),
-                FlSpot(5, 4.2),
-                FlSpot(6, 4),
-              ],
+              spots: spots,
             ),
           ],
         ),

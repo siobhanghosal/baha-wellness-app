@@ -18,6 +18,7 @@ The acquisition platform discovers, downloads, updates, classifies, stores, and 
 - Clinical Review Queue: downloaded resources must be approved before downstream RAG ingestion.
 - Priority Acquisition: BAHA, IAP, NIMHANS, WHO, UNICEF, and UNESCO are ranked in that order for candidate download and gap closure.
 - Manual Resource Ingestion: PDFs, DOCX, PPTX, transcripts, directories, and safe ZIP archives enter through an audited review path under `STORAGE_ROOT/manual_resource_ingestion`.
+- Curated HTML Snapshot Ingestion: reviewed `.html` and `.htm` source snapshots can also be manually imported for retrieval demos and future curated knowledge workflows.
 
 ## Approved Sources
 
@@ -73,12 +74,14 @@ baha-rag generate-report
 baha-rag manual-import ./resources --organization BAHA --reviewer "Reviewer Name" \
   --source "BAHA library" --audience parent --topic anxiety
 baha-rag manual-import ./iap-pdfs --organization IAP --reviewer "Reviewer Name"
+baha-rag manual-import ./curated-html --organization "Common Sense Media" --reviewer "Reviewer Name" \
+  --source "Buddy demo shortlist" --audience adolescent --topic "digital wellness"
 baha-rag priority-dashboard
 baha-rag priority-gap-closure --max-topics 9
 baha-rag weekly-gap-report
 ```
 
-Manual uploads preserve the original binary. DOCX and PPTX Open XML content and supplied
+Manual uploads preserve the original binary. HTML snapshots, DOCX and PPTX Open XML content, and supplied
 `.txt`, `.md`, `.vtt`, or `.srt` transcripts are extracted locally. The module does not
 transcribe raw video media; a human- or system-produced transcript must be supplied.
 

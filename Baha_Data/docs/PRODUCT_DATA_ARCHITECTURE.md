@@ -55,6 +55,27 @@ Important current constraint:
   the curated publishable content layer
 - that is intentional and should remain the product-serving model
 
+Important current runtime status:
+
+- the local backend currently has product content for app screens
+- but the retrieval-backed chatbot knowledge index is still effectively unpopulated
+- that means BAHA Buddy can now run through the local LLM architecture, but it will correctly stay in scope-guard mode until approved corpus material is imported and indexed into the retrieval tables
+
+For the first Buddy retrieval activation pass, do **not** point the chatbot at the full raw corpus immediately.
+
+Use a curated demo subset first:
+
+- [BUDDY_DEMO_CORPUS_SHORTLIST.md](./BUDDY_DEMO_CORPUS_SHORTLIST.md)
+- [BUDDY_DEMO_QUESTION_BANK.md](./BUDDY_DEMO_QUESTION_BANK.md)
+
+That shortlist-first pattern should become the default operating model for future retrieval rollouts too:
+
+- shortlist
+- import
+- index
+- evaluate
+- only then widen corpus coverage
+
 ## 2. Design Principles
 
 ### 2.1 Separate evidence from product content
@@ -641,6 +662,7 @@ Identity and consent:
 Student wellness:
 
 - `checkin_templates`
+- `checkin_response_sets`
 - `checkin_responses`
 - `trend_snapshots`
 - `reflection_entries`
@@ -649,6 +671,11 @@ Student wellness:
 - `badge_awards`
 - `game_sessions`
 - `game_behavioral_signals`
+
+Current implementation note:
+
+- the adaptive student daily check-in now lives primarily in `checkin_templates`, `checkin_response_sets`, and `checkin_responses`
+- one-time wellbeing profile answers are currently stored locally in the mobile app until a dedicated backend profile write model is introduced
 
 Support and safeguarding:
 

@@ -21,6 +21,7 @@ from baha_rag.db.repository import KnowledgeRepository
 from baha_rag.db.session import get_session
 from baha_rag.embeddings.bge import EmbeddingService
 from baha_rag.extraction.condition_profile import ConditionProfileExtractor
+from baha_rag.generation.buddy import BuddyChatService
 from baha_rag.generation.composer import EvidenceComposer
 from baha_rag.identity import ROLE_PRIORITY
 from baha_rag.privacy import PrivacyService
@@ -67,6 +68,10 @@ from baha_rag.schemas import (
     ModuleProgressUpsertRequest,
     ModuleProgressUpsertResponse,
     ParentWeeklySummaryResponse,
+    StoryWorldSceneResponse,
+    StoryWorldStateResponse,
+    StoryWorldTurnRequest,
+    StoryWorldTurnResponse,
     PastoralFlagCreateRequest,
     PastoralFlagResponse,
     SearchRequest,
@@ -81,6 +86,7 @@ from baha_rag.schemas import (
     ViewRequest,
 )
 from baha_rag.taxonomy import TAXONOMY, find_conditions
+from baha_rag.story_world import STORY_WORLD_LOCATIONS
 
 router = APIRouter()
 
@@ -105,6 +111,12 @@ async def get_retriever(
     embeddings: EmbeddingService = Depends(get_embedding_service),
 ) -> HybridRetriever:
     return HybridRetriever(KnowledgeRepository(session), embeddings)
+
+
+def get_buddy_chat_service(
+    settings: Settings = Depends(get_settings),
+) -> BuddyChatService:
+    return BuddyChatService(settings)
 
 
 def _require_student(actor: ActorContext) -> None:
@@ -436,16 +448,17 @@ async def resources(
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest, retriever: HybridRetriever = Depends(get_retriever)) -> ChatResponse:
-    results = await retriever.search(request.message, top_k=request.top_k, filters=request.filters)
-    condition = next(iter(find_conditions(request.message)), "General Wellbeing")
-    answer = EvidenceComposer().compose(
-        condition=condition,
-        perspective=request.audience,
-        query=request.message,
-        evidence=results,
+async def chat(
+    request: ChatRequest,
+    retriever: HybridRetriever = Depends(get_retriever),
+    buddy_chat_service: BuddyChatService = Depends(get_buddy_chat_service),
+) -> ChatResponse:
+    result = await buddy_chat_service.generate(
+        request=request,
+        retriever=retriever,
+        history=[],
     )
-    return ChatResponse(answer=answer, retrieved=results)
+    return result.response
 
 
 @router.post("/auth/bootstrap", response_model=AuthOnboardingStateResponse)
@@ -1004,6 +1017,99 @@ async def mobile_upsert_student_module_progress(
     return ModuleProgressUpsertResponse.model_validate(row)
 
 
+@router.get("/mobile/student/games/story-world/state", response_model=StoryWorldStateResponse)
+async def mobile_story_world_state(
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> StoryWorldStateResponse:
+    _require_student(actor)
+    row = await MobileAppRepository(session).get_story_world_state(
+        student_profile_id=actor.student_profile_id,
+        display_name=actor.display_name,
+        age_cohort=actor.age_cohort,
+    )
+    return StoryWorldStateResponse.model_validate(row)
+
+
+@router.get("/mobile/student/games/story-world/scenes/{location_id}", response_model=StoryWorldSceneResponse)
+async def mobile_story_world_scene(
+    location_id: str,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> StoryWorldSceneResponse:
+    _require_student(actor)
+    if location_id not in STORY_WORLD_LOCATIONS:
+        raise HTTPException(status_code=404, detail="Story World location not found")
+    row = await MobileAppRepository(session).get_story_world_scene(
+        student_profile_id=actor.student_profile_id,
+        display_name=actor.display_name,
+        age_cohort=actor.age_cohort,
+        location_id=location_id,
+    )
+    return StoryWorldSceneResponse.model_validate(row)
+
+
+@router.post("/mobile/student/games/story-world/turns", response_model=StoryWorldTurnResponse)
+async def mobile_story_world_turn(
+    request: StoryWorldTurnRequest,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> StoryWorldTurnResponse:
+    _require_student(actor)
+    if request.location_id not in STORY_WORLD_LOCATIONS:
+        raise HTTPException(status_code=404, detail="Story World location not found")
+    safety = assess_safety(request.answer)
+    try:
+        row = await MobileAppRepository(session).submit_story_world_turn(
+            student_profile_id=actor.student_profile_id,
+            display_name=actor.display_name,
+            age_cohort=actor.age_cohort,
+            location_id=request.location_id,
+            answer=request.answer,
+            expected_chapter=request.expected_chapter,
+            emergency=bool(safety.emergency_indicators),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if safety.emergency_indicators:
+        signal = await MobileAppRepository(session).create_monitoring_signal(
+            student_profile_id=actor.student_profile_id,
+            signal_type="game_behavior_signal",
+            severity="emergency",
+            title="Emergency language detected in Story World",
+            signal_summary="Student entered emergency safety language during Story World gameplay.",
+            derived_facts_json=json.dumps(
+                {
+                    "game_session_id": str(row["session_id"]),
+                    "location_id": request.location_id,
+                    "answer": request.answer,
+                }
+            ),
+        )
+        await MobileAppRepository(session).create_escalation_case(
+            student_profile_id=actor.student_profile_id,
+            primary_signal_id=signal["id"],
+            opened_by_user_id=actor.user_id,
+            case_type="crisis",
+            severity="emergency",
+            title="Story World emergency escalation",
+            summary="Story World turn triggered an emergency safeguarding review.",
+            privacy_override_active=True,
+            override_reason="Emergency Story World signal",
+        )
+    await session.commit()
+    return StoryWorldTurnResponse(
+        state=StoryWorldStateResponse.model_validate(row["state"]),
+        scene=StoryWorldSceneResponse.model_validate(row["scene"]),
+        message=row["message"],
+        memory=row["memory"],
+        xp_earned=row["xp_earned"],
+        coins_earned=row["coins_earned"],
+        stars_earned=row["stars_earned"],
+        observed_signals=row["observed_signals"],
+    )
+
+
 @router.get("/mobile/student/checkins", response_model=list[StudentCheckinSummary])
 async def mobile_student_checkins(
     actor: ActorContext = Depends(get_actor_context),
@@ -1160,6 +1266,7 @@ async def mobile_create_chat_message(
     actor: ActorContext = Depends(get_actor_context),
     session: AsyncSession = Depends(get_session),
     retriever: HybridRetriever = Depends(get_retriever),
+    buddy_chat_service: BuddyChatService = Depends(get_buddy_chat_service),
 ) -> MobileChatExchangeResponse:
     owned = await MobileAppRepository(session).get_chat_session_owned(
         session_id=session_id,
@@ -1178,10 +1285,31 @@ async def mobile_create_chat_message(
         retrieval_filters_json=json.dumps(request.filters),
     )
 
-    chat_response = await chat(
-        ChatRequest(message=request.body, audience="adolescent" if actor.app_audience == "student" else actor.app_audience, filters=request.filters),
-        retriever=retriever,
+    history_rows = await MobileAppRepository(session).list_chat_messages(
+        chat_session_id=session_id,
     )
+    chat_result = await buddy_chat_service.generate(
+        request=ChatRequest(
+            message=request.body,
+            audience=(
+                "adolescent"
+                if actor.app_audience == "student"
+                else actor.app_audience
+            ),
+            filters=request.filters,
+        ),
+        retriever=retriever,
+        history=[
+            {
+                "role": (
+                    "assistant" if row["sender_type"] == "assistant" else "user"
+                ),
+                "content": row["body"],
+            }
+            for row in history_rows
+        ],
+    )
+    chat_response = chat_result.response
     safety = assess_safety(request.body)
     safety_labels = []
     if safety.emergency_indicators:
@@ -1194,7 +1322,15 @@ async def mobile_create_chat_message(
         sender_type="assistant",
         message_type="assistant_answer",
         body=_assistant_body(chat_response),
-        structured_payload_json=json.dumps(chat_response.answer.model_dump(mode="json")),
+        structured_payload_json=json.dumps(
+            {
+                "answer": chat_response.answer.model_dump(mode="json"),
+                "generation": {
+                    "backend_used": chat_result.backend_used,
+                    "fallback_reason": chat_result.fallback_reason,
+                },
+            }
+        ),
         retrieval_filters_json=json.dumps(request.filters),
         safety_labels_json=json.dumps(safety_labels),
     )

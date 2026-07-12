@@ -22,6 +22,8 @@ from baha_rag.acquisition.storage import StorageService
 
 
 SUPPORTED_EXTENSIONS = {
+    ".html": "html",
+    ".htm": "html",
     ".pdf": "pdf",
     ".docx": "docx",
     ".pptx": "powerpoint",
@@ -63,7 +65,7 @@ class ManualResourceIngestionService:
         paths: Iterable[str | Path],
         metadata: ManualResourceMetadata,
     ) -> dict[str, Any]:
-        source = self.priority_registry.resolve(metadata.organization)
+        source = self.priority_registry.resolve(metadata.organization, allow_custom=True)
         if metadata.audience not in {
             "parent", "teacher", "counselor", "adolescent", "administrator", "general"
         }:
@@ -184,7 +186,7 @@ class ManualResourceIngestionService:
         resource_type = self._resource_type(path)
         content = path.read_bytes()
         content_hash = self.detector.content_hash(content)
-        priority = self.priority_registry.resolve(metadata.organization)
+        priority = self.priority_registry.resolve(metadata.organization, allow_custom=True)
         duplicate = await self.repository.existing_resource_for_hash(content_hash)
         storage_uri, stored_hash = self.storage.store(
             url=path.as_uri(),
@@ -349,6 +351,8 @@ class ManualResourceIngestionService:
 
     def _content_type(self, path: Path) -> str:
         return {
+            ".html": "text/html",
+            ".htm": "text/html",
             ".pdf": "application/pdf",
             ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",

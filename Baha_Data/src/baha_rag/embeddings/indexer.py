@@ -15,7 +15,7 @@ from baha_rag.acquisition.knowledge_extraction import KnowledgeExtractionService
 from baha_rag.config import Settings
 from baha_rag.db.repository import vector_literal
 from baha_rag.embeddings.bge import EmbeddingService
-from baha_rag.ingestion.chunking import chunk_tokens
+from baha_rag.ingestion.chunking import chunk_text, chunk_tokens
 
 
 def _hash_text(value: str) -> str:
@@ -114,12 +114,22 @@ class IncrementalEmbeddingIndexer:
             text_value = self._fallback_resource_text(row)
         if not text_value.strip():
             return 0
-        chunks = chunk_tokens(
-            text_value,
-            tokenizer=self.embeddings.tokenizer,
-            max_tokens=self.settings.embedding_chunk_tokens,
-            overlap_tokens=self.settings.embedding_chunk_overlap_tokens,
-        )
+        if self.settings.embedding_backend == "hash":
+            # The lightweight runtime intentionally avoids transformer dependencies.
+            # Use an approximate word-based chunking path so demo indexing can still
+            # populate retrieval rows without loading a tokenizer model.
+            chunks = chunk_text(
+                text_value,
+                max_words=max(200, int(self.settings.embedding_chunk_tokens * 0.75)),
+                overlap_words=max(30, int(self.settings.embedding_chunk_overlap_tokens * 0.75)),
+            )
+        else:
+            chunks = chunk_tokens(
+                text_value,
+                tokenizer=self.embeddings.tokenizer,
+                max_tokens=self.settings.embedding_chunk_tokens,
+                overlap_tokens=self.settings.embedding_chunk_overlap_tokens,
+            )
         if not chunks:
             return 0
         vectors = self.embeddings.embed_long_texts(chunk.text for chunk in chunks)

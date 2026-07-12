@@ -10,6 +10,7 @@ export 'src/mobile_actor.dart';
 export 'src/student_bootstrap_request.dart';
 export 'src/student_checkin.dart';
 export 'src/student_module.dart';
+export 'src/story_world.dart';
 export 'src/parent_models.dart';
 export 'src/support_request.dart';
 export 'src/student_weekly_summary.dart';

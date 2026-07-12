@@ -257,4 +257,98 @@ void main() {
     expect(consent.scope, 'weekly_summaries');
     expect(consent.actorRelationship, 'parent');
   });
+
+  test('maps story world state and scene payloads', () {
+    final state = StoryWorldState.fromJson(const {
+      'student_profile_id': '30000000-0000-0000-0000-000000000001',
+      'display_name': 'Aarav Student',
+      'age_cohort': '13_14',
+      'theme_variant': 'social_confidence',
+      'pet_name': 'Comet',
+      'xp': 165,
+      'coins': 56,
+      'stars': 4,
+      'current_day': 2,
+      'current_location_id': 'school',
+      'completed_quest_count': 0,
+      'locations': [
+        {
+          'location_id': 'school',
+          'display_name': 'School',
+          'subtitle': 'Class, teamwork, and learning one step at a time.',
+          'npc_id': 'maya',
+          'npc_name': 'Maya',
+          'unlock_stars': 0,
+          'chapter': 2,
+          'last_choice': 'Help Maya rebuild the volcano together',
+          'unlocked': true,
+          'completed': false,
+          'progress_percent': 25.0,
+          'session_status': 'started',
+        },
+      ],
+      'npcs': [
+        {
+          'npc_id': 'maya',
+          'npc_name': 'Maya',
+          'friendship_level': 2,
+          'current_mood': 'warm',
+          'memories': ['Maya remembers how you helped before.'],
+        },
+      ],
+    });
+    final scene = StoryWorldScene.fromJson(const {
+      'location_id': 'school',
+      'chapter': 2,
+      'title': 'The Hallway Supply Sprint · Chapter 2',
+      'body': 'Maya remembers your first brave move.',
+      'prompt': 'What is your next move?',
+      'npc_id': 'maya',
+      'npc_name': 'Maya',
+    });
+
+    expect(state.currentLocationId, 'school');
+    expect(state.locations.single.progressPercent, 25.0);
+    expect(state.npcs.single.friendshipLevel, 2);
+    expect(scene.npcName, 'Maya');
+    expect(scene.prompt, contains('next move'));
+  });
+
+  test('maps story world turn response payload', () {
+    final response = StoryWorldTurnResponse.fromJson(const {
+      'state': {
+        'student_profile_id': '30000000-0000-0000-0000-000000000001',
+        'display_name': 'Aarav Student',
+        'theme_variant': 'social_confidence',
+        'pet_name': 'Comet',
+        'xp': 210,
+        'coins': 72,
+        'stars': 6,
+        'current_day': 2,
+        'current_location_id': 'school',
+        'completed_quest_count': 0,
+        'locations': [],
+        'npcs': [],
+      },
+      'scene': {
+        'location_id': 'school',
+        'chapter': 3,
+        'title': 'The Judge\'s Surprise Question · Chapter 3',
+        'body': 'The story keeps moving.',
+        'prompt': 'How do you answer or help in the moment?',
+        'npc_id': 'maya',
+        'npc_name': 'Maya',
+      },
+      'message': 'Your kind move changes the mood before it changes the path.',
+      'memory': 'Maya remembers how you chose to help.',
+      'xp_earned': 45,
+      'coins_earned': 16,
+      'stars_earned': 2,
+      'observed_signals': ['kindness', 'cooperation'],
+    });
+
+    expect(response.scene.chapter, 3);
+    expect(response.xpEarned, 45);
+    expect(response.observedSignals, contains('kindness'));
+  });
 }

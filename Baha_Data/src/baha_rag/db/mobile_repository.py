@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
@@ -8,6 +9,14 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from baha_rag.identity import ActorContext
+from baha_rag.story_world import (
+    STORY_WORLD_LOCATIONS,
+    TOTAL_STORY_WORLD_CHAPTERS,
+    consequence_for,
+    observed_signals,
+    scene_for,
+    story_world_theme_variant,
+)
 
 
 class MobileAppRepository:
@@ -446,6 +455,590 @@ class MobileAppRepository:
                 },
             )
         return dict(result.mappings().one())
+
+    async def ensure_story_world_profile(
+        self,
+        *,
+        student_profile_id: UUID,
+        display_name: str,
+        age_cohort: str | None,
+    ) -> None:
+        theme_variant = story_world_theme_variant(age_cohort)
+        await self.session.execute(
+            text(
+                """
+                insert into story_world_profiles (
+                  student_profile_id,
+                  display_name,
+                  theme_variant,
+                  pet_name
+                )
+                values (
+                  :student_profile_id,
+                  :display_name,
+                  :theme_variant,
+                  :pet_name
+                )
+                on conflict (student_profile_id) do update
+                set
+                  display_name = excluded.display_name,
+                  theme_variant = excluded.theme_variant,
+                  updated_at = now()
+                """
+            ),
+            {
+                "student_profile_id": student_profile_id,
+                "display_name": display_name,
+                "theme_variant": theme_variant,
+                "pet_name": "Comet",
+            },
+        )
+        for location in STORY_WORLD_LOCATIONS.values():
+            await self.session.execute(
+                text(
+                    """
+                    insert into story_world_location_progress (
+                      student_profile_id,
+                      location_id,
+                      chapter,
+                      metadata
+                    )
+                    values (
+                      :student_profile_id,
+                      :location_id,
+                      1,
+                      '{}'::jsonb
+                    )
+                    on conflict (student_profile_id, location_id) do nothing
+                    """
+                ),
+                {
+                    "student_profile_id": student_profile_id,
+                    "location_id": location.location_id,
+                },
+            )
+            await self.session.execute(
+                text(
+                    """
+                    insert into story_world_npc_states (
+                      student_profile_id,
+                      npc_id,
+                      npc_name,
+                      friendship_level,
+                      current_mood,
+                      memories
+                    )
+                    values (
+                      :student_profile_id,
+                      :npc_id,
+                      :npc_name,
+                      1,
+                      'curious',
+                      '[]'::jsonb
+                    )
+                    on conflict (student_profile_id, npc_id) do nothing
+                    """
+                ),
+                {
+                    "student_profile_id": student_profile_id,
+                    "npc_id": location.npc_id,
+                    "npc_name": location.npc_name,
+                },
+            )
+
+    async def get_story_world_state(
+        self,
+        *,
+        student_profile_id: UUID,
+        display_name: str,
+        age_cohort: str | None,
+    ) -> dict[str, Any]:
+        await self.ensure_story_world_profile(
+            student_profile_id=student_profile_id,
+            display_name=display_name,
+            age_cohort=age_cohort,
+        )
+        profile_result = await self.session.execute(
+            text(
+                """
+                select
+                  student_profile_id,
+                  display_name,
+                  theme_variant,
+                  pet_name,
+                  xp,
+                  coins,
+                  stars,
+                  current_day
+                from story_world_profiles
+                where student_profile_id = :student_profile_id
+                """
+            ),
+            {"student_profile_id": student_profile_id},
+        )
+        profile = dict(profile_result.mappings().one())
+        progress_result = await self.session.execute(
+            text(
+                """
+                select
+                  location_id,
+                  chapter,
+                  last_choice,
+                  completed_at
+                from story_world_location_progress
+                where student_profile_id = :student_profile_id
+                order by location_id
+                """
+            ),
+            {"student_profile_id": student_profile_id},
+        )
+        npc_result = await self.session.execute(
+            text(
+                """
+                select
+                  npc_id,
+                  npc_name,
+                  friendship_level,
+                  current_mood,
+                  memories
+                from story_world_npc_states
+                where student_profile_id = :student_profile_id
+                order by npc_name
+                """
+            ),
+            {"student_profile_id": student_profile_id},
+        )
+        session_result = await self.session.execute(
+            text(
+                """
+                select distinct on (metadata ->> 'location_id')
+                  metadata ->> 'location_id' as location_id,
+                  status
+                from game_sessions
+                where student_profile_id = :student_profile_id
+                  and game_type = 'other'
+                  and metadata ->> 'game_mode' = 'story_world'
+                order by metadata ->> 'location_id', started_at desc
+                """
+            ),
+            {"student_profile_id": student_profile_id},
+        )
+        session_status_by_location = {
+            row["location_id"]: row["status"]
+            for row in session_result.mappings().all()
+        }
+        raw_progress = {
+            row["location_id"]: dict(row)
+            for row in progress_result.mappings().all()
+        }
+        locations: list[dict[str, Any]] = []
+        completed_quest_count = 0
+        current_location_id = next(iter(STORY_WORLD_LOCATIONS))
+        for location in STORY_WORLD_LOCATIONS.values():
+            row = raw_progress.get(
+                location.location_id,
+                {
+                    "chapter": 1,
+                    "last_choice": None,
+                    "completed_at": None,
+                },
+            )
+            completed = row["completed_at"] is not None
+            if completed:
+                completed_quest_count += 1
+            unlocked = profile["stars"] >= location.unlock_stars
+            chapter = int(row["chapter"] or 1)
+            progress_units = TOTAL_STORY_WORLD_CHAPTERS if completed else max(chapter - 1, 0)
+            locations.append(
+                {
+                    "location_id": location.location_id,
+                    "display_name": location.display_name,
+                    "subtitle": location.subtitle,
+                    "npc_id": location.npc_id,
+                    "npc_name": location.npc_name,
+                    "unlock_stars": location.unlock_stars,
+                    "chapter": chapter,
+                    "last_choice": self._normalize_story_choice(row["last_choice"]),
+                    "unlocked": unlocked,
+                    "completed": completed,
+                    "progress_percent": round(
+                        (progress_units / TOTAL_STORY_WORLD_CHAPTERS) * 100, 1
+                    ),
+                    "session_status": session_status_by_location.get(
+                        location.location_id, "started"
+                    ),
+                }
+            )
+        for location in locations:
+            if location["unlocked"] and not location["completed"]:
+                current_location_id = location["location_id"]
+                break
+            if location["unlocked"]:
+                current_location_id = location["location_id"]
+        return {
+            **profile,
+            "age_cohort": age_cohort,
+            "current_location_id": current_location_id,
+            "completed_quest_count": completed_quest_count,
+            "locations": locations,
+            "npcs": [
+                {
+                    **dict(row),
+                    "memories": self._dedupe_story_memories(
+                        [
+                            self._normalize_story_memory(memory)
+                            for memory in (row["memories"] or [])
+                        ]
+                    ),
+                }
+                for row in npc_result.mappings().all()
+            ],
+        }
+
+    async def get_story_world_scene(
+        self,
+        *,
+        student_profile_id: UUID,
+        display_name: str,
+        age_cohort: str | None,
+        location_id: str,
+    ) -> dict[str, Any]:
+        state = await self.get_story_world_state(
+            student_profile_id=student_profile_id,
+            display_name=display_name,
+            age_cohort=age_cohort,
+        )
+        location = next(
+            (item for item in state["locations"] if item["location_id"] == location_id),
+            None,
+        )
+        if location is None:
+            raise ValueError("Unknown story world location")
+        npc = next(
+            (item for item in state["npcs"] if item["npc_id"] == location["npc_id"]),
+            None,
+        )
+        return scene_for(
+            location_id=location_id,
+            chapter=location["chapter"],
+            remembered=(npc or {}).get("friendship_level", 0) > 1,
+            last_choice=location.get("last_choice"),
+            completed=location["completed"],
+        )
+
+    async def submit_story_world_turn(
+        self,
+        *,
+        student_profile_id: UUID,
+        display_name: str,
+        age_cohort: str | None,
+        location_id: str,
+        answer: str,
+        expected_chapter: int,
+        emergency: bool,
+    ) -> dict[str, Any]:
+        await self.ensure_story_world_profile(
+            student_profile_id=student_profile_id,
+            display_name=display_name,
+            age_cohort=age_cohort,
+        )
+        profile_result = await self.session.execute(
+            text(
+                """
+                select
+                  student_profile_id,
+                  display_name,
+                  theme_variant,
+                  pet_name,
+                  xp,
+                  coins,
+                  stars,
+                  current_day
+                from story_world_profiles
+                where student_profile_id = :student_profile_id
+                for update
+                """
+            ),
+            {"student_profile_id": student_profile_id},
+        )
+        profile_result.mappings().one()
+        progress_result = await self.session.execute(
+            text(
+                """
+                select
+                  location_id,
+                  chapter,
+                  last_choice,
+                  completed_at
+                from story_world_location_progress
+                where student_profile_id = :student_profile_id
+                  and location_id = :location_id
+                for update
+                """
+            ),
+            {
+                "student_profile_id": student_profile_id,
+                "location_id": location_id,
+            },
+        )
+        progress = dict(progress_result.mappings().one())
+        if int(progress["chapter"]) != expected_chapter:
+            raise ValueError(
+                f"Story has already advanced to chapter {progress['chapter']}"
+            )
+        normalized_answer = " ".join(answer.strip().split())
+        cleaned_answer = self._normalize_story_choice(normalized_answer) or "Keep going"
+        npc_id = STORY_WORLD_LOCATIONS[location_id].npc_id
+        npc_result = await self.session.execute(
+            text(
+                """
+                select
+                  npc_id,
+                  npc_name,
+                  friendship_level,
+                  current_mood,
+                  memories
+                from story_world_npc_states
+                where student_profile_id = :student_profile_id
+                  and npc_id = :npc_id
+                for update
+                """
+            ),
+            {
+                "student_profile_id": student_profile_id,
+                "npc_id": npc_id,
+            },
+        )
+        npc = dict(npc_result.mappings().one())
+        session_id = await self._ensure_story_world_session(
+            student_profile_id=student_profile_id,
+            location_id=location_id,
+            location_name=STORY_WORLD_LOCATIONS[location_id].display_name,
+        )
+        chapter = int(progress["chapter"])
+        signals = observed_signals(cleaned_answer)
+        if emergency:
+            message = (
+                "I’m really glad you said that. Please go to a trusted grown-up near you right now and say, “I need help staying safe.” If there is immediate danger, call your local emergency number together."
+            )
+            memory = "Safety came first on this turn."
+            xp_earned = 0
+            coins_earned = 0
+            stars_earned = 0
+            completed_now = False
+            next_chapter = chapter
+            completed_at = progress["completed_at"]
+        else:
+            message = consequence_for(location_id, cleaned_answer, chapter)
+            completed_now = (
+                progress["completed_at"] is None
+                and chapter >= TOTAL_STORY_WORLD_CHAPTERS
+            )
+            next_chapter = (
+                chapter if chapter >= TOTAL_STORY_WORLD_CHAPTERS else chapter + 1
+            )
+            completed_at = (
+                datetime.now(timezone.utc)
+                if completed_now
+                else progress["completed_at"]
+            )
+            xp_earned = 65 if completed_now else 45
+            coins_earned = 24 if completed_now else 16
+            stars_earned = 4 if completed_now else 2
+            memory = (
+                f'{STORY_WORLD_LOCATIONS[location_id].npc_name} remembers your choice: "{cleaned_answer}."'
+            )
+
+        await self.session.execute(
+            text(
+                """
+                insert into game_session_events (
+                  game_session_id,
+                  event_type,
+                  ordinal,
+                  event_payload,
+                  metadata
+                )
+                values (
+                  :game_session_id,
+                  'story_world_turn',
+                  :ordinal,
+                  cast(:event_payload as jsonb),
+                  '{}'::jsonb
+                )
+                """
+            ),
+            {
+                "game_session_id": session_id,
+                "ordinal": await self._next_game_session_event_ordinal(
+                    session_id=session_id
+                ),
+                "event_payload": json.dumps(
+                    {
+                        "location_id": location_id,
+                        "chapter": chapter,
+                        "answer": cleaned_answer,
+                        "message": message,
+                        "npc_id": npc_id,
+                        "observed_signals": signals,
+                        "xp_earned": xp_earned,
+                        "coins_earned": coins_earned,
+                        "stars_earned": stars_earned,
+                        "emergency": emergency,
+                    }
+                ),
+            },
+        )
+        for signal in signals:
+            await self.session.execute(
+                text(
+                    """
+                    insert into game_behavioral_signals (
+                      game_session_id,
+                      student_profile_id,
+                      signal_type,
+                      signal_value,
+                      signal_label,
+                      confidence,
+                      visibility_scope,
+                      metadata
+                    )
+                    values (
+                      :game_session_id,
+                      :student_profile_id,
+                      :signal_type,
+                      1,
+                      :signal_label,
+                      :confidence,
+                      :visibility_scope,
+                      cast(:metadata as jsonb)
+                    )
+                    """
+                ),
+                {
+                    "game_session_id": session_id,
+                    "student_profile_id": student_profile_id,
+                    "signal_type": signal,
+                    "signal_label": signal.replace("_", " "),
+                    "confidence": 0.85 if emergency else 0.65,
+                    "visibility_scope": (
+                        "safeguarding_only" if emergency else "private"
+                    ),
+                    "metadata": json.dumps(
+                        {
+                            "game_mode": "story_world",
+                            "location_id": location_id,
+                            "chapter": chapter,
+                        }
+                    ),
+                },
+            )
+        if not emergency:
+            await self.session.execute(
+                text(
+                    """
+                    update story_world_profiles
+                    set
+                      xp = xp + :xp_earned,
+                      coins = coins + :coins_earned,
+                      stars = stars + :stars_earned,
+                      current_day = current_day + :day_increment,
+                      updated_at = now()
+                    where student_profile_id = :student_profile_id
+                    """
+                ),
+                {
+                    "student_profile_id": student_profile_id,
+                    "xp_earned": xp_earned,
+                    "coins_earned": coins_earned,
+                    "stars_earned": stars_earned,
+                    "day_increment": 1 if completed_now else 0,
+                },
+            )
+            updated_memories = list((npc.get("memories") or [])[-5:])
+            if not updated_memories or updated_memories[-1] != memory:
+                updated_memories.append(memory)
+            await self.session.execute(
+                text(
+                    """
+                    update story_world_npc_states
+                    set
+                      friendship_level = least(friendship_level + 1, 5),
+                      current_mood = :current_mood,
+                      memories = cast(:memories as jsonb),
+                      updated_at = now()
+                    where student_profile_id = :student_profile_id
+                      and npc_id = :npc_id
+                    """
+                ),
+                {
+                    "student_profile_id": student_profile_id,
+                    "npc_id": npc_id,
+                    "current_mood": self._story_world_mood_for_signals(signals),
+                    "memories": json.dumps(updated_memories),
+                },
+            )
+            await self.session.execute(
+                text(
+                    """
+                    update story_world_location_progress
+                    set
+                      chapter = :chapter,
+                      last_choice = :last_choice,
+                      completed_at = :completed_at,
+                      updated_at = now()
+                    where student_profile_id = :student_profile_id
+                      and location_id = :location_id
+                    """
+                ),
+                {
+                    "student_profile_id": student_profile_id,
+                    "location_id": location_id,
+                    "chapter": next_chapter,
+                    "last_choice": cleaned_answer,
+                    "completed_at": completed_at,
+                },
+            )
+            if completed_now:
+                await self.session.execute(
+                    text(
+                        """
+                        update game_sessions
+                        set
+                          status = 'completed',
+                          ended_at = now(),
+                          duration_seconds = greatest(
+                            0,
+                            floor(extract(epoch from (now() - started_at)))::int
+                          )
+                        where id = :game_session_id
+                        """
+                    ),
+                    {"game_session_id": session_id},
+                )
+
+        state = await self.get_story_world_state(
+            student_profile_id=student_profile_id,
+            display_name=display_name,
+            age_cohort=age_cohort,
+        )
+        scene = await self.get_story_world_scene(
+            student_profile_id=student_profile_id,
+            display_name=display_name,
+            age_cohort=age_cohort,
+            location_id=location_id,
+        )
+        return {
+            "session_id": session_id,
+            "message": message,
+            "memory": memory,
+            "xp_earned": xp_earned,
+            "coins_earned": coins_earned,
+            "stars_earned": stars_earned,
+            "observed_signals": signals,
+            "state": state,
+            "scene": scene,
+        }
 
     async def list_chat_sessions(
         self,
@@ -1838,6 +2431,120 @@ class MobileAppRepository:
             {"case_id": case_id, "author_user_id": author_user_id},
         )
         return dict(result.mappings().one())
+
+    async def _ensure_story_world_session(
+        self,
+        *,
+        student_profile_id: UUID,
+        location_id: str,
+        location_name: str,
+    ) -> UUID:
+        existing = await self.session.execute(
+            text(
+                """
+                select id
+                from game_sessions
+                where student_profile_id = :student_profile_id
+                  and game_type = 'other'
+                  and status = 'started'
+                  and metadata ->> 'game_mode' = 'story_world'
+                  and metadata ->> 'location_id' = :location_id
+                order by started_at desc
+                limit 1
+                """
+            ),
+            {
+                "student_profile_id": student_profile_id,
+                "location_id": location_id,
+            },
+        )
+        session_id = existing.scalar_one_or_none()
+        if session_id is not None:
+            return session_id
+        created = await self.session.execute(
+            text(
+                """
+                insert into game_sessions (
+                  student_profile_id,
+                  game_type,
+                  status,
+                  metadata
+                )
+                values (
+                  :student_profile_id,
+                  'other',
+                  'started',
+                  cast(:metadata as jsonb)
+                )
+                returning id
+                """
+            ),
+            {
+                "student_profile_id": student_profile_id,
+                "metadata": json.dumps(
+                    {
+                        "game_mode": "story_world",
+                        "location_id": location_id,
+                        "location_name": location_name,
+                    }
+                ),
+            },
+        )
+        return created.scalar_one()
+
+    async def _next_game_session_event_ordinal(self, *, session_id: UUID) -> int:
+        result = await self.session.execute(
+            text(
+                """
+                select coalesce(max(ordinal), 0) + 1
+                from game_session_events
+                where game_session_id = :session_id
+                """
+            ),
+            {"session_id": session_id},
+        )
+        return int(result.scalar_one())
+
+    def _story_world_mood_for_signals(self, signals: list[str]) -> str:
+        if "self_regulation" in signals:
+            return "steady"
+        if "kindness" in signals or "cooperation" in signals:
+            return "warm"
+        if "help_seeking" in signals:
+            return "supported"
+        if "persistence" in signals:
+            return "confident"
+        return "curious"
+
+    def _normalize_story_choice(self, value: str | None) -> str | None:
+        if value is None:
+            return None
+        compact = " ".join(value.strip().split())
+        if not compact:
+            return None
+        trimmed = compact.rstrip(".!?")
+        if not trimmed:
+            return None
+        return trimmed[0].upper() + trimmed[1:]
+
+    def _normalize_story_memory(self, value: str) -> str:
+        compact = " ".join(value.strip().split())
+        compact = compact.replace('.."', '."').replace("..", ".")
+        legacy_prefix = " remembers how you chose to "
+        if legacy_prefix in compact.lower():
+            split_at = compact.lower().index(legacy_prefix)
+            npc_name = compact[:split_at].strip() or "A friend"
+            raw_choice = compact[split_at + len(legacy_prefix) :].strip()
+            normalized_choice = self._normalize_story_choice(raw_choice) or "Keep going"
+            return f'{npc_name} remembers your choice: "{normalized_choice}."'
+        return compact
+
+    def _dedupe_story_memories(self, values: list[str]) -> list[str]:
+        deduped: list[str] = []
+        for value in values:
+            if value and value not in deduped:
+                deduped.append(value)
+        return deduped
 
     def _row_to_actor_context(self, row: Any) -> ActorContext:
         roles = [role for role in (row["roles"] or []) if role]

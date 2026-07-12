@@ -143,6 +143,55 @@ void main() {
     expect(contacts.single.label, 'BAHA Demo Counselor Line');
   });
 
+  test('fetches story world state', () async {
+    final client = BahaApiClient(
+      baseUrl: 'http://localhost:8000',
+      httpClient: MockClient((request) async {
+        expect(request.url.path, '/mobile/student/games/story-world/state');
+        return http.Response(
+          '{"student_profile_id":"30000000-0000-0000-0000-000000000001","display_name":"Aarav Student","age_cohort":"13_14","theme_variant":"social_confidence","pet_name":"Comet","xp":120,"coins":40,"stars":0,"current_day":1,"current_location_id":"home","completed_quest_count":0,"locations":[{"location_id":"home","display_name":"Home","subtitle":"Family moments, daily routines, and small choices.","npc_id":"ria","npc_name":"Ria","unlock_stars":0,"chapter":1,"last_choice":null,"unlocked":true,"completed":false,"progress_percent":0.0,"session_status":"started"}],"npcs":[{"npc_id":"ria","npc_name":"Ria","friendship_level":1,"current_mood":"curious","memories":[]}]}',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+
+    final state = await client.getStoryWorldState(
+      identity: const DevelopmentIdentity(externalAuthId: 'student-ext-id'),
+    );
+
+    expect(state.currentLocationId, 'home');
+    expect(state.locations.single.npcName, 'Ria');
+  });
+
+  test('submits story world turn', () async {
+    final client = BahaApiClient(
+      baseUrl: 'http://localhost:8000',
+      httpClient: MockClient((request) async {
+        expect(request.url.path, '/mobile/student/games/story-world/turns');
+        expect(request.method, 'POST');
+        return http.Response(
+          '{"state":{"student_profile_id":"30000000-0000-0000-0000-000000000001","display_name":"Aarav Student","theme_variant":"social_confidence","pet_name":"Comet","xp":165,"coins":56,"stars":2,"current_day":1,"current_location_id":"school","completed_quest_count":0,"locations":[],"npcs":[]},"scene":{"location_id":"school","chapter":2,"title":"The Hallway Supply Sprint · Chapter 2","body":"The quest grows bigger because of what you do next.","prompt":"What is your next move?","npc_id":"maya","npc_name":"Maya"},"message":"Your first move lands immediately.","memory":"Maya remembers how you chose to help.","xp_earned":45,"coins_earned":16,"stars_earned":2,"observed_signals":["kindness","cooperation"]}',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+
+    final turn = await client.submitStoryWorldTurn(
+      identity: const DevelopmentIdentity(externalAuthId: 'student-ext-id'),
+      request: const StoryWorldTurnRequest(
+        locationId: 'school',
+        answer: 'Help Maya rebuild the volcano together',
+        expectedChapter: 1,
+      ),
+    );
+
+    expect(turn.scene.chapter, 2);
+    expect(turn.starsEarned, 2);
+    expect(turn.observedSignals, contains('cooperation'));
+  });
+
   test('creates student help request', () async {
     final client = BahaApiClient(
       baseUrl: 'http://localhost:8000',

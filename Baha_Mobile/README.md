@@ -108,6 +108,14 @@ Student feature slice 2 currently supports:
 4. `POST /mobile/student/checkins`
 5. `GET /mobile/student/checkins`
 6. `GET /mobile/student/checkins/{response_set_id}`
+7. adaptive daily check-in rendering driven by backend question metadata plus a one-time local wellbeing profile
+8. factor-specific trend derivation for:
+   - sleep
+   - energy
+   - mood
+   - stress
+   - physical wellbeing
+   - connectedness
 
 Student feature slice 3 currently supports:
 
@@ -148,6 +156,8 @@ Student corrective UI rewrite currently supports:
    - support request flow
    - Buddy session list
    - Buddy live chat
+6. one-time local wellbeing profile setup and editing from settings
+7. tracked-factor charts derived from real submitted check-in detail with demo fallback when history is empty
 6. finished student shell utility screens for:
    - weekly metric insights
    - emotion wheel

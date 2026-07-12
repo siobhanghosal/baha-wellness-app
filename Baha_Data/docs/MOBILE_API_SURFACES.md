@@ -126,6 +126,10 @@ Returns active student check-in templates filtered by the actor's age cohort.
 
 Returns one student check-in template including ordered question definitions so the client can render a live submission form.
 
+Important current usage note:
+
+- the student app now uses template `metadata` and question `metadata` to drive conditional follow-up behavior such as `show_when`, `show_when_any`, and profile-gated options
+
 `GET /mobile/student/modules`
 
 Returns active approved student learning modules plus latest progress for the current student.
@@ -160,6 +164,11 @@ Returns a submitted check-in plus question/answer detail.
 `POST /mobile/student/checkins`
 
 Submits a check-in response set.
+
+Important current usage note:
+
+- the student app now sends `selected_options`, `numeric_value`, and `normalized_value`
+- `normalized_value` currently carries the choice label, factor dimension, normalized burden score, and whether the answer belongs to the six-factor daily core
 
 `POST /mobile/student/help-requests`
 

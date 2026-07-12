@@ -100,6 +100,30 @@ The existing `Solomon_UI_Version1` branch is best treated as:
 
 It should not be treated as the final navigation, auth, or backend integration structure.
 
+## 4.1 Story World Branch Audit
+
+The teammate branch adds one substantial game-like feature called `Story World`.
+
+Useful parts:
+
+- world-based student game framing
+- typed free-text interaction
+- persistent location progression
+- strong student-facing visual/game shell ideas
+
+Unsafe parts to merge directly:
+
+- OpenAI-dependent story generation
+- detached `X-Story-Player-Key` identity
+- separate game-player storage not linked to current student auth
+- a backend/auth direction that conflicts with the current branch
+
+Decision:
+
+- keep `Story World` as a reference feature concept
+- do not merge its backend/runtime directly
+- rebuild it on top of the current BAHA identity, consent, and student game schema
+
 ## 5. Screen Mapping By App
 
 ### 5.1 Student App
@@ -137,6 +161,7 @@ It should not be treated as the final navigation, auth, or backend integration s
   - `POST /mobile/chat/sessions`
   - `GET /mobile/chat/sessions/{session_id}/messages`
   - `POST /mobile/chat/sessions/{session_id}/messages`
+  - backend generation is now retrieval-grounded and can use local `Ollama` + `qwen3:4b` without changing the Flutter Buddy UI
 - help pathway:
   - `POST /mobile/student/help-requests`
   - `GET /mobile/support-contacts`
@@ -149,12 +174,17 @@ It should not be treated as the final navigation, auth, or backend integration s
 - avatar selection
 - animated wellness tiles and celebratory motion
 - local wellness tools:
-  - emotion wheel
+  - comet sequence
   - calm breathing
-  - friendship scenario practice
+  - focus catch
 - notification center composition
 - badge and level visuals
 - theme switching
+
+Planned next game slice:
+
+- `Story World` is now the first backend-aware student game after being reworked to fit the current backend and local-LLM roadmap documented in
+  [STORY_WORLD_AND_GAMES_PLAN.md](./STORY_WORLD_AND_GAMES_PLAN.md)
 
 #### Implemented so far in the real Flutter workspace
 
@@ -207,6 +237,11 @@ It should not be treated as the final navigation, auth, or backend integration s
 - richer student profile editing
 - finer-grained trend history beyond latest summary
 - dedicated module sections/steps read endpoint if the app later needs backend-authored section navigation instead of content-block-driven flow
+
+Important constraint for the game slice:
+
+- the first game runtime should extend the current `game_sessions` and student identity model
+- it should not introduce a parallel player-key identity or an external OpenAI dependency
 
 Content strategy note:
 

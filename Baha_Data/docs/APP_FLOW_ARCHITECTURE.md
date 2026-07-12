@@ -16,6 +16,7 @@ It should be read together with:
 - [BAHA_Project_PRD_v2.md](/Users/sudharshan/Desktop/PES/RF Internship/BAHA_Project_PRD_v2.md)
 - [UI_BACKEND_INTEGRATION_PLAN.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/UI_BACKEND_INTEGRATION_PLAN.md)
 - [SCREEN_API_MATRIX.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/SCREEN_API_MATRIX.md)
+- [STORY_WORLD_AND_GAMES_PLAN.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/STORY_WORLD_AND_GAMES_PLAN.md)
 - [BACKEND_HANDOFF_FOR_FLUTTER.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/BACKEND_HANDOFF_FOR_FLUTTER.md)
 
 The goal is to lock the app flow before building screens so implementation does not drift away from the PRD.
@@ -152,17 +153,20 @@ Flow:
 
 Flow:
 
-1. fetch `GET /mobile/student/checkin-templates`
-2. open selected template detail
-3. fetch `GET /mobile/student/checkin-templates/{template_id}`
-4. render question sequence
-5. submit using `POST /mobile/student/checkins`
-6. return to updated summary or confirmation screen
+1. ensure the one-time local wellbeing profile exists
+2. fetch `GET /mobile/student/checkin-templates`
+3. open selected template detail
+4. fetch `GET /mobile/student/checkin-templates/{template_id}`
+5. render the universal six-factor daily pulse
+6. reveal only the follow-up questions whose `show_when` conditions are met
+7. submit using `POST /mobile/student/checkins`
+8. return to updated summary or confirmation screen
 
 Required states:
 
 - first-time check-in
-- optional daily check-in later
+- one-time wellbeing profile setup before adaptive daily use
+- adaptive daily check-in
 - partial progress local state
 - submission success
 - submission retry on network failure
@@ -185,13 +189,67 @@ Flow:
 2. create session if none exists
 3. fetch `GET /mobile/chat/sessions/{session_id}/messages`
 4. post messages with `POST /mobile/chat/sessions/{session_id}/messages`
-5. if emergency language is detected, backend creates the signal and escalation case
+5. backend retrieves approved BAHA evidence for the message
+6. backend uses the local Buddy generation path:
+   - `Ollama` + `qwen3:4b` when available
+   - deterministic evidence-composer fallback when the local model is unavailable
+7. if retrieval is weak or outside corpus scope, backend returns a bounded "I can only answer from approved BAHA material" response instead of guessing
+8. if emergency language is detected, backend creates the signal and escalation case
 
 Frontend rule:
 
 - do not implement client-side crisis logic beyond UI messaging and connectivity handling
+- do not implement client-side chatbot logic or direct LLM calls
 
-### 4.8 Student Help Flow
+### 4.8 Student Games Flow
+
+Release-1 student games should be treated as two different categories:
+
+- lightweight local wellness tools
+- backend-aware progressive games
+
+Initial game set:
+
+- Comet Sequence
+- Calm Breathing
+- Focus Catch
+- Story World
+
+Flow for local tools:
+
+1. open tool from Home or Explore
+2. run the interaction locally
+3. optionally store local-only completion state now
+4. later persist signals and completion through the game runtime
+
+Current local-tool intent:
+
+- `Comet Sequence`
+  short-term memory and visual attention through repeat-the-pattern play
+- `Calm Breathing`
+  paced reset routine with timed inhale/hold/exhale guidance
+- `Focus Catch`
+  visual tracking and hand-eye coordination through a moving tap target
+
+Flow for Story World:
+
+1. open Story World from the student game/discovery area
+2. backend resolves the authenticated `student_profile_id`
+3. fetch or create the current Story World state
+4. open the current location, scene, and progress
+5. submit a free-text turn
+6. backend stores the turn and returns the next safe grounded scene
+7. backend records any non-diagnostic gameplay signals server-side
+
+Architecture rules:
+
+- Story World must use the current student auth model
+- Story World must not use a detached player-key identity
+- Story World must not depend on external OpenAI APIs
+- age-band differences should be implemented through content packs and presentation variants
+- gameplay signals are for insight/support workflows only and must never be shown as child-facing scores
+
+### 4.9 Student Help Flow
 
 Flow:
 
@@ -200,7 +258,7 @@ Flow:
 3. create request using `POST /mobile/student/help-requests`
 4. show confirmation and support options
 
-### 4.9 Student Offline Rules
+### 4.10 Student Offline Rules
 
 Offline-allowed:
 

@@ -368,6 +368,72 @@ class ModuleProgressUpsertResponse(BaseModel):
     updated_at: datetime
 
 
+class StoryWorldLocationState(BaseModel):
+    location_id: str
+    display_name: str
+    subtitle: str
+    npc_id: str
+    npc_name: str
+    unlock_stars: int
+    chapter: int
+    last_choice: str | None = None
+    unlocked: bool
+    completed: bool
+    progress_percent: float = Field(ge=0, le=100)
+    session_status: str = "started"
+
+
+class StoryWorldNpcState(BaseModel):
+    npc_id: str
+    npc_name: str
+    friendship_level: int = 0
+    current_mood: str
+    memories: list[str] = Field(default_factory=list)
+
+
+class StoryWorldStateResponse(BaseModel):
+    student_profile_id: UUID
+    display_name: str
+    age_cohort: str | None = None
+    theme_variant: str
+    pet_name: str
+    xp: int
+    coins: int
+    stars: int
+    current_day: int
+    current_location_id: str
+    completed_quest_count: int = 0
+    locations: list[StoryWorldLocationState] = Field(default_factory=list)
+    npcs: list[StoryWorldNpcState] = Field(default_factory=list)
+
+
+class StoryWorldSceneResponse(BaseModel):
+    location_id: str
+    chapter: int
+    title: str
+    body: str
+    prompt: str
+    npc_id: str
+    npc_name: str
+
+
+class StoryWorldTurnRequest(BaseModel):
+    location_id: str = Field(min_length=2, max_length=80)
+    answer: str = Field(min_length=2, max_length=600)
+    expected_chapter: int = Field(ge=1, le=12)
+
+
+class StoryWorldTurnResponse(BaseModel):
+    state: StoryWorldStateResponse
+    scene: StoryWorldSceneResponse
+    message: str
+    memory: str
+    xp_earned: int
+    coins_earned: int
+    stars_earned: int
+    observed_signals: list[str] = Field(default_factory=list)
+
+
 class ChatSessionSummary(BaseModel):
     id: UUID
     session_type: ChatSessionType

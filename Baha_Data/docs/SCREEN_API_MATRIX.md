@@ -32,19 +32,20 @@ This matrix is scoped to Release 1 from the PRD.
 | ST-003 | Privacy Explanation | Explain privacy and overrides | `GET /auth/onboarding-state`, later content read model | Student identity | Acknowledgement toggle | Partial | Explicit privacy copy can later move into content system |
 | ST-004 | Guardian Consent Wait | Block until guardian consent | `GET /auth/onboarding-state` | Student identity | Polling / refresh state | Ready | Minor-flow only |
 | ST-005 | Self-Consent Step | Complete 18+ self-consent | `POST /auth/bootstrap`, `GET /auth/onboarding-state` | Student identity | Draft confirmation state | Partial | Self-consent mutation can be richer later |
-| ST-006 | Home Dashboard | Show latest weekly summary and entry points | `GET /mobile/me`, `GET /mobile/student/weekly-summary/latest`, optional `GET /mobile/student/checkins` | Active student | Theme mode, dashboard shell | Ready | New student summary endpoint now supports this |
-| ST-007 | Check-In List | Show templates or past check-ins | `GET /mobile/student/checkin-templates`, `GET /mobile/student/checkins` | Active student | Filter state | Ready | Can start simple |
-| ST-008 | Check-In Detail | Render dynamic check-in form | `GET /mobile/student/checkin-templates/{template_id}` | Active student | In-progress answer draft | Ready | Backend supplies ordered questions |
-| ST-009 | Check-In Submit | Persist answers | `POST /mobile/student/checkins` | Active student | Submission retry state | Ready | Must support retry UX |
-| ST-010 | Trend Detail | Expanded personal trend view | `GET /mobile/student/weekly-summary/latest`, later historical endpoint | Active student | Chart tab state | Partial | Latest summary exists, history view still limited |
+| ST-006 | Home Dashboard | Show latest weekly summary, trend cards, and profile-aware entry points | `GET /mobile/me`, `GET /mobile/student/weekly-summary/latest`, `GET /mobile/student/checkins`, `GET /mobile/student/checkins/{response_set_id}` | Active student | Theme mode, local wellbeing profile, dashboard shell | Ready | Student app now derives tracked-factor charts from real check-in detail history |
+| ST-007 | Check-In List | Show adaptive daily template and past check-ins | `GET /mobile/student/checkin-templates`, `GET /mobile/student/checkins` | Active student | Local wellbeing profile, filter state | Ready | Current student flow uses a profile-aware daily pulse template first |
+| ST-008 | Check-In Detail | Render dynamic check-in form with conditional follow-ups | `GET /mobile/student/checkin-templates/{template_id}` | Active student | In-progress answer draft, local wellbeing profile | Ready | Backend supplies ordered questions and metadata; client evaluates `show_when` logic |
+| ST-009 | Check-In Submit | Persist adaptive answers and normalized scores | `POST /mobile/student/checkins` | Active student | Submission retry state | Ready | Student app submits selected options plus normalized scoring metadata |
+| ST-010 | Trend Detail | Expanded factor-specific trend view | `GET /mobile/student/weekly-summary/latest`, `GET /mobile/student/checkins`, `GET /mobile/student/checkins/{response_set_id}` | Active student | Chart tab state | Ready | Trends now reflect sleep, energy, mood, stress, physical wellbeing, and connectedness |
 | ST-011 | Learn Feed | Discovery cards and modules | `GET /mobile/content/feed`, `GET /mobile/student/modules` | Active student | Sort/filter state | Ready | Supports theme-focused lanes via `theme`; the student reference cards should now open filtered lanes instead of one generic feed |
 | ST-012 | Module Detail | Show module body and progress | `GET /mobile/content/{content_item_id}`, `POST /mobile/student/modules/{module_id}/progress` | Active student | Step progress, optimistic UI | Ready | `GET /mobile/student/modules` now exposes `content_item_id` plus section/step progress metadata for more structure-aware progress UI |
 | ST-013 | Buddy Session List | Resume or start chat | `GET /mobile/chat/sessions`, `POST /mobile/chat/sessions` | Active student | Selected session | Ready | Shared chat runtime already live |
-| ST-014 | Buddy Chat | Persist question/response thread | `GET /mobile/chat/sessions/{session_id}/messages`, `POST /mobile/chat/sessions/{session_id}/messages` | Active student | Draft message, scroll state | Ready | Emergency handling is backend-driven |
+| ST-014 | Buddy Chat | Persist question/response thread | `GET /mobile/chat/sessions/{session_id}/messages`, `POST /mobile/chat/sessions/{session_id}/messages` | Active student | Draft message, scroll state | Ready | Backend now uses retrieval-grounded local LLM generation when `Ollama` is available, with deterministic fallback and emergency handling server-side |
 | ST-015 | Help Request | Ask for support | `GET /mobile/support-contacts`, `POST /mobile/student/help-requests` | Active student | Draft help form | Ready | Maps to counselor queue |
-| ST-016 | Profile and Settings | Theme, privacy reminders, session actions | `GET /mobile/me`, `GET /auth/onboarding-state` | Active student | Theme, avatar, local prefs | Partial | Profile editing backend still limited |
+| ST-016 | Profile and Settings | Theme, privacy reminders, session actions, and wellbeing profile editing | `GET /mobile/me`, `GET /auth/onboarding-state` | Active student | Theme, avatar, local prefs, local wellbeing profile | Partial | One-time wellbeing profile is currently local-only until a profile write API exists |
 | ST-017 | Avatar Selection | Visual identity only | None initially | Active student | Selected avatar | Ready | Frontend-local for now |
-| ST-018 | Games Hub | Entry to calm breathing and future games | None yet, later game endpoints | Active student | Animation state | Missing | Backend runtime for games is still not exposed |
+| ST-018 | Games Hub | Entry to Comet Sequence, Calm Breathing, Focus Catch, and Story World | Local-only tools plus authenticated Story World endpoints | Active student | Animation state, local completion state | Partial | Two local cognitive mini-games and one paced breathing tool are client-side; Story World is backend-backed through the student auth model |
+| ST-019 | Story World | Progressive narrative wellness game with typed turns and safe NPC guidance | `GET /mobile/student/games/story-world/state`, `GET /mobile/student/games/story-world/scenes/{location_id}`, `POST /mobile/student/games/story-world/turns` | Active student | Draft turn text, current world, local optimistic state | Implemented | Uses current BAHA identity and consent architecture, additive runtime tables, deterministic progression, and no OpenAI dependency |
 
 ## 4. Parent App Screens
 
@@ -109,3 +110,8 @@ Do not start with:
 - notification center
 
 Those are later slices and should not block the initial implementation path.
+
+Important current update:
+
+- local student wellness tools now exist and are acceptable for demo use
+- `Story World` is now the first meaningful backend-backed game slice in the student app

@@ -85,7 +85,42 @@ Current expected meaning:
 - `CRAWL_DOWNLOAD_DELAY_SECONDS`
 - `CRAWL_DEPTH_LIMIT`
 
-## 8. Hosted Deployment Guidance
+## 8. Local Buddy LLM
+
+- `BUDDY_GENERATION_BACKEND`
+- `BUDDY_OLLAMA_BASE_URL`
+- `BUDDY_OLLAMA_MODEL`
+- `BUDDY_OLLAMA_TIMEOUT_SECONDS`
+- `BUDDY_OLLAMA_KEEP_ALIVE`
+- `BUDDY_OLLAMA_THINK`
+- `BUDDY_HISTORY_WINDOW`
+- `BUDDY_MIN_RETRIEVAL_CONFIDENCE`
+
+Current intended local values:
+
+```bash
+BUDDY_GENERATION_BACKEND=ollama
+BUDDY_OLLAMA_BASE_URL=http://localhost:11434
+BUDDY_OLLAMA_MODEL=qwen3:4b
+BUDDY_OLLAMA_TIMEOUT_SECONDS=60
+BUDDY_OLLAMA_KEEP_ALIVE=10m
+BUDDY_OLLAMA_THINK=false
+BUDDY_HISTORY_WINDOW=6
+BUDDY_MIN_RETRIEVAL_CONFIDENCE=0.45
+```
+
+Docker note:
+
+- if the backend is running directly on your host machine, `BUDDY_OLLAMA_BASE_URL=http://localhost:11434` is correct
+- if the backend is running through `docker compose`, the API container must use `http://host.docker.internal:11434`
+- the repository `docker-compose.yml` now applies that container-side override automatically for local Mac/Docker development
+
+Operational note:
+
+- the backend now supports a local `Ollama` runtime for `BAHA Buddy`
+- if `Ollama` is down or the model is missing, Buddy falls back to the deterministic evidence composer instead of crashing
+
+## 9. Hosted Deployment Guidance
 
 For hosted dev or pilot deployment:
 
@@ -94,7 +129,7 @@ For hosted dev or pilot deployment:
 - object-storage bucket and endpoint values should be injected as secrets where appropriate
 - `ALLOW_DEV_IDENTITY_HEADERS` should be `false`
 
-## 9. Current Status
+## 10. Current Status
 
 The repository includes placeholders in:
 

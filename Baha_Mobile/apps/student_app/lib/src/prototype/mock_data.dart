@@ -5,16 +5,17 @@ import 'prototype_models.dart';
 const studentCards = [
   UiCardItem(
     title: 'Daily Check-in',
-    subtitle: 'Mood, sleep, stress, energy, and one gentle reflection.',
+    subtitle:
+        'Sleep, mood, stress, energy, body, and connection with smart follow-ups.',
     tag: '2 min',
     icon: Icons.favorite_rounded,
     color: Color(0xFF14B8A6),
   ),
   UiCardItem(
-    title: 'Emotion Wheel',
-    subtitle: 'Find the right word for what you are feeling.',
-    tag: 'Private',
-    icon: Icons.bubble_chart_rounded,
+    title: 'Comet Sequence',
+    subtitle: 'Watch the pattern, remember it, and repeat it before it fades.',
+    tag: 'Memory',
+    icon: Icons.auto_awesome_rounded,
     color: Color(0xFF8B5CF6),
   ),
   UiCardItem(
@@ -25,11 +26,18 @@ const studentCards = [
     color: Color(0xFF3B82F6),
   ),
   UiCardItem(
-    title: 'Friendship Choices',
-    subtitle: 'Practice tricky social moments without pressure.',
-    tag: 'Game',
-    icon: Icons.diversity_1_rounded,
+    title: 'Focus Catch',
+    subtitle: 'Track the moving comet and tap fast before it jumps away.',
+    tag: 'Reflex',
+    icon: Icons.ads_click_rounded,
     color: Color(0xFFF97316),
+  ),
+  UiCardItem(
+    title: 'Story World',
+    subtitle: 'A guided story game where every reply changes the next scene.',
+    tag: 'Live',
+    icon: Icons.explore_rounded,
+    color: Color(0xFF06B6D4),
   ),
   UiCardItem(
     title: 'BAHA Buddy',

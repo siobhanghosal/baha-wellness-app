@@ -74,11 +74,25 @@ class PrioritySourceRegistry:
     def all(self) -> list[PrioritySource]:
         return list(PRIORITY_SOURCES)
 
-    def resolve(self, organization: str) -> PrioritySource:
+    def resolve(
+        self,
+        organization: str,
+        *,
+        allow_custom: bool = False,
+    ) -> PrioritySource:
         normalized = ALIASES.get(organization.strip().lower(), organization.strip())
         for source in PRIORITY_SOURCES:
             if source.organization.lower() == normalized.lower():
                 return source
+        if allow_custom:
+            # Manual curation should preserve the true organization even when the
+            # source is not part of the automated acquisition priority ladder.
+            return PrioritySource(
+                organization=normalized,
+                priority_rank=99,
+                domains=(),
+                source_weight=0.70,
+            )
         raise ValueError(
             f"{organization!r} is not a priority source. "
             f"Allowed: {', '.join(source.organization for source in PRIORITY_SOURCES)}"
