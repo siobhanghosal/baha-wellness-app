@@ -4,6 +4,7 @@ __pycache__/
 .ruff_cache/
 .venv/
 .env
+.coverage
 .DS_Store
 dist/
 build/
@@ -11,3 +12,7 @@ build/
 node_modules/
 .next/
 tsconfig.tsbuildinfo
+storage/
+baha-wellness-app/
+.tmp_*
+DOCUMENTS_SUMMARY.md

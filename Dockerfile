@@ -11,9 +11,13 @@ RUN apt-get update \
 
 COPY pyproject.toml README.md ./
 COPY src ./src
+COPY alembic ./alembic
+COPY alembic.ini ./alembic.ini
+COPY docker/entrypoint.sh ./docker/entrypoint.sh
 
 RUN pip install --no-cache-dir .
+RUN chmod +x ./docker/entrypoint.sh
 
 EXPOSE 8000
 
-CMD ["uvicorn", "baha_rag.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["./docker/entrypoint.sh"]

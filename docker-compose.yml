@@ -2,16 +2,15 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_DB: baha_rag
+      POSTGRES_DB: baha_companion
       POSTGRES_USER: baha
       POSTGRES_PASSWORD: baha
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U baha -d baha_rag"]
+      test: ["CMD-SHELL", "pg_isready -U baha -d baha_companion"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -19,18 +18,21 @@ services:
   api:
     build: .
     env_file:
-      - .env.example
+      - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://baha:baha@postgres:5432/baha_rag
-      STORAGE_ROOT: /app/storage/raw
+      DATABASE_URL: postgresql+asyncpg://baha:baha@postgres:5432/baha_companion
+      AUTH_SECRET_KEY: change-me-in-production
+      RUN_MIGRATIONS: "true"
     ports:
       - "8000:8000"
-    volumes:
-      - acquisition-storage:/app/storage/raw
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8000/health/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres-data:
-  acquisition-storage:
