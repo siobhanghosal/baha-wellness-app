@@ -1,8 +1,5 @@
 class BahaApiException implements Exception {
-  const BahaApiException({
-    required this.statusCode,
-    required this.message,
-  });
+  const BahaApiException({required this.statusCode, required this.message});
 
   final int statusCode;
   final String message;

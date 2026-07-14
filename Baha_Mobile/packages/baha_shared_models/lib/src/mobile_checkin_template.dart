@@ -68,7 +68,9 @@ class MobileCheckinQuestion {
       dimension: json['dimension'] as String? ?? '',
       questionType: json['question_type'] as String? ?? '',
       prompt: json['prompt'] as String? ?? '',
-      responseConfig: Map<String, dynamic>.from(json['response_config'] as Map? ?? const {}),
+      responseConfig: Map<String, dynamic>.from(
+        json['response_config'] as Map? ?? const {},
+      ),
       isRequired: json['is_required'] as bool? ?? false,
       ordinal: (json['ordinal'] as num?)?.toInt() ?? 0,
       metadata: Map<String, dynamic>.from(json['metadata'] as Map? ?? const {}),
@@ -104,7 +106,11 @@ class MobileCheckinTemplateDetail {
       ageCohort: json['age_cohort'] as String? ?? '',
       metadata: Map<String, dynamic>.from(json['metadata'] as Map? ?? const {}),
       questions: (json['questions'] as List<dynamic>? ?? const [])
-          .map((value) => MobileCheckinQuestion.fromJson(Map<String, dynamic>.from(value as Map)))
+          .map(
+            (value) => MobileCheckinQuestion.fromJson(
+              Map<String, dynamic>.from(value as Map),
+            ),
+          )
           .toList(),
     );
   }

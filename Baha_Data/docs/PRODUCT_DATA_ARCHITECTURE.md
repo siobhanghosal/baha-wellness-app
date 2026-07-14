@@ -675,7 +675,8 @@ Student wellness:
 Current implementation note:
 
 - the adaptive student daily check-in now lives primarily in `checkin_templates`, `checkin_response_sets`, and `checkin_responses`
-- one-time wellbeing profile answers are currently stored locally in the mobile app until a dedicated backend profile write model is introduced
+- one-time student onboarding baseline answers are now attached to bootstrap metadata and returned through `GET /mobile/me`
+- the app still keeps a local copy for resilience, but the intended source of truth is no longer device-only
 
 Support and safeguarding:
 

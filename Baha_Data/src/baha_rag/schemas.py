@@ -196,9 +196,23 @@ class AuthBootstrapRequest(BaseModel):
 class AuthGuardianLinkStudentRequest(BaseModel):
     student_profile_id: UUID | None = None
     student_code: str | None = Field(default=None, max_length=80)
+    verification_code: str = Field(min_length=4, max_length=20)
     relationship_to_student: str = Field(min_length=2, max_length=80)
     is_primary: bool = True
     consent_authority: bool = True
+
+
+class AuthPlatformParticipationConsentResponse(BaseModel):
+    consent_type: Literal["platform_participation"] = "platform_participation"
+    consent_version_id: UUID | None = None
+    student_profile_id: UUID
+    guardian_id: UUID
+    status: Literal["pending", "granted", "declined", "withdrawn"]
+    scope: str
+    actor_relationship: str | None = None
+    granted_at: datetime | None = None
+    withdrawn_at: datetime | None = None
+    created_at: datetime | None = None
 
 
 class AuthPlatformParticipationConsentRequest(BaseModel):
@@ -249,6 +263,7 @@ class AuthOnboardingStateResponse(BaseModel):
     guardian_id: UUID | None = None
     teacher_profile_id: UUID | None = None
     student_code: str | None = None
+    guardian_link_verification_code: str | None = None
     age_cohort: str | None = None
     legal_consent_band: str | None = None
     approval_status: str
@@ -285,6 +300,9 @@ class MobileActorResponse(BaseModel):
     teacher_profile_id: UUID | None = None
     age_cohort: str | None = None
     school_id: UUID | None = None
+    school_name: str | None = None
+    user_metadata: dict[str, Any] = Field(default_factory=dict)
+    student_metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class MobileCheckinTemplateSummary(BaseModel):

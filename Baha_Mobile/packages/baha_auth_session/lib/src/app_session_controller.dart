@@ -6,14 +6,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'session_stage.dart';
 
 class AppSessionController extends ChangeNotifier {
-  AppSessionController({
-    required BahaApiClient apiClient,
-  })
-      // ignore: prefer_initializing_formals
-      : _apiClient = apiClient;
+  AppSessionController({required BahaApiClient apiClient})
+    // ignore: prefer_initializing_formals
+    : _apiClient = apiClient;
 
   static const _externalAuthIdKey = 'baha.dev.external_auth_id';
   static const _authEmailKey = 'baha.dev.auth_email';
+  static const _requestedRoleKey = 'baha.dev.requested_role';
 
   final BahaApiClient _apiClient;
 
@@ -34,6 +33,9 @@ class AppSessionController extends ChangeNotifier {
     final preferences = await SharedPreferences.getInstance();
     final externalAuthId = preferences.getString(_externalAuthIdKey)?.trim();
     final authEmail = preferences.getString(_authEmailKey)?.trim();
+    final requestedRole = AppRequestedRole.fromApiValue(
+      preferences.getString(_requestedRoleKey),
+    );
     if (externalAuthId == null || externalAuthId.isEmpty) {
       _identity = null;
       _onboardingState = null;
@@ -45,6 +47,7 @@ class AppSessionController extends ChangeNotifier {
     _identity = DevelopmentIdentity(
       externalAuthId: externalAuthId,
       authEmail: authEmail == null || authEmail.isEmpty ? null : authEmail,
+      requestedRole: requestedRole,
     );
     await refreshOnboarding();
   }
@@ -58,14 +61,42 @@ class AppSessionController extends ChangeNotifier {
     } else {
       await preferences.remove(_authEmailKey);
     }
+    await preferences.setString(
+      _requestedRoleKey,
+      identity.requestedRole.apiValue,
+    );
     _identity = identity;
     await refreshOnboarding();
+  }
+
+  Future<String?> attemptEntry(
+    DevelopmentIdentity identity, {
+    required bool registerMode,
+  }) async {
+    try {
+      final onboardingState = await _apiClient.getOnboardingState(
+        identity: identity,
+      );
+      final validationMessage = registerMode
+          ? _registrationMessageFor(onboardingState)
+          : _signInMessageFor(onboardingState);
+      if (validationMessage != null) {
+        return validationMessage;
+      }
+      await saveIdentity(identity);
+      return null;
+    } on BahaApiException catch (error) {
+      return error.message;
+    } catch (error) {
+      return 'Unexpected authentication error: $error';
+    }
   }
 
   Future<void> clearIdentity() async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_externalAuthIdKey);
     await preferences.remove(_authEmailKey);
+    await preferences.remove(_requestedRoleKey);
     _identity = null;
     _onboardingState = null;
     _actor = null;
@@ -81,7 +112,9 @@ class AppSessionController extends ChangeNotifier {
     }
     try {
       _errorMessage = null;
-      _onboardingState = await _apiClient.getOnboardingState(identity: identity);
+      _onboardingState = await _apiClient.getOnboardingState(
+        identity: identity,
+      );
       if (_onboardingState!.isReady) {
         _actor = await _apiClient.getMobileMe(identity: identity);
         _setStage(SessionStage.ready);
@@ -104,7 +137,7 @@ class AppSessionController extends ChangeNotifier {
     }
   }
 
-  Future<void> bootstrapStudent(StudentBootstrapRequest request) async {
+  Future<void> bootstrap(AppBootstrapRequest request) async {
     final identity = _identity;
     if (identity == null) {
       _setStage(SessionStage.requiresIdentity);
@@ -112,7 +145,7 @@ class AppSessionController extends ChangeNotifier {
     }
     try {
       _errorMessage = null;
-      _onboardingState = await _apiClient.bootstrapStudent(
+      _onboardingState = await _apiClient.bootstrapIdentity(
         identity: identity,
         request: request,
       );
@@ -128,15 +161,47 @@ class AppSessionController extends ChangeNotifier {
       );
     } on BahaApiException catch (error) {
       _errorMessage = error.message;
-      _setStage(SessionStage.failure);
+      _setStage(SessionStage.requiresBootstrap);
     } catch (error) {
       _errorMessage = 'Unexpected bootstrap error: $error';
       _setStage(SessionStage.failure);
     }
   }
 
+  Future<void> bootstrapStudent(StudentBootstrapRequest request) {
+    return bootstrap(request);
+  }
+
   void _setStage(SessionStage stage) {
     _stage = stage;
     notifyListeners();
+  }
+
+  String? _signInMessageFor(AuthOnboardingState state) {
+    switch (state.identityMatchMode) {
+      case 'external_auth_id':
+        return null;
+      case 'email':
+        return 'This email already belongs to a BAHA account, but this sign-in ID does not match it. Use the original sign-in ID or register with a different email.';
+      case 'duplicate_email':
+        return 'Multiple BAHA accounts are using this email. Sign in with the original sign-in ID instead.';
+      default:
+        return 'We could not find an account for this sign-in ID. Check the details or create a new account.';
+    }
+  }
+
+  String? _registrationMessageFor(AuthOnboardingState state) {
+    switch (state.identityMatchMode) {
+      case 'external_auth_id':
+        if (state.requiresBootstrap) {
+          return 'This sign-in ID is already tied to an unfinished BAHA account. Continue with that account or use a different sign-in ID.';
+        }
+        return 'This sign-in ID is already in use. Sign in instead or choose a different sign-in ID.';
+      case 'email':
+      case 'duplicate_email':
+        return 'This email is already linked to an existing BAHA account. Sign in instead or use a different email.';
+      default:
+        return null;
+    }
   }
 }

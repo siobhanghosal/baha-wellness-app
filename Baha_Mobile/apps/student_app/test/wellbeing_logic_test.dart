@@ -25,19 +25,17 @@ void main() {
 
     expect(
       profile.profileTags,
-      containsAll(
-        const [
-          'sleep_vulnerable',
-          'stress_vulnerable',
-          'school_pressure_driven',
-          'somatic_signal_prone',
-          'period_linked_physical_impact',
-          'low_help_seeking',
-          'social_isolation_risk',
-          'engagement_prefers_activity',
-          'focus_sleep',
-        ],
-      ),
+      containsAll(const [
+        'sleep_vulnerable',
+        'stress_vulnerable',
+        'school_pressure_driven',
+        'somatic_signal_prone',
+        'period_linked_physical_impact',
+        'low_help_seeking',
+        'social_isolation_risk',
+        'engagement_prefers_activity',
+        'focus_sleep',
+      ]),
     );
   });
 
@@ -159,5 +157,16 @@ void main() {
     expect(points.single.factorScores['sleep'], 3);
     expect(points.single.factorScores['mood'], 1);
     expect(points.single.overallScore, 2);
+  });
+
+  test('trend points stay empty when no submitted check-ins exist yet', () {
+    final points = buildTrendPointsFromDetails(const []);
+
+    expect(points, isEmpty);
+    expect(buildFactorMetrics(points: points, profile: null), isEmpty);
+    expect(chartLabels(points), isEmpty);
+    expect(overallChartValues(points), isEmpty);
+    expect(riskFlags(points: points, profile: null), isEmpty);
+    expect(dailyStateHeadline(points), 'No check-in entries yet.');
   });
 }

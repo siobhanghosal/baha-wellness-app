@@ -53,6 +53,11 @@ Returns the authenticated BAHA account state for an already-linked active user.
 `POST /auth/guardian/link-student`
 
 Creates or updates a guardian-to-student relationship using `student_profile_id` or `student_code`.
+For the live under-18 flow, the guardian must also provide the six-digit verification code shown in the student waiting screen.
+
+`GET /auth/guardian/consent/platform-participation/{student_profile_id}`
+
+Returns the current guardian-managed platform participation consent state for a linked student, or `pending` when no consent has been recorded yet.
 
 `POST /auth/guardian/consent/platform-participation`
 
@@ -87,6 +92,14 @@ Returns:
 - primary role
 - mapped app audience
 - active student profile ID if present
+- `school_id` and `school_name` when scoped
+- `user_metadata`
+- `student_metadata`
+
+Current frontend use:
+
+- the unified app uses this response to decide which role experience to open after shared login
+- the student flow reads `student_metadata.wellbeing_profile` so daily check-in gating and personalization do not rely on device-only storage
 
 ### Shared app content and support
 
@@ -188,6 +201,8 @@ Returns the latest parent-safe weekly summary if:
 - consent exists
 - privacy tiers allow it
 - or a safeguarding override is active
+
+If a dedicated `parent_weekly_summaries` row does not exist yet, the backend derives a parent-safe summary from the latest student weekly summary instead of returning raw entries.
 
 ### Teacher app
 

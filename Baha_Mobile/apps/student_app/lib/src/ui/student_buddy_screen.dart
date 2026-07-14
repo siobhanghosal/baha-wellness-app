@@ -5,7 +5,6 @@ import 'package:baha_shared_models/baha_shared_models.dart';
 import 'package:flutter/material.dart';
 
 import '../prototype/app_theme.dart';
-import '../prototype/prototype_models.dart';
 import '../prototype/prototype_widgets.dart';
 import '../prototype/theme_manager.dart';
 
@@ -80,9 +79,7 @@ class _StudentBuddyScreenState extends State<StudentBuddyScreen> {
     await _refresh();
   }
 
-  Future<void> _pushThemedRoute({
-    required WidgetBuilder builder,
-  }) async {
+  Future<void> _pushThemedRoute({required WidgetBuilder builder}) async {
     final controller = ThemeScope.of(context);
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -99,9 +96,8 @@ class _StudentBuddyScreenState extends State<StudentBuddyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final palette = studentPalette(
-      StudentAgeGroup.teen,
-      StudentGender.female,
+    final palette = appPaletteForTheme(
+      ThemeScope.of(context).colorTheme,
       isDark: ThemeScope.of(context).isDark,
     );
     return Theme(
@@ -391,9 +387,8 @@ class _StudentBuddyChatScreenState extends State<StudentBuddyChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final palette = studentPalette(
-      StudentAgeGroup.teen,
-      StudentGender.female,
+    final palette = appPaletteForTheme(
+      ThemeScope.of(context).colorTheme,
       isDark: ThemeScope.of(context).isDark,
     );
     return Theme(

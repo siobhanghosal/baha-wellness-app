@@ -2,14 +2,12 @@
 
 ## 1. Purpose
 
-This document defines the end-to-end application flow architecture for the BAHA mobile suite.
+This document defines the end-to-end application flow architecture for the BAHA mobile product.
 
 It is the development blueprint for:
 
-- Student App
-- Parent App
-- Teacher App
-- BAHA/Counselor App
+- one unified BAHA mobile app
+- role-based student, parent/guardian, teacher, and counselor experiences inside that app
 
 It should be read together with:
 
@@ -25,23 +23,26 @@ The goal is to lock the app flow before building screens so implementation does 
 
 These rules are architectural, not optional:
 
-- the product is four separate apps, not one role-switched app
+- the product now ships as one role-switched app, not four separately installed apps
+- the first screen asks who the app is for before sign-in or registration
 - student presentation cohort and legal consent band are separate
 - users aged 9-17 follow the minor flow
 - users aged 18-19 follow the self-consent flow
 - privacy and safeguarding logic is enforced server-side
+- student onboarding baseline questions are captured during account creation, not when opening the daily check-in
 - parent and teacher apps consume summaries and workflow data, not raw student data
 - the counselor app is an operational workflow app, not a student-facing extension
 
 ## 3. Shared Runtime State Model
 
-Every app should use the same high-level startup state machine:
+The unified app should use this high-level startup state machine:
 
 1. splash
 2. session restore
-3. auth identity check
-4. onboarding-state fetch
-5. route to blocked, onboarding, approval-pending, or active-app flow
+3. role selection if no session exists
+4. auth identity check
+5. onboarding-state fetch
+6. route to blocked, onboarding, approval-pending, or active-app flow
 
 Shared state buckets:
 
@@ -64,16 +65,17 @@ Shared blocked states:
 - account inactive
 - offline unsupported for requested action
 
-## 4. Student App Flow
+## 4. Student Experience Flow
 
 ### 4.1 Entry Flow
 
-The Student App starts with:
+The student experience starts with:
 
 1. splash
-2. restore session if available
-3. call `GET /auth/onboarding-state`
-4. branch by returned `next_step`
+2. ask who the app is for if there is no session
+3. restore session if available
+4. call `GET /auth/onboarding-state`
+5. branch by returned `next_step`
 
 Expected routing branches:
 
@@ -89,18 +91,19 @@ Expected routing branches:
 
 The student onboarding sequence should be:
 
-1. welcome and trust framing
-2. age cohort selection
-3. legal consent routing
-4. gender input or skip
-5. privacy explanation
-6. acknowledgment of privacy and override rules
-7. consent branch
-8. dashboard unlock
+1. role selection
+2. sign-in or registration choice
+3. account basics
+4. one-time wellbeing baseline during registration
+5. age cohort and consent routing
+6. privacy explanation
+7. acknowledgment of privacy and override rules
+8. consent branch
+9. dashboard unlock
 
 Minor branch:
 
-1. student submits profile
+1. student submits account + onboarding baseline
 2. backend marks account pending if guardian consent is required
 3. guardian consent route is initiated
 4. student sees waiting state
@@ -108,7 +111,7 @@ Minor branch:
 
 Adult branch:
 
-1. student submits profile
+1. student submits account + onboarding baseline
 2. self-consent acknowledgment is captured
 3. account becomes active
 4. dashboard unlocks immediately
@@ -153,19 +156,19 @@ Flow:
 
 Flow:
 
-1. ensure the one-time local wellbeing profile exists
+1. ensure the student onboarding baseline already exists
 2. fetch `GET /mobile/student/checkin-templates`
 3. open selected template detail
 4. fetch `GET /mobile/student/checkin-templates/{template_id}`
 5. render the universal six-factor daily pulse
-6. reveal only the follow-up questions whose `show_when` conditions are met
+6. adapt wording by age band and reveal only the follow-up questions whose `show_when` conditions are met
 7. submit using `POST /mobile/student/checkins`
 8. return to updated summary or confirmation screen
 
 Required states:
 
 - first-time check-in
-- one-time wellbeing profile setup before adaptive daily use
+- onboarding-baseline-missing gate only for legacy student accounts
 - adaptive daily check-in
 - partial progress local state
 - submission success
@@ -289,7 +292,7 @@ The Parent App follows the same shared startup sequence:
 Flow:
 
 1. parent identity bootstrap
-2. linked student discovery or student code linking
+2. linked student discovery or student code + verification-code linking
 3. relationship confirmation
 4. consent authority state
 5. privacy and summary-sharing setup
@@ -309,9 +312,9 @@ Release-1 primary areas:
 Flow:
 
 1. fetch `GET /mobile/parent/students`
-2. choose active student context if multiple exist later
+2. render link / approval / summary status for each linked student
 3. fetch `GET /mobile/parent/students/{student_profile_id}/weekly-summary/latest`
-4. render consent-gated summary
+4. render consent-gated summary with weekly trends, watch areas, and alerts only
 
 ### 5.5 Parent Consent Flow
 
@@ -319,7 +322,7 @@ Consent work should be reachable both during onboarding and later in settings.
 
 Flow:
 
-1. read current summary-sharing state
+1. read current platform-participation and summary-sharing states
 2. update summary-sharing consent if required
 3. update platform participation consent if minor onboarding is blocked
 4. reflect outcome in parent summary visibility

@@ -32,7 +32,9 @@ class StudentWeeklySummary {
       privacyTierApplied: json['privacy_tier_applied'] as String? ?? '',
       summaryStatus: json['summary_status'] as String? ?? '',
       summary: Map<String, dynamic>.from(json['summary'] as Map? ?? const {}),
-      sourceWindow: Map<String, dynamic>.from(json['source_window'] as Map? ?? const {}),
+      sourceWindow: Map<String, dynamic>.from(
+        json['source_window'] as Map? ?? const {},
+      ),
       generationVersion: json['generation_version'] as String? ?? '',
       generatedAt: DateTime.parse(json['generated_at'] as String),
     );

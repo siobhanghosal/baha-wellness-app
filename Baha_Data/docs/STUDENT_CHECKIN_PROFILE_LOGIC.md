@@ -1,91 +1,107 @@
 # Student Check-In And Profile Logic
 
-This document describes the current student wellbeing logic implemented in the mobile app and supported by the backend seed data.
+This document describes the current student onboarding baseline and adaptive daily check-in logic now implemented in the BAHA mobile app.
 
-## 1. Purpose
+## 1. Product Position
 
-The student flow now uses:
+The student wellbeing flow is designed to be:
 
-- a `one-time wellbeing profile`
-- a `short daily wellbeing pulse`
-- `adaptive follow-up questions`
-- `factor-specific trend views`
+- short enough to use daily
+- personalized without feeling invasive
+- support-oriented, not diagnostic
+- comparable over time across repeated check-ins
 
-The design goal is:
+The core rule is:
 
-- keep the daily check-in low-friction
-- avoid a clinical-feeling questionnaire every day
-- personalize follow-up questions only where that improves relevance
-- infer trends from repeated patterns, not from one bad day
+- long-form context belongs in onboarding
+- short-form state belongs in the daily check-in
 
-This is a product support layer, not a diagnostic tool.
+## 2. Brutally Honest Critique Of The Older Logic
 
-## 2. Core Principle
+The previous version had three real problems:
 
-The logic is intentionally split into two layers:
+1. It asked too many low-value onboarding questions.
+2. It mixed meaningful assessment context with preference-style questions that did not strongly improve interpretation.
+3. It collected the baseline profile too close to the daily check-in flow, which made the product feel heavier than it should.
 
-1. `Universal daily core`
-2. `Personalized interpretation layer`
+The revised version fixes that by:
 
-The daily core stays mostly the same for everyone so trend data remains comparable.
+- moving the baseline into account creation
+- trimming the question set down to what actually changes interpretation
+- deriving lower-value app preferences instead of explicitly asking all of them
 
-Personalization changes:
+## 3. Current Implementation State
 
-- which follow-up questions appear
-- which answer choices are visible
-- how trend text is described
-- which risk flags matter more for a given student
-- which support or learning paths should be suggested first
+The current app now does this:
 
-## 3. One-Time Wellbeing Profile
+1. student chooses the app role before login
+2. if registering, the student completes account basics plus one-time onboarding baseline
+3. the onboarding baseline is attached to `POST /auth/bootstrap` as student metadata
+4. `GET /mobile/me` returns that metadata back to the app
+5. daily check-in is treated as a separate shorter flow
 
-The app now asks a one-time student profile questionnaire before the adaptive daily check-in flow is used.
+Important practical note:
 
-Current implementation state:
+- the app still keeps a local copy of the profile for resilience
+- student baseline edits from settings also attempt to refresh backend metadata through `POST /auth/bootstrap`
 
-- stored locally on-device with `SharedPreferences`
-- keyed by student development identity
-- editable later from settings
-- not yet written back into a dedicated backend profile-edit API
-- can still be attached to bootstrap metadata later without changing the mobile logic
+## 4. One-Time Student Onboarding Baseline
 
-### 3.1 Profile questions
+All onboarding questions are multiple choice.
 
-All profile questions are multiple choice.
+The current baseline intentionally asks only for factors that affect wording, interpretation, or follow-up relevance.
+
+### 4.1 Questions Asked Directly
 
 Identity and support:
 
 - age band
 - gender identity
-- who the student usually talks to when something feels wrong
+- who the student usually goes to first when something feels off
 
 Baseline wellbeing:
 
-- usual school-day sleep quality
-- usual energy
-- stress frequency in a normal week
-- main pressure source
+- normal school-week sleep quality
+- normal day-to-day energy
+- usual stress frequency
+- main pressure source lately
+
+Social and help context:
+
+- usual connectedness to friends or classmates
+- ease of asking for help
 
 Physical context:
 
-- main recurring physical issue
 - whether the student experiences periods
 - if yes, how much periods affect energy, pain, or mood
 
-Social and coping style:
+### 4.2 Things Now Derived Instead Of Asked Explicitly
 
-- what the student does first when feeling low
-- how easy it is to ask for help
-- how connected the student usually feels
+The app now derives these fields instead of directly asking them:
 
-Support preferences:
+- `main_physical_issue`
+- `coping_style`
+- `support_preference`
+- `checkin_focus`
 
-- preferred support style
-- preferred check-in focus area
+That keeps onboarding shorter while still preserving the downstream personalization hooks the app already uses.
 
-### 3.2 Profile tags
+### 4.3 Why Sex/Gender Is Not Used As A Crude Scoring Switch
 
-The app derives internal profile tags from the onboarding answers.
+Gender identity is not used to change severity scoring.
+
+It is used only where it improves:
+
+- tone and phrasing
+- optional physical-context follow-up relevance
+- respectful personalization
+
+This is deliberate. The model should adapt to actual context, not stereotype.
+
+## 5. Derived Internal Tags
+
+The app converts onboarding answers into non-clinical internal tags.
 
 Current tags include:
 
@@ -99,21 +115,13 @@ Current tags include:
 - `period_linked_physical_impact`
 - `low_help_seeking`
 - `social_isolation_risk`
-- `engagement_prefers_activity`
 - `focus_<factor>`
 
-These tags do not label the student clinically. They only steer interpretation and follow-up behavior.
+These do not label the child. They only steer interpretation and follow-up relevance.
 
-## 4. Daily Wellbeing Pulse
+## 6. Daily Check-In Structure
 
-The backend now seeds an adaptive template:
-
-- template key: `daily_student_pulse_v2_13_14`
-- cadence: `daily`
-
-### 4.1 Core daily questions
-
-The current daily core tracks six factors:
+The current daily pulse is built around six stable factors:
 
 1. sleep
 2. energy
@@ -122,73 +130,97 @@ The current daily core tracks six factors:
 5. physical wellbeing
 6. connectedness
 
-Every core question is multiple choice with a 5-level answer set.
+This is the part that should remain broadly comparable over time.
 
-The stored score direction is consistent:
+### 6.1 Core Daily Questions
 
-- `0` means low burden / healthy signal
-- `4` means high burden / strain signal
+The current daily core asks one question for each factor:
 
-### 4.2 Follow-up questions
+- `sleep_last_night`
+- `energy_today`
+- `mood_today`
+- `stress_today`
+- `body_today`
+- `connected_today`
 
-Follow-ups only appear when triggered by earlier answers.
+Each answer maps to a burden score from `0` to `4`:
 
-Current follow-ups:
+- `0` = low burden / healthy signal
+- `4` = high burden / strain signal
 
-- sleep reason
-- hardest part of the day
-- low-energy reason
-- physical discomfort reason
-- support preference for today
+### 6.2 Follow-Up Questions
 
-The app evaluates template metadata such as:
+Follow-ups are shown only when triggered.
 
-- `show_when`
-- `show_when_any`
-- option-level `profile_requirements`
+Current follow-up set:
 
-Example:
+- `sleep_reason`
+- `hardest_today`
+- `energy_reason`
+- `body_reason`
+- `support_today`
 
-- the `period-related` physical option only appears if the profile says the student experiences periods
-- the sleep reason question appears only after poor sleep answers
+Trigger logic is based on:
 
-## 5. Scoring Model
+- earlier selected answers
+- question metadata such as `show_when` and `show_when_any`
+- onboarding context such as periods-related relevance
 
-### 5.1 Raw storage
+## 7. Age-Appropriate Personalization
 
-For each answer the app submits:
+The app now personalizes question wording by age band.
 
-- `selected_options`
-- `numeric_value`
-- `normalized_value`
+Examples:
 
-`normalized_value` currently includes:
+- older adolescents see wording like "How much stress or worry are you carrying today?"
+- younger users keep slightly simpler phrasing like "How stressed or worried do you feel today?"
 
-- `question_key`
-- `dimension`
-- `choice_key`
-- `label`
-- `score`
-- `is_core`
+The important constraint is:
 
-### 5.2 Burden interpretation
+- wording can adapt
+- factor definitions stay stable
 
-The app treats the six core factors as burden scores from `0` to `4`.
+That preserves both usability and comparability.
 
-Interpretation:
+## 8. Inference Model
 
-- `0.0 - 0.9`: very steady
-- `1.0 - 1.9`: mild strain
-- `2.0 - 2.9`: moderate strain
-- `3.0 - 4.0`: high strain
+The app derives trend points from real submitted check-in detail records by reading:
 
-This is not shown as a diagnostic score to the user.
+- `normalized_value.score`
+- `normalized_value.dimension`
+- `normalized_value.is_core`
 
-## 6. Trend Logic
+### 8.1 What The App Infers
 
-Trend charts now use the actual tracked factors instead of placeholder mood/sleep-only visuals.
+From repeated check-ins, the app can infer:
 
-Current chart factors:
+- sleep strain patterns
+- stress persistence
+- mood dips over multiple days
+- low connectedness trends
+- physical discomfort patterns when the onboarding context suggests they matter more
+
+### 8.2 Example Product Flags
+
+Current demo-facing flags include:
+
+- `Sleep strain repeating`
+- `Stress elevated across days`
+- `Mood dip needs attention`
+- `Connection feels low`
+- `Physical discomfort pattern visible`
+
+These are support signals only.
+
+They are not:
+
+- diagnoses
+- risk scores shown to students
+- standalone intervention decisions
+
+## 9. What The Graphs Should Mean
+
+The student graphs should reflect the actual six tracked factors:
 
 - sleep
 - energy
@@ -197,53 +229,21 @@ Current chart factors:
 - physical wellbeing
 - connectedness
 
-The app derives trend points from submitted check-in detail records by reading:
+The graphs should not show placeholder categories that are not actually being collected.
 
-- `normalized_value.score`
-- `normalized_value.dimension`
-- `normalized_value.is_core`
+Current UI behavior:
 
-If no real history exists yet, the app uses a small deterministic demo fallback so the UI remains presentable.
+- if no real check-ins have been submitted yet, the student dashboard should stay in an explicit empty state
+- trend cards and graphs should only appear once actual entries exist
+- first-use weekly summary placeholders are acceptable, but fake chart lines are not
 
-## 7. Risk Flags
+## 10. Backend Contract Used By This Logic
 
-Current demo-ready flag rules:
+The current implementation relies on:
 
-- repeated sleep strain
-- repeated elevated stress
-- repeated mood dip
-- repeated low connectedness
-- recurring physical discomfort when the profile already suggests somatic vulnerability
-
-These are surfaced as lightweight product flags such as:
-
-- `Sleep strain repeating`
-- `Stress elevated across days`
-- `Mood dip needs attention`
-
-They are support signals, not crisis labels.
-
-## 8. Why This Design Was Chosen
-
-This implementation intentionally avoids:
-
-- making the whole questionnaire clinically heavy every day
-- changing severity scoring just because the student is male or female
-- assuming all female students need the same physical follow-ups
-- using sex or gender as a crude substitute for actual context
-
-Instead it personalizes only where useful:
-
-- periods-related physical interpretation
-- support style preference
-- help-seeking difficulty
-- school-pressure vs friendship-pressure emphasis
-- baseline sleep/stress vulnerability
-
-## 9. Current Backend Support
-
-The backend currently supports this through existing mobile contracts:
-
+- `POST /auth/bootstrap`
+- `GET /auth/onboarding-state`
+- `GET /mobile/me`
 - `GET /mobile/student/checkin-templates`
 - `GET /mobile/student/checkin-templates/{template_id}`
 - `POST /mobile/student/checkins`
@@ -251,26 +251,14 @@ The backend currently supports this through existing mobile contracts:
 - `GET /mobile/student/checkins/{response_set_id}`
 - `GET /mobile/student/weekly-summary/latest`
 
-No new mobile API endpoint was required for this slice.
+## 11. Practical Product Recommendation
 
-The adaptive behavior is driven by:
+For this product, this is the right balance:
 
-- richer seeded check-in template metadata
-- normalized answer payloads
-- locally stored wellbeing profile state in the app
+- keep onboarding concise but meaningful
+- keep the daily pulse to six stable factors
+- allow only a few targeted follow-ups
+- keep all interpretation non-clinical
+- intervene based on repeated patterns, not one isolated bad day
 
-## 10. Current Limitations
-
-- the one-time wellbeing profile is currently local-only
-- weekly deeper assessment logic is not yet upgraded to match the daily pulse quality
-- trend summaries are still partially app-derived rather than fully generated server-side
-- counselor escalation logic is still driven by product rules, not a dedicated safeguarding engine
-
-## 11. Recommended Next Step
-
-The next strong backend step for this area would be:
-
-1. add a server-side student profile read/write model
-2. persist profile tags centrally
-3. generate trend snapshots and flag summaries on the backend
-4. add a deeper weekly reflection/check-in aligned to the same factor model
+That is strong enough for a demo and disciplined enough not to drift into pseudo-diagnosis.

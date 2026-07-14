@@ -157,6 +157,75 @@ class ParentSummaryConsentRequest {
   }
 }
 
+class GuardianLinkStudentRequest {
+  const GuardianLinkStudentRequest({
+    required this.studentCode,
+    required this.verificationCode,
+    required this.relationshipToStudent,
+    this.isPrimary = true,
+    this.consentAuthority = true,
+  });
+
+  final String studentCode;
+  final String verificationCode;
+  final String relationshipToStudent;
+  final bool isPrimary;
+  final bool consentAuthority;
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'student_code': studentCode,
+      'verification_code': verificationCode,
+      'relationship_to_student': relationshipToStudent,
+      'is_primary': isPrimary,
+      'consent_authority': consentAuthority,
+    };
+  }
+}
+
+class PlatformParticipationConsentStatus {
+  const PlatformParticipationConsentStatus({
+    required this.consentType,
+    required this.studentProfileId,
+    required this.guardianId,
+    required this.status,
+    required this.scope,
+    this.consentVersionId,
+    this.actorRelationship,
+    this.grantedAt,
+    this.withdrawnAt,
+    this.createdAt,
+  });
+
+  final String consentType;
+  final String? consentVersionId;
+  final String studentProfileId;
+  final String guardianId;
+  final String status;
+  final String scope;
+  final String? actorRelationship;
+  final DateTime? grantedAt;
+  final DateTime? withdrawnAt;
+  final DateTime? createdAt;
+
+  factory PlatformParticipationConsentStatus.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    return PlatformParticipationConsentStatus(
+      consentType: json['consent_type'] as String? ?? '',
+      consentVersionId: json['consent_version_id'] as String?,
+      studentProfileId: json['student_profile_id'] as String? ?? '',
+      guardianId: json['guardian_id'] as String? ?? '',
+      status: json['status'] as String? ?? 'pending',
+      scope: json['scope'] as String? ?? '',
+      actorRelationship: json['actor_relationship'] as String?,
+      grantedAt: _parseDateTime(json['granted_at']),
+      withdrawnAt: _parseDateTime(json['withdrawn_at']),
+      createdAt: _parseDateTime(json['created_at']),
+    );
+  }
+}
+
 class PlatformParticipationConsentRequest {
   const PlatformParticipationConsentRequest({
     required this.studentProfileId,

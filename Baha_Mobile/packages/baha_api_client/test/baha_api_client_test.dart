@@ -393,4 +393,102 @@ void main() {
     expect(state.nextStep, 'ready');
     expect(state.consentStatus, 'granted');
   });
+
+  test('links guardian to student with verification code', () async {
+    final client = BahaApiClient(
+      baseUrl: 'http://localhost:8000',
+      httpClient: MockClient((request) async {
+        expect(request.url.path, '/auth/guardian/link-student');
+        expect(request.method, 'POST');
+        expect(request.body, contains('"student_code":"STU-ABC1234567"'));
+        expect(request.body, contains('"verification_code":"482931"'));
+        return http.Response(
+          '{"has_baha_user":true,"identity_match_mode":"external_auth_id","external_auth_id":"guardian-ext-id","roles":["guardian"],"guardian_link_status":"linked","approval_status":"not_required","consent_status":"not_required","linked_student_count":1,"linked_guardian_count":0,"next_step":"ready"}',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+
+    final state = await client.linkGuardianStudent(
+      identity: const DevelopmentIdentity(
+        externalAuthId: 'guardian-ext-id',
+        requestedRole: AppRequestedRole.guardian,
+      ),
+      request: const GuardianLinkStudentRequest(
+        studentCode: 'STU-ABC1234567',
+        verificationCode: '482931',
+        relationshipToStudent: 'parent',
+      ),
+    );
+
+    expect(state.guardianLinkStatus, 'linked');
+    expect(state.linkedStudentCount, 1);
+  });
+
+  test('loads platform participation consent status for guardian', () async {
+    final client = BahaApiClient(
+      baseUrl: 'http://localhost:8000',
+      httpClient: MockClient((request) async {
+        expect(
+          request.url.path,
+          '/auth/guardian/consent/platform-participation/student-1',
+        );
+        return http.Response(
+          '{"consent_type":"platform_participation","student_profile_id":"student-1","guardian_id":"guardian-1","status":"granted","scope":"platform_access","actor_relationship":"parent","granted_at":"2026-07-14T10:00:00Z"}',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+
+    final status = await client.getPlatformParticipationConsentStatus(
+      identity: const DevelopmentIdentity(
+        externalAuthId: 'guardian-ext-id',
+        requestedRole: AppRequestedRole.guardian,
+      ),
+      studentProfileId: 'student-1',
+    );
+
+    expect(status.status, 'granted');
+    expect(status.scope, 'platform_access');
+  });
+
+  test(
+    'surfaces plain-text bootstrap failures as readable API errors',
+    () async {
+      final client = BahaApiClient(
+        baseUrl: 'http://localhost:8000',
+        httpClient: MockClient((request) async {
+          expect(request.url.path, '/auth/bootstrap');
+          return http.Response(
+            'Internal Server Error',
+            500,
+            headers: {'content-type': 'text/plain'},
+          );
+        }),
+      );
+
+      expect(
+        () => client.bootstrapIdentity(
+          identity: const DevelopmentIdentity(externalAuthId: 'student-ext-id'),
+          request: const AppBootstrapRequest(
+            role: AppRequestedRole.student,
+            displayName: 'Student Demo',
+            schoolName: 'BAHA Pilot School',
+            ageCohort: '15_18',
+            legalConsentBand: 'minor',
+            gender: 'male',
+          ),
+        ),
+        throwsA(
+          isA<BahaApiException>().having(
+            (error) => error.message,
+            'message',
+            'Internal Server Error',
+          ),
+        ),
+      );
+    },
+  );
 }

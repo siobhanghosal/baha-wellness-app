@@ -20,6 +20,7 @@ class AuthOnboardingState {
     this.guardianId,
     this.teacherProfileId,
     this.studentCode,
+    this.guardianLinkVerificationCode,
     this.ageCohort,
     this.legalConsentBand,
     this.detail,
@@ -39,6 +40,7 @@ class AuthOnboardingState {
   final String? guardianId;
   final String? teacherProfileId;
   final String? studentCode;
+  final String? guardianLinkVerificationCode;
   final String? ageCohort;
   final String? legalConsentBand;
   final String approvalStatus;
@@ -51,7 +53,8 @@ class AuthOnboardingState {
 
   bool get isReady => nextStep == 'ready';
 
-  bool get requiresBootstrap => nextStep == 'bootstrap' || nextStep == 'complete_profile';
+  bool get requiresBootstrap =>
+      nextStep == 'bootstrap' || nextStep == 'complete_profile';
 
   bool get requiresAttention => !isReady && !requiresBootstrap;
 
@@ -64,20 +67,26 @@ class AuthOnboardingState {
       email: json['email'] as String?,
       displayName: json['display_name'] as String?,
       accountStatus: json['account_status'] as String?,
-      roles: (json['roles'] as List<dynamic>? ?? const []).map((value) => value.toString()).toList(),
+      roles: (json['roles'] as List<dynamic>? ?? const [])
+          .map((value) => value.toString())
+          .toList(),
       primaryRole: json['primary_role'] as String?,
       schoolId: json['school_id'] as String?,
       studentProfileId: json['student_profile_id'] as String?,
       guardianId: json['guardian_id'] as String?,
       teacherProfileId: json['teacher_profile_id'] as String?,
       studentCode: json['student_code'] as String?,
+      guardianLinkVerificationCode:
+          json['guardian_link_verification_code'] as String?,
       ageCohort: json['age_cohort'] as String?,
       legalConsentBand: json['legal_consent_band'] as String?,
       approvalStatus: json['approval_status'] as String? ?? 'not_required',
       consentStatus: json['consent_status'] as String? ?? 'not_required',
-      guardianLinkStatus: json['guardian_link_status'] as String? ?? 'not_required',
+      guardianLinkStatus:
+          json['guardian_link_status'] as String? ?? 'not_required',
       linkedStudentCount: (json['linked_student_count'] as num?)?.toInt() ?? 0,
-      linkedGuardianCount: (json['linked_guardian_count'] as num?)?.toInt() ?? 0,
+      linkedGuardianCount:
+          (json['linked_guardian_count'] as num?)?.toInt() ?? 0,
       nextStep: json['next_step'] as String? ?? 'bootstrap',
       detail: json['detail'] as String?,
     );

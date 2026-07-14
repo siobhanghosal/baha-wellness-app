@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../prototype/app_theme.dart';
-import '../prototype/prototype_models.dart';
 import '../prototype/prototype_widgets.dart';
 
 class StudentErrorScreen extends StatelessWidget {
@@ -18,7 +17,7 @@ class StudentErrorScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = studentPalette(StudentAgeGroup.teen, StudentGender.female);
+    final palette = appPaletteForTheme(AppColorTheme.growth);
     return Theme(
       data: buildTheme(palette),
       child: AnimatedGradientScaffold(

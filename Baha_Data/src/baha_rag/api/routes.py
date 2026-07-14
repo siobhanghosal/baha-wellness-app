@@ -39,6 +39,7 @@ from baha_rag.schemas import (
     AuthParentSummaryConsentRequest,
     AuthParentSummaryConsentResponse,
     AuthPlatformParticipationConsentRequest,
+    AuthPlatformParticipationConsentResponse,
     ChatRequest,
     ChatResponse,
     ChatSessionCreateRequest,
@@ -252,6 +253,7 @@ async def _build_onboarding_state(
     account_status = account["account_status"]
     linked_student_count = 0
     linked_guardian_count = 0
+    guardian_link_verification_code = None
     approval_status = "not_required"
     consent_status = "not_required"
     guardian_link_status = "not_required"
@@ -261,6 +263,9 @@ async def _build_onboarding_state(
         linked_student_count = await repository.count_active_linked_students_for_guardian(guardian_id=account["guardian_id"])
     if primary_role == "student" and account["student_profile_id"] is not None:
         linked_guardian_count = await repository.count_active_guardian_links_for_student(student_profile_id=account["student_profile_id"])
+        guardian_link_verification_code = await repository.ensure_student_guardian_link_code(
+            student_profile_id=account["student_profile_id"]
+        )
 
     if primary_role in {"teacher", "counselor", "administrator"}:
         approval_row = await repository.get_latest_approval_request(
@@ -319,6 +324,7 @@ async def _build_onboarding_state(
         guardian_id=account["guardian_id"],
         teacher_profile_id=account["teacher_profile_id"],
         student_code=account["student_code"],
+        guardian_link_verification_code=guardian_link_verification_code,
         age_cohort=account["presentation_age_cohort"],
         legal_consent_band=account["legal_consent_band"],
         approval_status=approval_status,
@@ -337,6 +343,45 @@ def _reviewer_scope(actor: ActorContext) -> tuple[str, UUID | None]:
     if "administrator" in actor.roles:
         return ("administrator", actor.school_id)
     raise HTTPException(status_code=403, detail="Approval review requires administrator or BAHA admin access")
+
+
+def _normalize_verification_code(value: str | None) -> str:
+    return (value or "").strip().replace(" ", "")
+
+
+def _build_parent_safe_summary(
+    student_summary: dict[str, object],
+    *,
+    visible_tiers: list[str],
+) -> dict[str, object]:
+    risk_flags = student_summary.get("risk_flags")
+    if not isinstance(risk_flags, list):
+        risk_flags = []
+    trend_labels = student_summary.get("trend_labels")
+    if not isinstance(trend_labels, list):
+        trend_labels = []
+    focus_dimensions = student_summary.get("focus_dimensions")
+    if not isinstance(focus_dimensions, list):
+        focus_dimensions = []
+
+    return {
+        "headline": student_summary.get("headline") or "No summary has been generated yet.",
+        "week_story": student_summary.get("week_story")
+        or "BAHA is still building a weekly pattern summary for this student.",
+        "best_progress": student_summary.get("best_progress") or "No clear improvement trend detected yet.",
+        "watch_area": student_summary.get("watch_area") or "No watch area has been flagged yet.",
+        "support_nudge": student_summary.get("support_nudge")
+        or "Use a calm check-in conversation and watch for repeated patterns over time.",
+        "risk_flags": risk_flags,
+        "trend_labels": trend_labels,
+        "focus_dimensions": focus_dimensions,
+        "visible_tiers": visible_tiers,
+        "privacy_note": (
+            "This parent view intentionally hides individual student answers and only shows "
+            "high-level weekly trends and alert signals."
+        ),
+        "derived_from_student_summary": True,
+    }
 
 
 def _ensure_request_visible_to_reviewer(
@@ -530,7 +575,7 @@ async def auth_bootstrap(
     await repository.ensure_role_assignment(user_id=user_id, role_key=request.role)
 
     if request.role == "student":
-        await repository.upsert_student_profile(
+        student_profile_id = await repository.upsert_student_profile(
             user_id=user_id,
             school_id=school_id,
             age_cohort=_derive_student_age_cohort(request),
@@ -538,6 +583,9 @@ async def auth_bootstrap(
             date_of_birth=request.date_of_birth.isoformat() if request.date_of_birth else None,
             gender=request.gender,
             metadata_json=json.dumps(request.metadata),
+        )
+        await repository.ensure_student_guardian_link_code(
+            student_profile_id=student_profile_id
         )
     elif request.role == "guardian":
         await repository.upsert_guardian_profile(
@@ -639,6 +687,26 @@ async def auth_guardian_link_student(
     )
     if student is None:
         raise HTTPException(status_code=404, detail="Student not found")
+    if student["legal_consent_band"] != "minor":
+        raise HTTPException(
+            status_code=400,
+            detail="Only under-18 student accounts require parent linking in this flow",
+        )
+    expected_code = _normalize_verification_code(
+        (student.get("metadata") or {}).get("guardian_link_verification_code")
+        if isinstance(student.get("metadata"), dict)
+        else None
+    )
+    provided_code = _normalize_verification_code(request.verification_code)
+    if not expected_code:
+        expected_code = await repository.ensure_student_guardian_link_code(
+            student_profile_id=student["student_profile_id"]
+        )
+    if provided_code != expected_code:
+        raise HTTPException(
+            status_code=403,
+            detail="Verification code did not match this student account",
+        )
     await repository.upsert_guardian_link(
         student_profile_id=student["student_profile_id"],
         guardian_id=actor.guardian_id,
@@ -653,6 +721,58 @@ async def auth_guardian_link_student(
         identity_match_mode="external_auth_id",
         external_auth_id=actor.external_auth_id or "",
         account=account,
+    )
+
+
+@router.get(
+    "/auth/guardian/consent/platform-participation/{student_profile_id}",
+    response_model=AuthPlatformParticipationConsentResponse,
+)
+async def auth_guardian_platform_participation_consent_status(
+    student_profile_id: UUID,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> AuthPlatformParticipationConsentResponse:
+    _require_guardian(actor)
+    repository = AuthRepository(session)
+    student = await repository.get_student_for_link(
+        student_profile_id=student_profile_id,
+        student_code=None,
+    )
+    if student is None:
+        raise HTTPException(status_code=404, detail="Student not found")
+    link = await repository.get_active_guardian_link(
+        student_profile_id=student["student_profile_id"],
+        guardian_id=actor.guardian_id,
+    )
+    if link is None or not link["consent_authority"]:
+        raise HTTPException(status_code=403, detail="Guardian does not have active consent authority for this student")
+    consent_row = await repository.get_latest_platform_participation_consent(
+        student_user_id=student["student_user_id"]
+    )
+    if consent_row is not None:
+        return AuthPlatformParticipationConsentResponse(
+            consent_version_id=None,
+            student_profile_id=student["student_profile_id"],
+            guardian_id=actor.guardian_id,
+            status=consent_row["status"],
+            scope="platform_access",
+            actor_relationship=link["relationship_to_student"],
+            granted_at=consent_row.get("granted_at"),
+            withdrawn_at=consent_row.get("withdrawn_at"),
+            created_at=consent_row.get("granted_at") or consent_row.get("withdrawn_at"),
+        )
+
+    consent_version = await repository.get_latest_active_consent_version(
+        consent_type="platform_participation"
+    )
+    return AuthPlatformParticipationConsentResponse(
+        consent_version_id=consent_version["id"] if consent_version else None,
+        student_profile_id=student["student_profile_id"],
+        guardian_id=actor.guardian_id,
+        status="pending",
+        scope="platform_access",
+        actor_relationship=link["relationship_to_student"],
     )
 
 
@@ -869,6 +989,9 @@ async def mobile_me(actor: ActorContext = Depends(get_actor_context)) -> MobileA
         teacher_profile_id=actor.teacher_profile_id,
         age_cohort=actor.age_cohort,
         school_id=actor.school_id,
+        school_name=actor.school_name,
+        user_metadata=actor.user_metadata,
+        student_metadata=actor.student_metadata,
     )
 
 
@@ -1420,7 +1543,25 @@ async def mobile_parent_latest_summary(
         student_profile_id=student_profile_id,
     )
     if row is None:
-        raise HTTPException(status_code=404, detail="Parent weekly summary not found")
+        student_summary = await MobileAppRepository(session).get_latest_student_weekly_summary(
+            student_profile_id=student_profile_id
+        )
+        if student_summary is None:
+            raise HTTPException(status_code=404, detail="Parent weekly summary not found")
+        row = {
+            "id": student_summary["id"],
+            "student_profile_id": student_summary["student_profile_id"],
+            "guardian_id": actor.guardian_id,
+            "week_start": student_summary["week_start"],
+            "week_end": student_summary["week_end"],
+            "consent_status": "granted",
+            "visible_tiers": access["visible_tiers"],
+            "summary": _build_parent_safe_summary(
+                student_summary.get("summary") or {},
+                visible_tiers=access["visible_tiers"],
+            ),
+            "generated_at": student_summary["generated_at"],
+        }
     row["access"] = access
     return ParentWeeklySummaryResponse.model_validate(row)
 

@@ -2,7 +2,6 @@ import 'package:baha_shared_models/baha_shared_models.dart';
 import 'package:flutter/material.dart';
 
 import '../prototype/app_theme.dart';
-import '../prototype/prototype_models.dart';
 import '../prototype/prototype_widgets.dart';
 
 class StudentWaitingScreen extends StatelessWidget {
@@ -20,7 +19,7 @@ class StudentWaitingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = onboardingState;
-    final palette = studentPalette(StudentAgeGroup.teen, StudentGender.female);
+    final palette = appPaletteForTheme(AppColorTheme.growth);
     return Theme(
       data: buildTheme(palette),
       child: AnimatedGradientScaffold(
@@ -61,6 +60,40 @@ class StudentWaitingScreen extends StatelessWidget {
                 ],
               ),
             ),
+            if (state?.nextStep == 'await_guardian_link') ...[
+              const SizedBox(height: 18),
+              GlassPanel(
+                palette: palette,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Give these two details to your parent or guardian',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _WaitingCodeRow(
+                      label: 'Student ID',
+                      value: state?.studentCode ?? 'Not available yet',
+                    ),
+                    const SizedBox(height: 10),
+                    _WaitingCodeRow(
+                      label: 'Verification code',
+                      value:
+                          state?.guardianLinkVerificationCode ??
+                          'Generating...',
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Your parent or guardian will use these in their BAHA account to link with you and approve access.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 18),
             AnimatedPrimaryButton(
               label: 'Refresh onboarding state',
@@ -94,5 +127,35 @@ class StudentWaitingScreen extends StatelessWidget {
   String _detailForState(AuthOnboardingState? state) {
     return state?.detail ??
         'The mobile app is respecting the server-side onboarding and consent rules. Once the backend returns `ready`, this flow will unlock automatically.';
+  }
+}
+
+class _WaitingCodeRow extends StatelessWidget {
+  const _WaitingCodeRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 4),
+        SelectableText(
+          value,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ],
+    );
   }
 }

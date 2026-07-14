@@ -144,9 +144,8 @@ class _StudentLearnScreenState extends State<StudentLearnScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final palette = studentPalette(
-      StudentAgeGroup.teen,
-      StudentGender.female,
+    final palette = appPaletteForTheme(
+      ThemeScope.of(context).colorTheme,
       isDark: ThemeScope.of(context).isDark,
     );
     return Theme(
@@ -584,9 +583,8 @@ class _StudentModuleDetailScreenState extends State<StudentModuleDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final palette = studentPalette(
-      StudentAgeGroup.teen,
-      StudentGender.female,
+    final palette = appPaletteForTheme(
+      ThemeScope.of(context).colorTheme,
       isDark: ThemeScope.of(context).isDark,
     );
     return PopScope<bool>(
@@ -881,9 +879,8 @@ class _StudentContentDetailScreenState
 
   @override
   Widget build(BuildContext context) {
-    final palette = studentPalette(
-      StudentAgeGroup.teen,
-      StudentGender.female,
+    final palette = appPaletteForTheme(
+      ThemeScope.of(context).colorTheme,
       isDark: ThemeScope.of(context).isDark,
     );
     return Theme(

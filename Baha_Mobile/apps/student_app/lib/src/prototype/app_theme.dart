@@ -33,214 +33,265 @@ class PrototypePalette {
   final bool isDark;
 }
 
+enum AppColorTheme {
+  growth('growth', 'Growth'),
+  ocean('ocean', 'Ocean'),
+  sunrise('sunrise', 'Sunrise'),
+  dusk('dusk', 'Dusk'),
+  ember('ember', 'Ember');
+
+  const AppColorTheme(this.storageKey, this.label);
+
+  final String storageKey;
+  final String label;
+
+  static AppColorTheme fromStorageKey(String? value) {
+    return AppColorTheme.values.firstWhere(
+      (theme) => theme.storageKey == value,
+      orElse: () => AppColorTheme.growth,
+    );
+  }
+}
+
+PrototypePalette appPaletteForTheme(
+  AppColorTheme theme, {
+  bool isDark = false,
+}) {
+  switch (theme) {
+    case AppColorTheme.growth:
+      return isDark
+          ? const PrototypePalette(
+              name: 'Growth',
+              background: Color(0xFF111816),
+              surface: Color(0xFF18231F),
+              text: Color(0xFFF5F3EE),
+              muted: Color(0xFFA8B8AE),
+              primary: Color(0xFF6EE7B7),
+              secondary: Color(0xFF2DD4BF),
+              accent: Color(0xFFA7F3D0),
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFF183B35),
+                  Color(0xFF0F766E),
+                  Color(0xFF1E3A2F),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              heroIcon: Icons.spa_rounded,
+              story: 'Calm, grounded, and clean.',
+              isDark: true,
+            )
+          : const PrototypePalette(
+              name: 'Growth',
+              background: Color(0xFFF5FBF8),
+              surface: Color(0xFFFFFFFF),
+              text: Color(0xFF123328),
+              muted: Color(0xFF5E7D73),
+              primary: Color(0xFF239B72),
+              secondary: Color(0xFF4CBF9F),
+              accent: Color(0xFF9FE3CC),
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFF4DBA8A),
+                  Color(0xFF21A67A),
+                  Color(0xFF8FDCC0),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              heroIcon: Icons.spa_rounded,
+              story: 'Calm, grounded, and clean.',
+            );
+    case AppColorTheme.ocean:
+      return isDark
+          ? const PrototypePalette(
+              name: 'Ocean',
+              background: Color(0xFF0B1824),
+              surface: Color(0xFF122235),
+              text: Color(0xFFF3F9FF),
+              muted: Color(0xFFA7C2D8),
+              primary: Color(0xFF58B8F5),
+              secondary: Color(0xFF2DD4BF),
+              accent: Color(0xFF93C5FD),
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFF12395F),
+                  Color(0xFF0E7490),
+                  Color(0xFF155E75),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              heroIcon: Icons.waves_rounded,
+              story: 'Cool, airy, and focused.',
+              isDark: true,
+            )
+          : const PrototypePalette(
+              name: 'Ocean',
+              background: Color(0xFFF4FAFF),
+              surface: Color(0xFFFFFFFF),
+              text: Color(0xFF16324A),
+              muted: Color(0xFF64829B),
+              primary: Color(0xFF1783D1),
+              secondary: Color(0xFF29B8B1),
+              accent: Color(0xFFA9D7F7),
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFF2D9CDB),
+                  Color(0xFF4FC3F7),
+                  Color(0xFF7DD3C7),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              heroIcon: Icons.waves_rounded,
+              story: 'Cool, airy, and focused.',
+            );
+    case AppColorTheme.sunrise:
+      return isDark
+          ? const PrototypePalette(
+              name: 'Sunrise',
+              background: Color(0xFF23150F),
+              surface: Color(0xFF312018),
+              text: Color(0xFFFFF4ED),
+              muted: Color(0xFFDDB69E),
+              primary: Color(0xFFFF8A5B),
+              secondary: Color(0xFFF8B84E),
+              accent: Color(0xFFFEC89A),
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFF7C2D12),
+                  Color(0xFFB45309),
+                  Color(0xFF92400E),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              heroIcon: Icons.wb_sunny_rounded,
+              story: 'Warm, optimistic, and bright.',
+              isDark: true,
+            )
+          : const PrototypePalette(
+              name: 'Sunrise',
+              background: Color(0xFFFFF8F3),
+              surface: Color(0xFFFFFFFF),
+              text: Color(0xFF4B2315),
+              muted: Color(0xFF9A6C56),
+              primary: Color(0xFFF26C3D),
+              secondary: Color(0xFFF3AE3D),
+              accent: Color(0xFFFDD5A1),
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFFFF8A5B),
+                  Color(0xFFF6B04C),
+                  Color(0xFFFAD7A0),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              heroIcon: Icons.wb_sunny_rounded,
+              story: 'Warm, optimistic, and bright.',
+            );
+    case AppColorTheme.dusk:
+      return isDark
+          ? const PrototypePalette(
+              name: 'Dusk',
+              background: Color(0xFF171328),
+              surface: Color(0xFF241D3A),
+              text: Color(0xFFF8F5FF),
+              muted: Color(0xFFC6BBE8),
+              primary: Color(0xFFA78BFA),
+              secondary: Color(0xFFF472B6),
+              accent: Color(0xFFC4B5FD),
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFF4C1D95),
+                  Color(0xFF6D28D9),
+                  Color(0xFF9D174D),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              heroIcon: Icons.nights_stay_rounded,
+              story: 'Soft, moody, and expressive.',
+              isDark: true,
+            )
+          : const PrototypePalette(
+              name: 'Dusk',
+              background: Color(0xFFFBF8FF),
+              surface: Color(0xFFFFFFFF),
+              text: Color(0xFF322149),
+              muted: Color(0xFF7F6A9A),
+              primary: Color(0xFF8665E8),
+              secondary: Color(0xFFE46AAE),
+              accent: Color(0xFFD7CCFB),
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFFA78BFA),
+                  Color(0xFFF472B6),
+                  Color(0xFFC4B5FD),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              heroIcon: Icons.nights_stay_rounded,
+              story: 'Soft, moody, and expressive.',
+            );
+    case AppColorTheme.ember:
+      return isDark
+          ? const PrototypePalette(
+              name: 'Ember',
+              background: Color(0xFF1E1613),
+              surface: Color(0xFF2A1F1A),
+              text: Color(0xFFFFF7F3),
+              muted: Color(0xFFD9B8A8),
+              primary: Color(0xFFFF7A59),
+              secondary: Color(0xFFE85757),
+              accent: Color(0xFFF7B267),
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFF7F1D1D),
+                  Color(0xFFB91C1C),
+                  Color(0xFF9A3412),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              heroIcon: Icons.local_fire_department_rounded,
+              story: 'Energetic, bold, and vivid.',
+              isDark: true,
+            )
+          : const PrototypePalette(
+              name: 'Ember',
+              background: Color(0xFFFFF8F5),
+              surface: Color(0xFFFFFFFF),
+              text: Color(0xFF4A271D),
+              muted: Color(0xFF9B6B5C),
+              primary: Color(0xFFF1643E),
+              secondary: Color(0xFFE14C56),
+              accent: Color(0xFFF5C27A),
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFFFF7A59),
+                  Color(0xFFF15A5A),
+                  Color(0xFFF4B860),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              heroIcon: Icons.local_fire_department_rounded,
+              story: 'Energetic, bold, and vivid.',
+            );
+  }
+}
+
 PrototypePalette studentPalette(
   StudentAgeGroup age,
   StudentGender gender, {
   bool isDark = false,
 }) {
-  if (!isDark) {
-    if (age == StudentAgeGroup.child && gender == StudentGender.male) {
-      return const PrototypePalette(
-        name: 'Adventure Island',
-        background: Color(0xFFF0FBFF),
-        surface: Color(0xFFFFFFFF),
-        text: Color(0xFF123047),
-        muted: Color(0xFF5F7A8C),
-        primary: Color(0xFF0284C7),
-        secondary: Color(0xFF38BDF8),
-        accent: Color(0xFFF59E0B),
-        gradient: LinearGradient(
-          colors: [Color(0xFF0EA5E9), Color(0xFF22D3EE), Color(0xFFA7F3D0)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        heroIcon: Icons.explore_rounded,
-        story:
-            'Sky islands, treasure maps, clouds, and friendly adventure energy.',
-      );
-    }
-    if (age == StudentAgeGroup.child && gender == StudentGender.female) {
-      return const PrototypePalette(
-        name: 'Magic Castle',
-        background: Color(0xFFFFF7FB),
-        surface: Color(0xFFFFFFFF),
-        text: Color(0xFF442044),
-        muted: Color(0xFF8B5F88),
-        primary: Color(0xFFEC4899),
-        secondary: Color(0xFFC084FC),
-        accent: Color(0xFFFBBF24),
-        gradient: LinearGradient(
-          colors: [Color(0xFFF9A8D4), Color(0xFFC4B5FD), Color(0xFFFDE68A)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        heroIcon: Icons.castle_rounded,
-        story:
-            'Princess-inspired warmth with lavender, gold, sparkles, and soft magic.',
-      );
-    }
-    if (age == StudentAgeGroup.teen && gender == StudentGender.male) {
-      return const PrototypePalette(
-        name: 'Neon Quest',
-        background: Color(0xFF0B1020),
-        surface: Color(0xFF151B31),
-        text: Color(0xFFF8FAFC),
-        muted: Color(0xFF94A3B8),
-        primary: Color(0xFF3B82F6),
-        secondary: Color(0xFF8B5CF6),
-        accent: Color(0xFF22D3EE),
-        gradient: LinearGradient(
-          colors: [Color(0xFF1D4ED8), Color(0xFF7C3AED), Color(0xFF06B6D4)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        heroIcon: Icons.sports_esports_rounded,
-        story:
-            'Gaming-inspired energy with neon gradients, XP cards, and smooth motion.',
-        isDark: true,
-      );
-    }
-    if (age == StudentAgeGroup.teen && gender == StudentGender.female) {
-      return const PrototypePalette(
-        name: 'Glow Social',
-        background: Color(0xFFFFF6FA),
-        surface: Color(0xFFFFFFFF),
-        text: Color(0xFF331827),
-        muted: Color(0xFF9D5C7C),
-        primary: Color(0xFFDB2777),
-        secondary: Color(0xFF9333EA),
-        accent: Color(0xFFFB7185),
-        gradient: LinearGradient(
-          colors: [Color(0xFFFF6B9E), Color(0xFFA855F7), Color(0xFFFF8A65)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        heroIcon: Icons.auto_awesome_rounded,
-        story: 'Pinterest-meets-Instagram glassmorphism, vibrant but mature.',
-      );
-    }
-    return const PrototypePalette(
-      name: 'Personal Growth',
-      background: Color(0xFFF8FAFC),
-      surface: Color(0xFFFFFFFF),
-      text: Color(0xFF0F172A),
-      muted: Color(0xFF64748B),
-      primary: Color(0xFF2563EB),
-      secondary: Color(0xFF14B8A6),
-      accent: Color(0xFF64748B),
-      gradient: LinearGradient(
-        colors: [Color(0xFF2563EB), Color(0xFF14B8A6)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      heroIcon: Icons.spa_rounded,
-      story:
-          'Apple Health inspired clarity with quiet confidence and premium calm.',
-    );
-  }
-
-  if (age == StudentAgeGroup.child && gender == StudentGender.male) {
-    return const PrototypePalette(
-      name: 'Adventure Island',
-      background: Color(0xFF071B33),
-      surface: Color(0xFF0E2A47),
-      text: Color(0xFFEAF8FF),
-      muted: Color(0xFF9CC9DD),
-      primary: Color(0xFF38BDF8),
-      secondary: Color(0xFF0EA5E9),
-      accent: Color(0xFFFBBF24),
-      gradient: LinearGradient(
-        colors: [Color(0xFF075985), Color(0xFF0369A1), Color(0xFF0F766E)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      heroIcon: Icons.explore_rounded,
-      story:
-          'Sky islands, treasure maps, clouds, and friendly adventure energy.',
-      isDark: true,
-    );
-  }
-  if (age == StudentAgeGroup.child && gender == StudentGender.female) {
-    return const PrototypePalette(
-      name: 'Magic Castle',
-      background: Color(0xFF2A102A),
-      surface: Color(0xFF3B173B),
-      text: Color(0xFFFFF2FB),
-      muted: Color(0xFFD8A7D7),
-      primary: Color(0xFFF472B6),
-      secondary: Color(0xFFC084FC),
-      accent: Color(0xFFFACC15),
-      gradient: LinearGradient(
-        colors: [Color(0xFF9D174D), Color(0xFF6D28D9), Color(0xFFB45309)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      heroIcon: Icons.castle_rounded,
-      story:
-          'Princess-inspired warmth with lavender, gold, sparkles, and soft magic.',
-      isDark: true,
-    );
-  }
-  if (age == StudentAgeGroup.teen && gender == StudentGender.male) {
-    return const PrototypePalette(
-      name: 'Neon Quest',
-      background: Color(0xFF070B18),
-      surface: Color(0xFF10172A),
-      text: Color(0xFFF8FAFC),
-      muted: Color(0xFFA5B4FC),
-      primary: Color(0xFF60A5FA),
-      secondary: Color(0xFFA78BFA),
-      accent: Color(0xFF22D3EE),
-      gradient: LinearGradient(
-        colors: [Color(0xFF172554), Color(0xFF4C1D95), Color(0xFF155E75)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      heroIcon: Icons.sports_esports_rounded,
-      story:
-          'Gaming-inspired energy with neon gradients, XP cards, and smooth motion.',
-      isDark: true,
-    );
-  }
-  if (age == StudentAgeGroup.teen && gender == StudentGender.female) {
-    return const PrototypePalette(
-      name: 'Glow Social',
-      background: Color(0xFF251226),
-      surface: Color(0xFF351936),
-      text: Color(0xFFFFF4FB),
-      muted: Color(0xFFE0A4C7),
-      primary: Color(0xFFF472B6),
-      secondary: Color(0xFFC084FC),
-      accent: Color(0xFFFB7185),
-      gradient: LinearGradient(
-        colors: [Color(0xFF831843), Color(0xFF581C87), Color(0xFFBE123C)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      heroIcon: Icons.auto_awesome_rounded,
-      story: 'Pinterest-meets-Instagram glassmorphism, vibrant but mature.',
-      isDark: true,
-    );
-  }
-  return const PrototypePalette(
-    name: 'Personal Growth',
-    background: Color(0xFF111816),
-    surface: Color(0xFF18231F),
-    text: Color(0xFFF5F3EE),
-    muted: Color(0xFFA8B8AE),
-    primary: Color(0xFF6EE7B7),
-    secondary: Color(0xFF2DD4BF),
-    accent: Color(0xFFA7B3C2),
-    gradient: LinearGradient(
-      colors: [Color(0xFF193B35), Color(0xFF0F766E), Color(0xFF334155)],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    ),
-    heroIcon: Icons.spa_rounded,
-    story:
-        'Apple Health inspired clarity with quiet confidence and premium calm.',
-    isDark: true,
-  );
+  return appPaletteForTheme(AppColorTheme.growth, isDark: isDark);
 }
 
 ThemeData buildTheme(PrototypePalette palette) {

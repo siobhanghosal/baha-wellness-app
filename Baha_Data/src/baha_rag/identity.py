@@ -26,6 +26,9 @@ class ActorContext:
     teacher_profile_id: UUID | None
     age_cohort: str | None
     school_id: UUID | None
+    school_name: str | None
+    user_metadata: dict
+    student_metadata: dict
 
     @property
     def primary_role(self) -> str:

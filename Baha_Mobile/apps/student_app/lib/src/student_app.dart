@@ -4,13 +4,12 @@ import 'package:flutter/material.dart';
 
 import 'app_environment.dart';
 import 'prototype/app_theme.dart';
-import 'prototype/prototype_models.dart';
 import 'prototype/prototype_widgets.dart';
 import 'ui/student_bootstrap_screen.dart';
 import 'ui/student_error_screen.dart';
 import 'ui/student_identity_screen.dart';
-import 'ui/student_ready_screen.dart';
 import 'ui/student_waiting_screen.dart';
+import 'ui/unified_role_home_screen.dart';
 
 class StudentAppEntryPoint extends StatefulWidget {
   const StudentAppEntryPoint({super.key});
@@ -41,12 +40,9 @@ class _StudentAppEntryPointState extends State<StudentAppEntryPoint> {
 
   @override
   Widget build(BuildContext context) {
-    final basePalette = studentPalette(
-      StudentAgeGroup.teen,
-      StudentGender.female,
-    );
+    final basePalette = appPaletteForTheme(AppColorTheme.growth);
     return MaterialApp(
-      title: 'BAHA Student',
+      title: 'BAHA',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(basePalette),
       home: AnimatedBuilder(
@@ -60,16 +56,16 @@ class _StudentAppEntryPointState extends State<StudentAppEntryPoint> {
                 defaultExternalAuthId: _environment.defaultExternalAuthId,
                 defaultAuthEmail: _environment.defaultAuthEmail,
                 apiBaseUrl: _environment.apiBaseUrl,
-                onSubmit: (identity) =>
-                    _sessionController.saveIdentity(identity),
+                onSubmit: (identity, mode) => _sessionController.attemptEntry(
+                  identity,
+                  registerMode: mode == AppEntryMode.register,
+                ),
               );
             case SessionStage.requiresBootstrap:
               return StudentBootstrapScreen(
-                initialEmail: _sessionController.identity?.authEmail,
-                externalAuthId:
-                    _sessionController.identity?.externalAuthId ?? '',
-                onSubmit: (request) =>
-                    _sessionController.bootstrapStudent(request),
+                identity: _sessionController.identity!,
+                errorMessage: _sessionController.errorMessage,
+                onSubmit: (request) => _sessionController.bootstrap(request),
                 onChangeIdentity: _sessionController.clearIdentity,
               );
             case SessionStage.waiting:
@@ -79,7 +75,7 @@ class _StudentAppEntryPointState extends State<StudentAppEntryPoint> {
                 onChangeIdentity: _sessionController.clearIdentity,
               );
             case SessionStage.ready:
-              return StudentReadyScreen(
+              return UnifiedRoleHomeScreen(
                 apiClient: _apiClient,
                 identity: _sessionController.identity!,
                 environment: _environment,
@@ -106,7 +102,7 @@ class _StudentSplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = studentPalette(StudentAgeGroup.teen, StudentGender.female);
+    final palette = appPaletteForTheme(AppColorTheme.growth);
     return Theme(
       data: buildTheme(palette),
       child: AnimatedGradientScaffold(
@@ -121,10 +117,7 @@ class _StudentSplashScreen extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 3),
               ),
               const SizedBox(height: 24),
-              Text(
-                'BAHA Student',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
+              Text('BAHA', style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 8),
               Text(
                 'Restoring session and checking onboarding state.',

@@ -10,17 +10,17 @@ const genderIdentityOptions = <String, String>{
 
 const trustedSupportOptions = <String, String>{
   'parent_guardian': 'Parent or guardian',
-  'sibling_family': 'Sibling or family member',
+  'sibling_family': 'Another family member',
   'friend': 'Friend',
   'teacher_counselor': 'Teacher or counselor',
-  'no_one': 'No one regularly',
+  'no_one': 'I usually keep it to myself',
 };
 
 const baselineScaleOptions = <String, String>{
   'very_good': 'Very good',
-  'good': 'Good',
-  'okay': 'Okay',
-  'poor': 'Poor',
+  'good': 'Mostly good',
+  'okay': 'Up and down',
+  'poor': 'Usually poor',
   'very_poor': 'Very poor',
 };
 
@@ -28,8 +28,8 @@ const stressFrequencyOptions = <String, String>{
   'rarely': 'Rarely',
   'sometimes': 'Sometimes',
   'often': 'Often',
-  'very_often': 'Very often',
-  'almost_every_day': 'Almost every day',
+  'very_often': 'Most days',
+  'almost_every_day': 'Nearly every day',
 };
 
 const mainPressureOptions = <String, String>{
@@ -46,7 +46,7 @@ const physicalIssueOptions = <String, String>{
   'stomach_issues': 'Stomach issues',
   'poor_sleep': 'Poor sleep',
   'low_appetite': 'Low appetite',
-  'chronic_condition': 'A chronic condition',
+  'chronic_condition': 'A health issue or ongoing condition',
   'none': 'None of these',
 };
 
@@ -74,11 +74,11 @@ const copingStyleOptions = <String, String>{
 };
 
 const helpSeekingOptions = <String, String>{
-  'very_easy': 'Very easy',
+  'very_easy': 'Easy',
   'somewhat_easy': 'Somewhat easy',
   'mixed': 'Mixed',
-  'hard': 'Hard',
-  'very_hard': 'Very hard',
+  'hard': 'Difficult',
+  'very_hard': 'Very difficult',
 };
 
 const connectednessOptions = <String, String>{

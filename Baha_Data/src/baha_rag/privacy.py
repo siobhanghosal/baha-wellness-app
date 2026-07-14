@@ -103,12 +103,15 @@ class PrivacyService:
             )
         ).mappings().first()
         visible_tiers: list[str] = []
-        if tiers_row and tiers_row["tier_1_enabled"]:
-            visible_tiers.append("tier1")
-        if tiers_row and tiers_row["tier_2_enabled"]:
-            visible_tiers.append("tier2")
-        if tiers_row and tiers_row["tier_3_enabled"]:
-            visible_tiers.append("tier3")
+        if tiers_row is None:
+            visible_tiers = ["tier1"]
+        else:
+            if tiers_row["tier_1_enabled"]:
+                visible_tiers.append("tier1")
+            if tiers_row["tier_2_enabled"]:
+                visible_tiers.append("tier2")
+            if tiers_row["tier_3_enabled"]:
+                visible_tiers.append("tier3")
 
         if not visible_tiers:
             return ParentSummaryAccessDecision(False, "none", [], "No privacy tiers are enabled for guardian summaries")

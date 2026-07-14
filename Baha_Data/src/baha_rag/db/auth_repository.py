@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from secrets import randbelow
 from typing import Any
 from uuid import UUID
 
@@ -334,7 +335,7 @@ class AuthRepository:
                 )
                 values (
                   :user_id,
-                  concat('STU-', upper(substr(replace(cast(:user_id as text), '-', ''), 1, 10))),
+                  concat('STU-', upper(substr(replace(:user_id_text, '-', ''), 1, 10))),
                   :school_id,
                   :age_cohort,
                   :legal_consent_band,
@@ -358,6 +359,7 @@ class AuthRepository:
             ),
             {
                 "user_id": user_id,
+                "user_id_text": str(user_id),
                 "school_id": school_id,
                 "age_cohort": age_cohort,
                 "legal_consent_band": legal_consent_band,
@@ -644,7 +646,8 @@ class AuthRepository:
                   sp.user_id as student_user_id,
                   sp.student_code,
                   sp.presentation_age_cohort,
-                  sp.legal_consent_band
+                  sp.legal_consent_band,
+                  sp.metadata
                 from student_profiles sp
                 where sp.id = :student_profile_id
                 limit 1
@@ -659,7 +662,8 @@ class AuthRepository:
                   sp.user_id as student_user_id,
                   sp.student_code,
                   sp.presentation_age_cohort,
-                  sp.legal_consent_band
+                  sp.legal_consent_band,
+                  sp.metadata
                 from student_profiles sp
                 where sp.student_code = :student_code
                 limit 1
@@ -672,6 +676,51 @@ class AuthRepository:
         )
         row = result.mappings().first()
         return dict(row) if row else None
+
+    async def ensure_student_guardian_link_code(
+        self,
+        *,
+        student_profile_id: UUID,
+    ) -> str:
+        result = await self.session.execute(
+            text(
+                """
+                select metadata ->> 'guardian_link_verification_code' as guardian_link_verification_code
+                from student_profiles
+                where id = :student_profile_id
+                limit 1
+                """
+            ),
+            {"student_profile_id": student_profile_id},
+        )
+        row = result.mappings().first()
+        existing_code = (
+            str(row["guardian_link_verification_code"]).strip()
+            if row and row["guardian_link_verification_code"]
+            else ""
+        )
+        if existing_code:
+            return existing_code
+
+        code = f"{randbelow(1_000_000):06d}"
+        await self.session.execute(
+            text(
+                """
+                update student_profiles
+                set
+                  metadata = jsonb_set(
+                    coalesce(metadata, '{}'::jsonb),
+                    '{guardian_link_verification_code}',
+                    to_jsonb(:code::text),
+                    true
+                  ),
+                  updated_at = now()
+                where id = :student_profile_id
+                """
+            ),
+            {"student_profile_id": student_profile_id, "code": code},
+        )
+        return code
 
     async def upsert_guardian_link(
         self,

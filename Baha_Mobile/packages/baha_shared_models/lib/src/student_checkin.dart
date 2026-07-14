@@ -77,7 +77,9 @@ class StudentCheckinAnswer {
       selectedOptions: (json['selected_options'] as List<dynamic>? ?? const [])
           .map((value) => value.toString())
           .toList(),
-      normalizedValue: Map<String, dynamic>.from(json['normalized_value'] as Map? ?? const {}),
+      normalizedValue: Map<String, dynamic>.from(
+        json['normalized_value'] as Map? ?? const {},
+      ),
     );
   }
 }
@@ -119,7 +121,11 @@ class StudentCheckinDetail {
       sourceMode: json['source_mode'] as String? ?? '',
       visibilityScope: json['visibility_scope'] as String? ?? '',
       answers: (json['answers'] as List<dynamic>? ?? const [])
-          .map((value) => StudentCheckinAnswer.fromJson(Map<String, dynamic>.from(value as Map)))
+          .map(
+            (value) => StudentCheckinAnswer.fromJson(
+              Map<String, dynamic>.from(value as Map),
+            ),
+          )
           .toList(),
     );
   }

@@ -17,7 +17,13 @@ class ThemeModeToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = ThemeScope.of(context);
+    final controller = ThemeScope.maybeOf(context);
+    if (controller == null) {
+      return Opacity(
+        opacity: 0.6,
+        child: IgnorePointer(child: _StaticThemeToggle(palette: palette)),
+      );
+    }
     return Semantics(
       button: true,
       label: controller.isDark ? 'Switch to light mode' : 'Switch to dark mode',
@@ -78,6 +84,47 @@ class ThemeModeToggle extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StaticThemeToggle extends StatelessWidget {
+  const _StaticThemeToggle({required this.palette});
+
+  final PrototypePalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 64,
+      height: 36,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            palette.accent.withValues(alpha: .9),
+            palette.primary.withValues(alpha: .75),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: .34)),
+      ),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Icon(
+            Icons.light_mode_rounded,
+            size: 17,
+            color: palette.accent,
           ),
         ),
       ),
@@ -549,9 +596,25 @@ class MiniLineChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final series = (values == null || values!.isEmpty)
-        ? const [2, 2.8, 2.4, 3.7, 3.2, 4.2, 4]
-        : values!;
+    final series = values ?? const <double>[];
+    if (series.isEmpty) {
+      return Container(
+        height: 160,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: palette.surface.withValues(alpha: palette.isDark ? .32 : .46),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: palette.muted.withValues(alpha: .16)),
+        ),
+        child: Text(
+          'No check-in data yet',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: palette.muted,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ).animate().fadeIn(duration: 400.ms);
+    }
     final spots = <FlSpot>[
       for (var index = 0; index < series.length; index++)
         FlSpot(index.toDouble(), series[index].toDouble()),

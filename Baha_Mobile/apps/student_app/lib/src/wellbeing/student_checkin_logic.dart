@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:baha_shared_models/baha_shared_models.dart';
 import 'package:flutter/material.dart';
 
@@ -168,17 +166,17 @@ List<WellbeingTrendPoint> buildTrendPointsFromDetails(
     }
   }
   points.sort((left, right) => left.date.compareTo(right.date));
-  if (points.isNotEmpty) {
-    return points;
-  }
-  return _demoTrendPoints();
+  return points;
 }
 
 List<WellbeingFactorMetric> buildFactorMetrics({
   required List<WellbeingTrendPoint> points,
   required StudentWellbeingProfile? profile,
 }) {
-  final latest = points.isNotEmpty ? points.last : _demoTrendPoints().last;
+  if (points.isEmpty) {
+    return const [];
+  }
+  final latest = points.last;
   final previous = points.length > 1 ? points[points.length - 2] : null;
   return _trackedFactors.map((factorKey) {
     final descriptor = _factorDescriptor(factorKey);
@@ -205,30 +203,27 @@ List<double> chartValuesForFactor(
   List<WellbeingTrendPoint> points,
   String factorKey,
 ) {
-  final source = points.isEmpty ? _demoTrendPoints() : points;
-  return source
+  return points
       .map((point) => point.factorScores[factorKey] ?? point.overallScore)
       .map((value) => double.parse(value.toStringAsFixed(2)))
       .toList();
 }
 
 List<double> overallChartValues(List<WellbeingTrendPoint> points) {
-  final source = points.isEmpty ? _demoTrendPoints() : points;
-  return source
+  return points
       .map((point) => double.parse(point.overallScore.toStringAsFixed(2)))
       .toList();
 }
 
 List<String> chartLabels(List<WellbeingTrendPoint> points) {
-  final source = points.isEmpty ? _demoTrendPoints() : points;
-  return source.map((point) => _weekdayLabel(point.date.weekday)).toList();
+  return points.map((point) => _weekdayLabel(point.date.weekday)).toList();
 }
 
 List<String> riskFlags({
   required List<WellbeingTrendPoint> points,
   required StudentWellbeingProfile? profile,
 }) {
-  final source = points.isEmpty ? _demoTrendPoints() : points;
+  final source = points;
   final flags = <String>[];
   if (_countAtOrAbove(source, 'sleep', 3) >= 3) {
     flags.add('Sleep strain repeating');
@@ -293,7 +288,10 @@ String answerDisplayLabel(StudentCheckinAnswer answer) {
 }
 
 String dailyStateHeadline(List<WellbeingTrendPoint> points) {
-  final latest = points.isNotEmpty ? points.last : _demoTrendPoints().last;
+  if (points.isEmpty) {
+    return 'No check-in entries yet.';
+  }
+  final latest = points.last;
   final highest = latest.factorScores.entries.fold<MapEntry<String, double>?>(
     null,
     (best, current) =>
@@ -322,6 +320,67 @@ class _FactorDescriptor {
   final String label;
   final Color color;
   final IconData icon;
+}
+
+String personalizedPromptForQuestion(
+  MobileCheckinQuestion question,
+  StudentWellbeingProfile profile,
+) {
+  final ageBand = profile.ageBand;
+  final older = ageBand == '15_18' || ageBand == '18_plus';
+  switch (question.questionKey) {
+    case 'sleep_last_night':
+      return older
+          ? 'How was your sleep last night?'
+          : 'How did you sleep last night?';
+    case 'energy_today':
+      return older
+          ? 'How is your energy level today?'
+          : 'How is your energy today?';
+    case 'mood_today':
+      return older
+          ? 'How has your mood felt today?'
+          : 'How is your mood today?';
+    case 'stress_today':
+      return older
+          ? 'How much stress or worry are you carrying today?'
+          : 'How stressed or worried do you feel today?';
+    case 'body_today':
+      return older
+          ? 'How is your body feeling today overall?'
+          : 'How does your body feel today?';
+    case 'connected_today':
+      return older
+          ? 'How connected or supported do you feel today?'
+          : 'How supported or connected do you feel today?';
+    case 'sleep_reason':
+      return older
+          ? 'What was the main reason sleep felt off?'
+          : 'What was the biggest reason your sleep felt bad?';
+    case 'energy_reason':
+      return older
+          ? 'What seems to explain the low energy most?'
+          : 'What best explains the low energy?';
+    case 'hardest_today':
+      return older
+          ? 'What felt heaviest or hardest today?'
+          : 'What felt hardest today?';
+    case 'body_reason':
+      if (profile.experiencesPeriods == 'yes') {
+        return older
+            ? 'What physical issue stood out most today?'
+            : 'What bothered you most physically today?';
+      }
+      return older
+          ? 'What physical issue stood out most today?'
+          : 'What bothered you most physically?';
+    case 'support_today':
+      return older
+          ? 'Would any support be useful right now?'
+          : 'Would you like support today?';
+    default:
+      return question.prompt;
+  }
 }
 
 _FactorDescriptor _factorDescriptor(String factorKey) {
@@ -487,25 +546,6 @@ String _trendSummary({
     return '${descriptor.label} looks $severity, with school pressure likely to matter most.';
   }
   return '${descriptor.label} looks $severity and $direction across recent check-ins.';
-}
-
-List<WellbeingTrendPoint> _demoTrendPoints() {
-  final now = DateTime.now();
-  return List<WellbeingTrendPoint>.generate(5, (index) {
-    final date = now.subtract(Duration(days: 4 - index));
-    final seed = index + 1;
-    return WellbeingTrendPoint(
-      date: date,
-      factorScores: <String, double>{
-        'sleep': 2.7 - (seed * 0.2),
-        'energy': 2.4 - (seed * 0.15),
-        'mood': 2.2 - (seed * 0.12),
-        'stress': max(0.8, 2.8 - (seed * 0.22)),
-        'physical_wellbeing': 1.9 - (seed * 0.1),
-        'connectedness': 1.8 - (seed * 0.08),
-      },
-    );
-  });
 }
 
 int _countAtOrAbove(

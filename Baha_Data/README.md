@@ -82,6 +82,10 @@ See [docs/BACKEND_HANDOFF_FOR_FLUTTER.md](/Users/sudharshan/Desktop/PES/RF Inter
 
 See [docs/ACCOUNT_ONBOARDING_SYSTEM.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/ACCOUNT_ONBOARDING_SYSTEM.md) for the current users-based onboarding model, approval workflow, guardian linking flow, and guardian-managed consent behavior for both platform participation and parent summaries.
 
+See [docs/STUDENT_CHECKIN_PROFILE_LOGIC.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/STUDENT_CHECKIN_PROFILE_LOGIC.md) for the current student onboarding baseline, adaptive daily check-in logic, scoring model, and trend/risk interpretation rules.
+
+See [docs/STUDENT_DEMO_SCENARIOS.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/STUDENT_DEMO_SCENARIOS.md) for the seeded student demo accounts, sign-in identities, and the narrative each one is intended to demonstrate on the dashboard.
+
 See [docs/ENVIRONMENT_AND_SECRETS.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/ENVIRONMENT_AND_SECRETS.md) for the runtime configuration, hosted auth variables, and object-storage environment contract.
 
 See [docs/DATA_ACQUISITION.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/DATA_ACQUISITION.md) for when to use the heavier acquisition/runtime profile instead of the default lightweight mobile API runtime.

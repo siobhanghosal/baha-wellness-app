@@ -14,6 +14,9 @@ def test_actor_context_primary_role_maps_to_mobile_audience() -> None:
         teacher_profile_id=None,
         age_cohort="13_14",
         school_id=uuid4(),
+        school_name="BAHA Pilot School",
+        user_metadata={},
+        student_metadata={},
     )
 
     assert actor.primary_role == "student"
@@ -31,6 +34,9 @@ def test_actor_context_guardian_maps_to_parent_audience() -> None:
         teacher_profile_id=None,
         age_cohort=None,
         school_id=None,
+        school_name=None,
+        user_metadata={},
+        student_metadata={},
     )
 
     assert actor.primary_role == "guardian"

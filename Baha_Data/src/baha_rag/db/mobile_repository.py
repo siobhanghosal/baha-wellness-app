@@ -31,11 +31,14 @@ class MobileAppRepository:
                   u.id as user_id,
                   u.external_auth_id,
                   u.display_name,
+                  u.metadata as user_metadata,
                   sp.id as student_profile_id,
+                  sp.metadata as student_metadata,
                   g.id as guardian_id,
                   tp.id as teacher_profile_id,
                   sp.presentation_age_cohort,
                   coalesce(sp.school_id, tp.school_id) as school_id,
+                  s.name as school_name,
                   array_remove(array_agg(distinct r.role_key), null) as roles
                 from users u
                 left join user_roles ur
@@ -48,10 +51,13 @@ class MobileAppRepository:
                   on g.user_id = u.id
                 left join teacher_profiles tp
                   on tp.user_id = u.id
+                left join schools s
+                  on s.id = coalesce(sp.school_id, tp.school_id)
                 where u.id = :user_id and u.status = 'active'
                 group by
-                  u.id, u.external_auth_id, u.display_name,
-                  sp.id, g.id, tp.id, sp.presentation_age_cohort, coalesce(sp.school_id, tp.school_id)
+                  u.id, u.external_auth_id, u.display_name, u.metadata,
+                  sp.id, sp.metadata, g.id, tp.id, sp.presentation_age_cohort,
+                  coalesce(sp.school_id, tp.school_id), s.name
                 """
             ),
             {"user_id": user_id},
@@ -67,11 +73,14 @@ class MobileAppRepository:
                   u.id as user_id,
                   u.external_auth_id,
                   u.display_name,
+                  u.metadata as user_metadata,
                   sp.id as student_profile_id,
+                  sp.metadata as student_metadata,
                   g.id as guardian_id,
                   tp.id as teacher_profile_id,
                   sp.presentation_age_cohort,
                   coalesce(sp.school_id, tp.school_id) as school_id,
+                  s.name as school_name,
                   array_remove(array_agg(distinct r.role_key), null) as roles
                 from users u
                 left join user_roles ur
@@ -84,10 +93,13 @@ class MobileAppRepository:
                   on g.user_id = u.id
                 left join teacher_profiles tp
                   on tp.user_id = u.id
+                left join schools s
+                  on s.id = coalesce(sp.school_id, tp.school_id)
                 where u.external_auth_id = :external_auth_id and u.status = 'active'
                 group by
-                  u.id, u.external_auth_id, u.display_name,
-                  sp.id, g.id, tp.id, sp.presentation_age_cohort, coalesce(sp.school_id, tp.school_id)
+                  u.id, u.external_auth_id, u.display_name, u.metadata,
+                  sp.id, sp.metadata, g.id, tp.id, sp.presentation_age_cohort,
+                  coalesce(sp.school_id, tp.school_id), s.name
                 """
             ),
             {"external_auth_id": external_auth_id},
@@ -103,11 +115,14 @@ class MobileAppRepository:
                   u.id as user_id,
                   u.external_auth_id,
                   u.display_name,
+                  u.metadata as user_metadata,
                   sp.id as student_profile_id,
+                  sp.metadata as student_metadata,
                   g.id as guardian_id,
                   tp.id as teacher_profile_id,
                   sp.presentation_age_cohort,
                   coalesce(sp.school_id, tp.school_id) as school_id,
+                  s.name as school_name,
                   array_remove(array_agg(distinct r.role_key), null) as roles
                 from users u
                 left join user_roles ur
@@ -120,10 +135,13 @@ class MobileAppRepository:
                   on g.user_id = u.id
                 left join teacher_profiles tp
                   on tp.user_id = u.id
+                left join schools s
+                  on s.id = coalesce(sp.school_id, tp.school_id)
                 where lower(u.email) = lower(:email) and u.status = 'active'
                 group by
-                  u.id, u.external_auth_id, u.display_name,
-                  sp.id, g.id, tp.id, sp.presentation_age_cohort, coalesce(sp.school_id, tp.school_id)
+                  u.id, u.external_auth_id, u.display_name, u.metadata,
+                  sp.id, sp.metadata, g.id, tp.id, sp.presentation_age_cohort,
+                  coalesce(sp.school_id, tp.school_id), s.name
                 order by u.created_at asc
                 """
             ),
@@ -190,14 +208,14 @@ class MobileAppRepository:
                   on cq.template_id = ct.id
                 where ct.active = true
                   and ct.audience_app = 'student'
-                  and (
-                    ct.age_cohort = 'all'
-                    or cast(:age_cohort as text) is null
-                    or ct.age_cohort = cast(:age_cohort as text)
-                  )
                 group by ct.id, ct.template_key, ct.title, ct.cadence, ct.age_cohort, ct.metadata
                 order by
-                  case when ct.age_cohort = cast(:age_cohort as text) then 0 else 1 end,
+                  case
+                    when ct.age_cohort = cast(:age_cohort as text) then 0
+                    when ct.age_cohort = 'all' then 1
+                    when ct.age_cohort = '13_14' then 2
+                    else 3
+                  end,
                   ct.template_key
                 """
             ),
@@ -244,11 +262,6 @@ class MobileAppRepository:
                 where ct.id = :template_id
                   and ct.active = true
                   and ct.audience_app = 'student'
-                  and (
-                    ct.age_cohort = 'all'
-                    or cast(:age_cohort as text) is null
-                    or ct.age_cohort = cast(:age_cohort as text)
-                  )
                 group by ct.id, ct.template_key, ct.title, ct.cadence, ct.age_cohort, ct.metadata
                 """
             ),
@@ -2558,4 +2571,7 @@ class MobileAppRepository:
             teacher_profile_id=row["teacher_profile_id"],
             age_cohort=row["presentation_age_cohort"],
             school_id=row["school_id"],
+            school_name=row["school_name"],
+            user_metadata=row["user_metadata"] or {},
+            student_metadata=row["student_metadata"] or {},
         )

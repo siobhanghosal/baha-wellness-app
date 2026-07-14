@@ -19,6 +19,9 @@ def _actor(*, external_auth_id: str | None = None) -> ActorContext:
         teacher_profile_id=None,
         age_cohort="13_14",
         school_id=uuid4(),
+        school_name="BAHA Pilot School",
+        user_metadata={},
+        student_metadata={},
     )
 
 
@@ -37,6 +40,9 @@ async def test_get_actor_context_links_token_subject_from_email_match(monkeypatc
         teacher_profile_id=initial_actor.teacher_profile_id,
         age_cohort=initial_actor.age_cohort,
         school_id=initial_actor.school_id,
+        school_name=initial_actor.school_name,
+        user_metadata=initial_actor.user_metadata,
+        student_metadata=initial_actor.student_metadata,
     )
 
     class FakeRepository:

@@ -8,6 +8,7 @@ It now combines:
 
 - the real backend session and onboarding flow
 - the real student backend slices for check-ins, learn, support, and Buddy
+- the first real guardian/parent onboarding and summary-management slice inside the same unified app
 - the visual shell direction from `origin/Solomon_UI_Version1`
 
 ## Current UI State
@@ -57,7 +58,11 @@ Remaining practical gap:
 ## What Is Backend-Backed Now
 
 - session restore and onboarding routing
+- sign-in/register preflight validation over the current development identity bridge
 - student bootstrap
+- guardian link flow using student ID + verification code
+- guardian consent flow for under-18 platform access and parent-summary sharing
+- parent-safe weekly summary detail view with trends, watch areas, alerts, and support nudges only
 - dashboard summary and recent check-ins
 - check-in list, form, submit, and submission detail
 - learning feed, module detail, content detail, and module progress writes
@@ -142,6 +147,14 @@ This app currently depends on:
 - when using a physical Android phone over USB, the app depends on `adb reverse tcp:8000 tcp:8000`
 - if the USB cable is removed, backend-backed screens will stop working unless the phone is pointed to a LAN-accessible or hosted backend
 - deeper student screens now have retryable error states instead of raw exception pages, but they still need real-device QA for spacing and navigation polish
+- a newly registered student account may not have a generated weekly summary row yet; the app now falls back to a first-use placeholder dashboard instead of failing the home screen
+- empty student dashboards no longer render demo factor graphs; they now stay empty until real check-ins exist
+- sign-in and registration now validate reused emails, reused sign-in IDs, and missing accounts before opening a session
+- the backend now falls back to the live daily pulse template for older student cohorts too, so fresh `15_18` and `18_plus` accounts can open daily check-ins immediately
+- under-18 student waiting screens now expose the student ID and guardian verification code needed for the parent-link flow
+- parent summaries intentionally do not show raw check-in answers; they only show high-level weekly patterns, alerts, and suggested support nudges
+- seeded multi-scenario student demo accounts are documented in:
+  - [Baha_Data/docs/STUDENT_DEMO_SCENARIOS.md](/Users/sudharshan/Desktop/PES/RF%20Internship/Baha_Data/docs/STUDENT_DEMO_SCENARIOS.md)
 - the local demo backend now includes a richer student Learn corpus seeded through `023_student_content_polish_seed.sql`
 - additional theme-specific student learning seeds now exist in `024_student_theme_learning_seed.sql`
 - the best reference for how the raw corpus should become student learning material is:

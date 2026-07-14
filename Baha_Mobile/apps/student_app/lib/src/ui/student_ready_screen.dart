@@ -8,7 +8,6 @@ import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:salomon_bottom_bar/salomon_bottom_bar.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app_environment.dart';
 import '../prototype/app_theme.dart';
@@ -49,15 +48,10 @@ class StudentReadyScreen extends StatefulWidget {
 }
 
 class _StudentReadyScreenState extends State<StudentReadyScreen> {
-  static const _ageStorageKey = 'baha.student.selected_age';
-  static const _genderStorageKey = 'baha.student.selected_gender';
-
   late final ThemeController _themeController;
   late final ConfettiController _confettiController;
   late final StudentWellbeingProfileStore _profileStore;
   int _currentIndex = 0;
-  StudentGender _gender = StudentGender.female;
-  StudentAgeGroup _age = StudentAgeGroup.teen;
   StudentWellbeingProfile? _profile;
   bool _profileLoaded = false;
 
@@ -67,7 +61,6 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
     _themeController = ThemeController()..load();
     _confettiController = ConfettiController(duration: 900.ms);
     _profileStore = StudentWellbeingProfileStore();
-    unawaited(_restoreDisplayPreferences());
     unawaited(_restoreProfile());
   }
 
@@ -76,6 +69,14 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
     _confettiController.dispose();
     _themeController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant StudentReadyScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.actor?.studentMetadata != widget.actor?.studentMetadata) {
+      unawaited(_restoreProfile());
+    }
   }
 
   Future<void> _openCheckins() async {
@@ -180,9 +181,11 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
       builder: (context) => StudentSettingsScreen(
         palette: _currentPalette,
         actor: widget.actor,
+        identity: widget.identity,
         onboardingState: widget.onboardingState,
         environment: widget.environment,
         profile: _profile,
+        themeController: _themeController,
         onRefreshOnboarding: widget.onRefresh,
         onOpenSupport: _openSupport,
         onEditProfile: _openProfileSetup,
@@ -191,8 +194,10 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
     );
   }
 
-  PrototypePalette get _currentPalette =>
-      studentPalette(_age, _gender, isDark: _themeController.isDark);
+  PrototypePalette get _currentPalette => appPaletteForTheme(
+    _themeController.colorTheme,
+    isDark: _themeController.isDark,
+  );
 
   Future<T?> _pushRoute<T>({required WidgetBuilder builder}) async {
     return Navigator.of(context).push<T>(
@@ -208,27 +213,12 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
     );
   }
 
-  Future<void> _restoreDisplayPreferences() async {
-    final preferences = await SharedPreferences.getInstance();
-    final savedAge = preferences.getString(_ageStorageKey);
-    final savedGender = preferences.getString(_genderStorageKey);
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _age = StudentAgeGroup.values.firstWhere(
-        (value) => value.name == savedAge,
-        orElse: () => _age,
-      );
-      _gender = StudentGender.values.firstWhere(
-        (value) => value.name == savedGender,
-        orElse: () => _gender,
-      );
-    });
-  }
-
   Future<void> _restoreProfile() async {
-    final profile = await _profileStore.load(widget.identity.externalAuthId);
+    final actorProfile = _profileFromActor(widget.actor);
+    final localProfile = await _profileStore.load(
+      widget.identity.externalAuthId,
+    );
+    final profile = actorProfile ?? localProfile;
     if (!mounted) {
       return;
     }
@@ -252,6 +242,7 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
       externalAuthId: widget.identity.externalAuthId,
       profile: result,
     );
+    await _persistProfileToBackend(result);
     if (!mounted) {
       return result;
     }
@@ -259,16 +250,6 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
       _profile = result;
       _profileLoaded = true;
     });
-    final mappedAge = _mapProfileAge(result.ageBand);
-    if (mappedAge != _age) {
-      _updateAge(mappedAge);
-    }
-    if (result.genderIdentity == 'male' && _gender != StudentGender.male) {
-      _updateGender(StudentGender.male);
-    } else if (result.genderIdentity == 'female' &&
-        _gender != StudentGender.female) {
-      _updateGender(StudentGender.female);
-    }
     return result;
   }
 
@@ -279,35 +260,56 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
     if (_profile != null) {
       return _profile;
     }
-    return _openProfileSetup();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Finish your one-time onboarding baseline from Home or Settings before starting daily check-ins.',
+          ),
+        ),
+      );
+    }
+    return null;
   }
 
-  Future<void> _persistDisplayPreferences() async {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_ageStorageKey, _age.name);
-    await preferences.setString(_genderStorageKey, _gender.name);
+  StudentWellbeingProfile? _profileFromActor(MobileActor? actor) {
+    final raw = actor?.studentMetadata['wellbeing_profile'];
+    if (raw is Map<String, dynamic>) {
+      return StudentWellbeingProfile.fromJson(raw);
+    }
+    if (raw is Map) {
+      return StudentWellbeingProfile.fromJson(Map<String, dynamic>.from(raw));
+    }
+    return null;
   }
 
-  void _updateAge(StudentAgeGroup value) {
-    setState(() => _age = value);
-    unawaited(_persistDisplayPreferences());
-  }
-
-  void _updateGender(StudentGender value) {
-    setState(() => _gender = value);
-    unawaited(_persistDisplayPreferences());
-  }
-
-  StudentAgeGroup _mapProfileAge(String ageBand) {
-    switch (ageBand) {
-      case '9_12':
-        return StudentAgeGroup.child;
-      case '15_18':
-      case '18_plus':
-        return StudentAgeGroup.youngAdult;
-      case '13_14':
-      default:
-        return StudentAgeGroup.teen;
+  Future<void> _persistProfileToBackend(StudentWellbeingProfile profile) async {
+    final actor = widget.actor;
+    if (actor == null) {
+      return;
+    }
+    if ((actor.schoolId == null || actor.schoolId!.isEmpty) &&
+        (actor.schoolName == null || actor.schoolName!.isEmpty)) {
+      return;
+    }
+    try {
+      await widget.apiClient.bootstrapIdentity(
+        identity: widget.identity,
+        request: AppBootstrapRequest(
+          role: AppRequestedRole.student,
+          displayName: actor.displayName,
+          email: widget.identity.authEmail,
+          schoolId: actor.schoolId,
+          schoolName: actor.schoolName,
+          ageCohort: profile.ageBand,
+          legalConsentBand: profile.ageBand == '18_plus' ? 'adult' : 'minor',
+          gender: profile.genderIdentity,
+          metadata: profile.toBootstrapMetadata(),
+        ),
+      );
+      await widget.onRefresh();
+    } catch (_) {
+      // Keep local persistence even if the backend metadata refresh fails.
     }
   }
 
@@ -401,9 +403,8 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
       child: AnimatedBuilder(
         animation: _themeController,
         builder: (context, child) {
-          final palette = studentPalette(
-            _age,
-            _gender,
+          final palette = appPaletteForTheme(
+            _themeController.colorTheme,
             isDark: _themeController.isDark,
           );
           final pages = <Widget>[
@@ -414,10 +415,6 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
               actor: widget.actor,
               onboardingState: widget.onboardingState,
               profile: _profile,
-              age: _age,
-              gender: _gender,
-              onAgeChanged: _updateAge,
-              onGenderChanged: _updateGender,
               onMetricTap: (metric) => unawaited(_openInsights(metric)),
               onOpenProfileSetup: _openProfileSetup,
               onOpenCheckins: _openCheckins,
@@ -516,10 +513,6 @@ class StudentReferenceHomeTab extends StatefulWidget {
     required this.actor,
     required this.onboardingState,
     required this.profile,
-    required this.age,
-    required this.gender,
-    required this.onAgeChanged,
-    required this.onGenderChanged,
     required this.onMetricTap,
     required this.onOpenProfileSetup,
     required this.onOpenCheckins,
@@ -534,10 +527,6 @@ class StudentReferenceHomeTab extends StatefulWidget {
   final MobileActor? actor;
   final AuthOnboardingState? onboardingState;
   final StudentWellbeingProfile? profile;
-  final StudentAgeGroup age;
-  final StudentGender gender;
-  final ValueChanged<StudentAgeGroup> onAgeChanged;
-  final ValueChanged<StudentGender> onGenderChanged;
   final ValueChanged<UiMetric> onMetricTap;
   final Future<StudentWellbeingProfile?> Function() onOpenProfileSetup;
   final Future<void> Function() onOpenCheckins;
@@ -559,9 +548,6 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
   }
 
   Future<_StudentDashboardData> _load() async {
-    final summary = await widget.apiClient.getStudentWeeklySummary(
-      identity: widget.identity,
-    );
     final checkins = await widget.apiClient.listStudentCheckins(
       identity: widget.identity,
       limit: 7,
@@ -576,6 +562,12 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
               responseSetId: checkin.id,
             ),
           ),
+    );
+    final summary = await _loadWeeklySummaryOrFallback(
+      apiClient: widget.apiClient,
+      identity: widget.identity,
+      actor: widget.actor,
+      checkinCount: checkins.length,
     );
     final trendPoints = buildTrendPointsFromDetails(details);
     return _StudentDashboardData(
@@ -603,6 +595,14 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
   @override
   Widget build(BuildContext context) {
     final palette = widget.palette;
+    final cohortLabel = switch (widget.profile?.ageBand ??
+        widget.actor?.ageCohort) {
+      '9_12' => 'Age 9-12',
+      '13_14' => 'Age 13-14',
+      '15_18' => 'Age 15-18',
+      '18_plus' => 'Age 18+',
+      _ => 'Student',
+    };
     return RefreshIndicator(
       onRefresh: _refresh,
       child: FutureBuilder<_StudentDashboardData>(
@@ -616,7 +616,7 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                 DashboardTopBar(palette: palette),
                 HeroHeader(
                   palette: palette,
-                  kicker: '${widget.gender.label} · ${widget.age.label}',
+                  kicker: cohortLabel,
                   title: 'Your private wellness world',
                   subtitle: palette.story,
                   actions: [
@@ -657,10 +657,16 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
           final data = snapshot.data!;
           final actor = widget.actor;
           final metrics = _metricsForData(data);
+          final hasTrendData = data.trendPoints.isNotEmpty;
           final labels = chartLabels(data.trendPoints);
           final overallValues = overallChartValues(data.trendPoints);
           final dailyHeadline = dailyStateHeadline(data.trendPoints);
           final flags = riskFlags(
+            points: data.trendPoints,
+            profile: widget.profile,
+          );
+          final dashboardCallouts = _dashboardCallouts(
+            summary: data.summary,
             points: data.trendPoints,
             profile: widget.profile,
           );
@@ -671,36 +677,12 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
               DashboardTopBar(palette: palette),
               HeroHeader(
                 palette: palette,
-                kicker: '${widget.gender.label} · ${widget.age.label}',
+                kicker: cohortLabel,
                 title: 'Your private wellness world',
                 subtitle: palette.story,
                 actions: [
                   Pill(icon: palette.heroIcon, label: palette.name),
                   const Pill(icon: Icons.lock_rounded, label: 'Private'),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: _PrototypeSelector<StudentAgeGroup>(
-                      palette: palette,
-                      value: widget.age,
-                      values: StudentAgeGroup.values,
-                      labelBuilder: (value) => value.label,
-                      onChanged: widget.onAgeChanged,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _PrototypeSelector<StudentGender>(
-                      palette: palette,
-                      value: widget.gender,
-                      values: StudentGender.values,
-                      labelBuilder: (value) => value.label,
-                      onChanged: widget.onGenderChanged,
-                    ),
-                  ),
                 ],
               ),
               const SizedBox(height: 18),
@@ -732,50 +714,69 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                 title: 'Today',
                 subtitle: 'Tiny signals, no judgement.',
               ),
-              ...metrics.map(
-                (metric) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: MetricTile(
-                    palette: palette,
-                    metric: metric,
-                    onTap: () => widget.onMetricTap(metric),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              GlassPanel(
-                palette: palette,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SectionTitle(
-                      title: 'Tracked factors',
-                      subtitle: dailyHeadline,
-                    ),
-                    MiniLineChart(
-                      palette: palette,
-                      values: overallValues,
-                      labels: labels,
-                      lineColor: palette.primary,
-                    ),
-                    if (flags.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: flags
-                            .map(
-                              (flag) => Pill(
-                                icon: Icons.insights_rounded,
-                                label: flag,
-                              ),
-                            )
-                            .toList(),
+              if (!hasTrendData)
+                GlassPanel(
+                  palette: palette,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
+                        title: 'No check-in entries yet',
+                        subtitle:
+                            'Your trend cards and graphs will appear after you submit your first daily check-in.',
+                      ),
+                      Text(
+                        'Once you add a few entries, BAHA will start showing real patterns for sleep, mood, stress, energy, body, and connection.',
                       ),
                     ],
-                  ],
+                  ),
+                )
+              else ...[
+                ...metrics.map(
+                  (metric) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: MetricTile(
+                      palette: palette,
+                      metric: metric,
+                      onTap: () => widget.onMetricTap(metric),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 10),
+                GlassPanel(
+                  palette: palette,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SectionTitle(
+                        title: 'Tracked factors',
+                        subtitle: dailyHeadline,
+                      ),
+                      MiniLineChart(
+                        palette: palette,
+                        values: overallValues,
+                        labels: labels,
+                        lineColor: palette.primary,
+                      ),
+                      if (flags.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: flags
+                              .map(
+                                (flag) => Pill(
+                                  icon: Icons.insights_rounded,
+                                  label: flag,
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 14),
               GlassPanel(
                 palette: palette,
@@ -809,6 +810,21 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                         context,
                       ).textTheme.bodyMedium?.copyWith(color: palette.muted),
                     ),
+                    if (dashboardCallouts.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        'This week at a glance',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 10),
+                      ...dashboardCallouts.map(
+                        (callout) => _ProfileInfoRow(
+                          label: callout.label,
+                          value: callout.value,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1283,9 +1299,6 @@ class _StudentInsightScreenState extends State<StudentInsightScreen> {
   }
 
   Future<_StudentInsightData> _load() async {
-    final summary = await widget.apiClient.getStudentWeeklySummary(
-      identity: widget.identity,
-    );
     final checkins = await widget.apiClient.listStudentCheckins(
       identity: widget.identity,
       limit: 7,
@@ -1303,6 +1316,12 @@ class _StudentInsightScreenState extends State<StudentInsightScreen> {
               responseSetId: checkin.id,
             ),
           ),
+    );
+    final summary = await _loadWeeklySummaryOrFallback(
+      apiClient: widget.apiClient,
+      identity: widget.identity,
+      actor: null,
+      checkinCount: checkins.length,
     );
     final trendPoints = buildTrendPointsFromDetails(details);
     return _StudentInsightData(
@@ -2534,9 +2553,11 @@ class StudentSettingsScreen extends StatefulWidget {
   const StudentSettingsScreen({
     required this.palette,
     required this.actor,
+    required this.identity,
     required this.onboardingState,
     required this.environment,
     required this.profile,
+    required this.themeController,
     required this.onRefreshOnboarding,
     required this.onOpenSupport,
     required this.onEditProfile,
@@ -2546,9 +2567,11 @@ class StudentSettingsScreen extends StatefulWidget {
 
   final PrototypePalette palette;
   final MobileActor? actor;
+  final DevelopmentIdentity identity;
   final AuthOnboardingState? onboardingState;
   final StudentAppEnvironment environment;
   final StudentWellbeingProfile? profile;
+  final ThemeController themeController;
   final Future<void> Function() onRefreshOnboarding;
   final Future<void> Function() onOpenSupport;
   final Future<StudentWellbeingProfile?> Function() onEditProfile;
@@ -2669,13 +2692,38 @@ class _StudentSettingsScreenState extends State<StudentSettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 14),
+                  Text(
+                    'Accent palette',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: AppColorTheme.values.map((theme) {
+                      return ChoiceChip(
+                        label: Text(theme.label),
+                        selected: widget.themeController.colorTheme == theme,
+                        selectedColor: palette.primary.withValues(alpha: .18),
+                        onSelected: (_) {
+                          unawaited(
+                            widget.themeController.setColorTheme(theme),
+                          );
+                          setState(() {});
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 14),
                   _ProfileInfoRow(
                     label: 'API URL',
                     value: widget.environment.apiBaseUrl,
                   ),
                   _ProfileInfoRow(
                     label: 'External ID',
-                    value: widget.environment.defaultExternalAuthId,
+                    value: widget.identity.externalAuthId,
                   ),
                 ],
               ),
@@ -2876,11 +2924,155 @@ class _StudentInsightData {
   final List<WellbeingTrendPoint> trendPoints;
 }
 
+class _DashboardCallout {
+  const _DashboardCallout({required this.label, required this.value});
+
+  final String label;
+  final String value;
+}
+
 class _StudentCalendarData {
   const _StudentCalendarData({required this.templates, required this.modules});
 
   final List<MobileCheckinTemplateSummary> templates;
   final List<StudentModuleSummary> modules;
+}
+
+List<_DashboardCallout> _dashboardCallouts({
+  required StudentWeeklySummary summary,
+  required List<WellbeingTrendPoint> points,
+  required StudentWellbeingProfile? profile,
+}) {
+  final payload = summary.summary;
+  final callouts = <_DashboardCallout>[];
+  final weekStory = payload['week_story']?.toString().trim();
+  final bestProgress = payload['best_progress']?.toString().trim();
+  final watchArea = payload['watch_area']?.toString().trim();
+  final supportNudge = payload['support_nudge']?.toString().trim();
+
+  if (weekStory != null && weekStory.isNotEmpty) {
+    callouts.add(_DashboardCallout(label: 'Story', value: weekStory));
+  }
+  if (bestProgress != null && bestProgress.isNotEmpty) {
+    callouts.add(_DashboardCallout(label: 'Best sign', value: bestProgress));
+  } else {
+    final derived = _derivedImprovement(points);
+    if (derived != null) {
+      callouts.add(_DashboardCallout(label: 'Best sign', value: derived));
+    }
+  }
+  if (watchArea != null && watchArea.isNotEmpty) {
+    callouts.add(_DashboardCallout(label: 'Watch area', value: watchArea));
+  } else {
+    final derived = _derivedWatchArea(points, profile);
+    if (derived != null) {
+      callouts.add(_DashboardCallout(label: 'Watch area', value: derived));
+    }
+  }
+  if (supportNudge != null && supportNudge.isNotEmpty) {
+    callouts.add(
+      _DashboardCallout(label: 'BAHA suggests', value: supportNudge),
+    );
+  }
+  return callouts.take(4).toList();
+}
+
+String? _derivedImprovement(List<WellbeingTrendPoint> points) {
+  if (points.length < 2) {
+    return null;
+  }
+  final first = points.first;
+  final last = points.last;
+  String? bestFactor;
+  double bestDelta = 0;
+  for (final factorKey in const [
+    'sleep',
+    'energy',
+    'mood',
+    'stress',
+    'physical_wellbeing',
+    'connectedness',
+  ]) {
+    final start = first.factorScores[factorKey];
+    final end = last.factorScores[factorKey];
+    if (start == null || end == null) {
+      continue;
+    }
+    final improvement = start - end;
+    if (improvement > bestDelta) {
+      bestDelta = improvement;
+      bestFactor = factorKey;
+    }
+  }
+  if (bestFactor == null || bestDelta < 0.5) {
+    return null;
+  }
+  return '${_factorLabel(bestFactor)} improved most across recent check-ins.';
+}
+
+String? _derivedWatchArea(
+  List<WellbeingTrendPoint> points,
+  StudentWellbeingProfile? profile,
+) {
+  if (points.isEmpty) {
+    return null;
+  }
+  final latest = points.last;
+  MapEntry<String, double>? highest;
+  for (final entry in latest.factorScores.entries) {
+    if (highest == null || entry.value > highest.value) {
+      highest = entry;
+    }
+  }
+  if (highest == null) {
+    return null;
+  }
+  if (highest.value < 2) {
+    return 'No repeated high-strain pattern stands out right now.';
+  }
+  final previousValue = points.length > 1
+      ? points[points.length - 2].factorScores[highest.key]
+      : null;
+  final delta = previousValue == null ? 0 : highest.value - previousValue;
+  final severity = highest.value >= 3
+      ? 'high'
+      : highest.value >= 2
+      ? 'moderate'
+      : 'steady';
+  final direction = delta >= 0.35
+      ? 'worsening'
+      : delta <= -0.35
+      ? 'improving'
+      : 'steady';
+  final label = _factorLabel(highest.key);
+  if (highest.key == 'sleep' &&
+      profile?.profileTags.contains('sleep_vulnerable') == true) {
+    return '$label looks $severity and $direction against this student\'s sleep-sensitive baseline.';
+  }
+  if (highest.key == 'stress' &&
+      profile?.profileTags.contains('school_pressure_driven') == true) {
+    return '$label looks $severity, with school pressure likely to matter most.';
+  }
+  return '$label looks $severity and $direction across recent check-ins.';
+}
+
+String _factorLabel(String factorKey) {
+  switch (factorKey) {
+    case 'sleep':
+      return 'Sleep';
+    case 'energy':
+      return 'Energy';
+    case 'mood':
+      return 'Mood';
+    case 'stress':
+      return 'Stress';
+    case 'physical_wellbeing':
+      return 'Body';
+    case 'connectedness':
+      return 'Connection';
+    default:
+      return 'Wellbeing';
+  }
 }
 
 String _summaryForMetric(
@@ -2949,49 +3141,6 @@ String _factorKeyForMetricLabel(String label) {
   }
 }
 
-class _PrototypeSelector<T> extends StatelessWidget {
-  const _PrototypeSelector({
-    required this.palette,
-    required this.value,
-    required this.values,
-    required this.labelBuilder,
-    required this.onChanged,
-  });
-
-  final PrototypePalette palette;
-  final T value;
-  final List<T> values;
-  final String Function(T value) labelBuilder;
-  final ValueChanged<T> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassPanel(
-      palette: palette,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<T>(
-          isExpanded: true,
-          value: value,
-          items: values
-              .map(
-                (item) => DropdownMenuItem<T>(
-                  value: item,
-                  child: Text(labelBuilder(item)),
-                ),
-              )
-              .toList(),
-          onChanged: (newValue) {
-            if (newValue != null) {
-              onChanged(newValue);
-            }
-          },
-        ),
-      ),
-    );
-  }
-}
-
 class StudentDashboardScreen extends StatefulWidget {
   const StudentDashboardScreen({
     required this.apiClient,
@@ -3024,9 +3173,6 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   }
 
   Future<_StudentDashboardData> _load() async {
-    final summary = await widget.apiClient.getStudentWeeklySummary(
-      identity: widget.identity,
-    );
     final checkins = await widget.apiClient.listStudentCheckins(
       identity: widget.identity,
       limit: 5,
@@ -3041,6 +3187,12 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
               responseSetId: checkin.id,
             ),
           ),
+    );
+    final summary = await _loadWeeklySummaryOrFallback(
+      apiClient: widget.apiClient,
+      identity: widget.identity,
+      actor: widget.actor,
+      checkinCount: checkins.length,
     );
     return _StudentDashboardData(
       summary: summary,
@@ -3341,9 +3493,8 @@ class _StudentCheckinsScreenState extends State<StudentCheckinsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final palette = studentPalette(
-      StudentAgeGroup.teen,
-      StudentGender.female,
+    final palette = appPaletteForTheme(
+      ThemeScope.of(context).colorTheme,
       isDark: ThemeScope.of(context).isDark,
     );
     return Theme(
@@ -3432,23 +3583,28 @@ class _StudentCheckinsScreenState extends State<StudentCheckinsScreen> {
                           subtitle:
                               'Live templates from the backend. Follow-up questions appear only when relevant.',
                         ),
-                        ...data.templates.map(
-                          (template) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: ActionCard(
-                              palette: palette,
-                              item: UiCardItem(
-                                title: template.title,
-                                subtitle:
-                                    '${template.cadence} • ${template.questionCount} questions',
-                                tag: 'Start',
-                                icon: Icons.favorite_rounded,
-                                color: palette.primary,
+                        if (data.templates.isEmpty)
+                          Text(
+                            'No check-in templates are available for this account yet. Pull to refresh after the backend template setup is complete.',
+                          )
+                        else
+                          ...data.templates.map(
+                            (template) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: ActionCard(
+                                palette: palette,
+                                item: UiCardItem(
+                                  title: template.title,
+                                  subtitle:
+                                      '${template.cadence} • ${template.questionCount} questions',
+                                  tag: 'Start',
+                                  icon: Icons.favorite_rounded,
+                                  color: palette.primary,
+                                ),
+                                onTap: () => _openTemplate(template),
                               ),
-                              onTap: () => _openTemplate(template),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -3643,9 +3799,8 @@ class _StudentCheckinFormScreenState extends State<StudentCheckinFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final palette = studentPalette(
-      StudentAgeGroup.teen,
-      StudentGender.female,
+    final palette = appPaletteForTheme(
+      ThemeScope.of(context).colorTheme,
       isDark: ThemeScope.of(context).isDark,
     );
     return Theme(
@@ -3763,7 +3918,10 @@ class _StudentCheckinFormScreenState extends State<StudentCheckinFormScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            question.prompt,
+                            personalizedPromptForQuestion(
+                              question,
+                              widget.profile,
+                            ),
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w800),
                           ),
@@ -3848,9 +4006,8 @@ class _StudentCheckinDetailScreenState
 
   @override
   Widget build(BuildContext context) {
-    final palette = studentPalette(
-      StudentAgeGroup.teen,
-      StudentGender.female,
+    final palette = appPaletteForTheme(
+      ThemeScope.of(context).colorTheme,
       isDark: ThemeScope.of(context).isDark,
     );
     return Theme(
@@ -4100,6 +4257,73 @@ class _StudentCheckinHubData {
 
   final List<MobileCheckinTemplateSummary> templates;
   final List<StudentCheckinSummary> history;
+}
+
+Future<StudentWeeklySummary> _loadWeeklySummaryOrFallback({
+  required BahaApiClient apiClient,
+  required DevelopmentIdentity identity,
+  required MobileActor? actor,
+  required int checkinCount,
+}) async {
+  try {
+    return await apiClient.getStudentWeeklySummary(identity: identity);
+  } on BahaApiException catch (error) {
+    if (error.statusCode != 404) {
+      rethrow;
+    }
+    return _buildEmptyWeeklySummary(actor: actor, checkinCount: checkinCount);
+  }
+}
+
+StudentWeeklySummary _buildEmptyWeeklySummary({
+  required MobileActor? actor,
+  required int checkinCount,
+}) {
+  final now = DateTime.now();
+  final weekStart = DateTime(
+    now.year,
+    now.month,
+    now.day,
+  ).subtract(Duration(days: now.weekday - 1));
+  final weekEnd = weekStart.add(const Duration(days: 6));
+  return StudentWeeklySummary(
+    id: 'local-empty-summary-${actor?.studentProfileId ?? 'student'}',
+    studentProfileId: actor?.studentProfileId ?? '',
+    weekStart: weekStart,
+    weekEnd: weekEnd,
+    privacyTierApplied: 'private',
+    summaryStatus: 'not_started',
+    summary: <String, dynamic>{
+      'headline': checkinCount == 0
+          ? 'Complete your first daily check-in to unlock personal trends.'
+          : 'Your dashboard is getting ready. Complete a few more check-ins to unlock stronger weekly insights.',
+      'mood_trend': checkinCount == 0
+          ? 'No mood trend yet.'
+          : 'Initial mood data is being collected.',
+      'sleep_trend': checkinCount == 0
+          ? 'No sleep trend yet.'
+          : 'Initial sleep data is being collected.',
+      'stress_trend': checkinCount == 0
+          ? 'No stress trend yet.'
+          : 'Initial stress data is being collected.',
+      'energy_trend': checkinCount == 0
+          ? 'No energy trend yet.'
+          : 'Initial energy data is being collected.',
+      'physical_trend': checkinCount == 0
+          ? 'No physical wellbeing trend yet.'
+          : 'Initial physical wellbeing data is being collected.',
+      'connectedness_trend': checkinCount == 0
+          ? 'No connectedness trend yet.'
+          : 'Initial connectedness data is being collected.',
+      'module_progress': checkinCount == 0
+          ? 'Start with a daily check-in or a learning card.'
+          : 'Keep going to build a clearer weekly picture.',
+      'is_placeholder': true,
+    },
+    sourceWindow: <String, dynamic>{'checkins': checkinCount},
+    generationVersion: 'first-use-placeholder',
+    generatedAt: now,
+  );
 }
 
 String _formatDate(DateTime date) {

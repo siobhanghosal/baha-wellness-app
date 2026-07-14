@@ -27,9 +27,9 @@ class BahaApiClient {
     return AuthOnboardingState.fromJson(payload);
   }
 
-  Future<AuthOnboardingState> bootstrapStudent({
+  Future<AuthOnboardingState> bootstrapIdentity({
     required DevelopmentIdentity identity,
-    required StudentBootstrapRequest request,
+    required AppBootstrapRequest request,
   }) async {
     final response = await _httpClient.post(
       Uri.parse('$_baseUrl/auth/bootstrap'),
@@ -39,6 +39,13 @@ class BahaApiClient {
     final payload = _decodeMap(response);
     _ensureSuccess(response.statusCode, payload);
     return AuthOnboardingState.fromJson(payload);
+  }
+
+  Future<AuthOnboardingState> bootstrapStudent({
+    required DevelopmentIdentity identity,
+    required StudentBootstrapRequest request,
+  }) {
+    return bootstrapIdentity(identity: identity, request: request);
   }
 
   Future<MobileActor> getMobileMe({
@@ -340,6 +347,20 @@ class BahaApiClient {
         .toList();
   }
 
+  Future<AuthOnboardingState> linkGuardianStudent({
+    required DevelopmentIdentity identity,
+    required GuardianLinkStudentRequest request,
+  }) async {
+    final response = await _httpClient.post(
+      Uri.parse('$_baseUrl/auth/guardian/link-student'),
+      headers: _headers(identity),
+      body: jsonEncode(request.toJson()),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
+    return AuthOnboardingState.fromJson(payload);
+  }
+
   Future<ParentWeeklySummary> getParentWeeklySummary({
     required DevelopmentIdentity identity,
     required String studentProfileId,
@@ -368,6 +389,22 @@ class BahaApiClient {
     final payload = _decodeMap(response);
     _ensureSuccess(response.statusCode, payload);
     return ParentSummaryConsentStatus.fromJson(payload);
+  }
+
+  Future<PlatformParticipationConsentStatus>
+  getPlatformParticipationConsentStatus({
+    required DevelopmentIdentity identity,
+    required String studentProfileId,
+  }) async {
+    final response = await _httpClient.get(
+      Uri.parse(
+        '$_baseUrl/auth/guardian/consent/platform-participation/$studentProfileId',
+      ),
+      headers: _headers(identity),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
+    return PlatformParticipationConsentStatus.fromJson(payload);
   }
 
   Future<ParentSummaryConsentStatus> updateParentSummaryConsent({
@@ -410,7 +447,7 @@ class BahaApiClient {
     if (response.body.trim().isEmpty) {
       return const <String, dynamic>{};
     }
-    final decoded = jsonDecode(response.body);
+    final decoded = _decodeJsonBody(response);
     if (decoded is Map<String, dynamic>) {
       return decoded;
     }
@@ -424,7 +461,7 @@ class BahaApiClient {
     if (response.body.trim().isEmpty) {
       return const <Map<String, dynamic>>[];
     }
-    final decoded = jsonDecode(response.body);
+    final decoded = _decodeJsonBody(response);
     if (decoded is List) {
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw BahaApiException(
@@ -449,13 +486,59 @@ class BahaApiClient {
     );
   }
 
+  Object _decodeJsonBody(http.Response response) {
+    try {
+      return jsonDecode(response.body);
+    } on FormatException {
+      final rawBody = response.body.trim();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw BahaApiException(
+          statusCode: response.statusCode,
+          message: rawBody.isEmpty ? 'Unexpected API error.' : rawBody,
+        );
+      }
+      throw BahaApiException(
+        statusCode: response.statusCode,
+        message: 'Expected a JSON response body.',
+      );
+    }
+  }
+
   void _ensureSuccess(int statusCode, Map<String, dynamic> payload) {
     if (statusCode >= 200 && statusCode < 300) {
       return;
     }
     throw BahaApiException(
       statusCode: statusCode,
-      message: payload['detail'] as String? ?? 'Unexpected API error.',
+      message: _extractErrorMessage(payload['detail']),
     );
+  }
+
+  String _extractErrorMessage(Object? detail) {
+    if (detail is String && detail.trim().isNotEmpty) {
+      return detail;
+    }
+    if (detail is List) {
+      final messages = detail
+          .map<String>((item) {
+            if (item is Map) {
+              final location = (item['loc'] as List<dynamic>? ?? const [])
+                  .whereType<Object>()
+                  .map((value) => value.toString())
+                  .join(' -> ');
+              final message = item['msg']?.toString().trim();
+              if (message != null && message.isNotEmpty) {
+                return location.isEmpty ? message : '$location: $message';
+              }
+            }
+            return item.toString();
+          })
+          .where((message) => message.trim().isNotEmpty)
+          .toList();
+      if (messages.isNotEmpty) {
+        return messages.join('\n');
+      }
+    }
+    return 'Unexpected API error.';
   }
 }

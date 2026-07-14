@@ -19,10 +19,10 @@ The key decision is:
 
 ## 2. Non-Negotiable Product Constraints From The PRD
 
-These constraints come directly from the PRD and override prototype convenience:
+These constraints come directly from the current product direction and override prototype convenience:
 
-- the product ships as four separate mobile apps: Student, Parent, Teacher, and BAHA/Counselor
-- stakeholder apps are not role-switched views inside one shared app
+- the product now ships as one unified mobile app with role-based student, parent, teacher, and counselor experiences
+- the first UX decision is "who is this app for?" before sign-in or registration
 - student presentation age cohort and legal consent band are separate concepts
 - users aged 9-17 follow the minor consent flow
 - users aged 18-19 follow the self-consent flow
@@ -382,9 +382,9 @@ This order supports the most prototype screens while staying consistent with the
 When Flutter development starts, the frontend developer should:
 
 1. keep the current visual direction from `Solomon_UI_Version1`
-2. split the product into four apps or four app targets immediately
+2. keep one shared app shell and route to the correct role experience after the shared auth flow
 3. replace fake auth with onboarding-state-driven routing
-4. map each app shell to real API contracts
+4. map each role experience to real API contracts
 5. keep decorative or presentation-only state local until product requirements demand persistence
 
 ## 8. Definition Of "Compatible Enough" For Frontend Handoff

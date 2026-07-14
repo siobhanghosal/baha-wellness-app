@@ -32,14 +32,10 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
   late String _usualEnergy;
   late String _weeklyStressFrequency;
   late String _mainPressure;
-  late String _mainPhysicalIssue;
   late String _experiencesPeriods;
   String? _periodImpact;
-  late String _copingStyle;
   late String _helpSeekingEase;
   late String _socialConnectedness;
-  late String _supportPreference;
-  late String _checkinFocus;
 
   @override
   void initState() {
@@ -52,14 +48,10 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
     _usualEnergy = initial?.usualEnergy ?? 'okay';
     _weeklyStressFrequency = initial?.weeklyStressFrequency ?? 'sometimes';
     _mainPressure = initial?.mainPressure ?? 'school';
-    _mainPhysicalIssue = initial?.mainPhysicalIssue ?? 'none';
     _experiencesPeriods = initial?.experiencesPeriods ?? 'prefer_not_to_say';
     _periodImpact = initial?.periodImpact;
-    _copingStyle = initial?.copingStyle ?? 'talk_to_someone';
     _helpSeekingEase = initial?.helpSeekingEase ?? 'mixed';
     _socialConnectedness = initial?.socialConnectedness ?? 'mostly_connected';
-    _supportPreference = initial?.supportPreference ?? 'quick_tips';
-    _checkinFocus = initial?.checkinFocus ?? 'no_preference';
   }
 
   void _save() {
@@ -83,17 +75,75 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
         usualEnergy: _usualEnergy,
         weeklyStressFrequency: _weeklyStressFrequency,
         mainPressure: _mainPressure,
-        mainPhysicalIssue: _mainPhysicalIssue,
+        mainPhysicalIssue: _deriveMainPhysicalIssue(),
         experiencesPeriods: _experiencesPeriods,
         periodImpact: _experiencesPeriods == 'yes' ? _periodImpact : null,
-        copingStyle: _copingStyle,
+        copingStyle: _deriveCopingStyle(),
         helpSeekingEase: _helpSeekingEase,
         socialConnectedness: _socialConnectedness,
-        supportPreference: _supportPreference,
-        checkinFocus: _checkinFocus,
+        supportPreference: _deriveSupportPreference(),
+        checkinFocus: _deriveCheckinFocus(),
       ),
     );
   }
+
+  String _deriveMainPhysicalIssue() {
+    if (_experiencesPeriods == 'yes' &&
+        (_periodImpact == 'often' || _periodImpact == 'a_lot')) {
+      return 'chronic_condition';
+    }
+    if (_schoolDaySleepQuality == 'poor' ||
+        _schoolDaySleepQuality == 'very_poor') {
+      return 'poor_sleep';
+    }
+    return 'none';
+  }
+
+  String _deriveCopingStyle() {
+    if (_trustedSupportPerson == 'friend' ||
+        _trustedSupportPerson == 'teacher_counselor' ||
+        _trustedSupportPerson == 'parent_guardian') {
+      return 'talk_to_someone';
+    }
+    if (_helpSeekingEase == 'hard' || _helpSeekingEase == 'very_hard') {
+      return 'stay_alone';
+    }
+    return 'phone_or_music';
+  }
+
+  String _deriveSupportPreference() {
+    if (_helpSeekingEase == 'very_easy' ||
+        _helpSeekingEase == 'somewhat_easy') {
+      return 'trusted_adult';
+    }
+    if (_ageBand == '9_12') {
+      return 'activities_games';
+    }
+    return 'quick_tips';
+  }
+
+  String _deriveCheckinFocus() {
+    if (_schoolDaySleepQuality == 'poor' ||
+        _schoolDaySleepQuality == 'very_poor') {
+      return 'sleep';
+    }
+    if (_weeklyStressFrequency == 'often' ||
+        _weeklyStressFrequency == 'very_often' ||
+        _weeklyStressFrequency == 'almost_every_day') {
+      return 'stress';
+    }
+    if (_socialConnectedness == 'a_bit_isolated' ||
+        _socialConnectedness == 'very_isolated' ||
+        _mainPressure == 'friends') {
+      return 'connectedness';
+    }
+    if (_mainPressure == 'health') {
+      return 'physical_wellbeing';
+    }
+    return 'mood';
+  }
+
+  bool get _shouldAskPeriodsQuestion => _genderIdentity != 'male';
 
   @override
   Widget build(BuildContext context) {
@@ -129,7 +179,8 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
             _ChoiceSection(
               palette: palette,
               title: 'Identity and support',
-              subtitle: 'Context that changes how the app interprets trends.',
+              subtitle:
+                  'Only the context needed to phrase questions appropriately and interpret patterns responsibly.',
               children: [
                 _ChoiceField(
                   palette: palette,
@@ -148,12 +199,22 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
                   question: 'Gender identity',
                   value: _genderIdentity,
                   options: genderIdentityOptions,
-                  onChanged: (value) => setState(() => _genderIdentity = value),
+                  onChanged: (value) {
+                    setState(() {
+                      _genderIdentity = value;
+                      if (!_shouldAskPeriodsQuestion) {
+                        _experiencesPeriods = 'no';
+                        _periodImpact = null;
+                      } else if (_experiencesPeriods == 'no') {
+                        _experiencesPeriods = 'prefer_not_to_say';
+                      }
+                    });
+                  },
                 ),
                 _ChoiceField(
                   palette: palette,
                   question:
-                      'Who do you usually talk to when something feels wrong?',
+                      'Who do you usually go to first when something feels off?',
                   value: _trustedSupportPerson,
                   options: trustedSupportOptions,
                   onChanged: (value) =>
@@ -165,11 +226,12 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
             _ChoiceSection(
               palette: palette,
               title: 'Baseline wellbeing',
-              subtitle: 'This becomes the reference point for daily check-ins.',
+              subtitle:
+                  'This becomes the baseline that future daily check-ins are compared against.',
               children: [
                 _ChoiceField(
                   palette: palette,
-                  question: 'How is your sleep usually on school days?',
+                  question: 'On a normal school week, how is your sleep?',
                   value: _schoolDaySleepQuality,
                   options: baselineScaleOptions,
                   onChanged: (value) =>
@@ -177,14 +239,14 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
                 ),
                 _ChoiceField(
                   palette: palette,
-                  question: 'How would you describe your usual energy?',
+                  question: 'On most days, how is your energy?',
                   value: _usualEnergy,
                   options: baselineScaleOptions,
                   onChanged: (value) => setState(() => _usualEnergy = value),
                 ),
                 _ChoiceField(
                   palette: palette,
-                  question: 'How often do you feel stressed in a normal week?',
+                  question: 'How often do you feel stressed in a usual week?',
                   value: _weeklyStressFrequency,
                   options: stressFrequencyOptions,
                   onChanged: (value) =>
@@ -192,7 +254,7 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
                 ),
                 _ChoiceField(
                   palette: palette,
-                  question: 'What usually affects you the most?',
+                  question: 'What tends to affect you the most lately?',
                   value: _mainPressure,
                   options: mainPressureOptions,
                   onChanged: (value) => setState(() => _mainPressure = value),
@@ -202,65 +264,10 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
             const SizedBox(height: 18),
             _ChoiceSection(
               palette: palette,
-              title: 'Physical context',
+              title: 'Social and help context',
               subtitle:
-                  'Only ask what changes interpretation meaningfully later on.',
+                  'This helps BAHA understand whether low mood or stress is more likely to stay private, social, or harder to raise.',
               children: [
-                _ChoiceField(
-                  palette: palette,
-                  question: 'What physical issue shows up most often?',
-                  value: _mainPhysicalIssue,
-                  options: physicalIssueOptions,
-                  onChanged: (value) =>
-                      setState(() => _mainPhysicalIssue = value),
-                ),
-                _ChoiceField(
-                  palette: palette,
-                  question: 'Do you experience periods?',
-                  value: _experiencesPeriods,
-                  options: yesNoUnknownOptions,
-                  onChanged: (value) {
-                    setState(() {
-                      _experiencesPeriods = value;
-                      if (value != 'yes') {
-                        _periodImpact = null;
-                      }
-                    });
-                  },
-                ),
-                if (_experiencesPeriods == 'yes')
-                  _ChoiceField(
-                    palette: palette,
-                    question:
-                        'Do periods sometimes affect energy, pain, or mood?',
-                    value: _periodImpact,
-                    options: periodImpactOptions,
-                    onChanged: (value) => setState(() => _periodImpact = value),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            _ChoiceSection(
-              palette: palette,
-              title: 'Social and coping style',
-              subtitle:
-                  'These answers guide support suggestions and follow-up tone.',
-              children: [
-                _ChoiceField(
-                  palette: palette,
-                  question: 'When you feel low, what do you usually do first?',
-                  value: _copingStyle,
-                  options: copingStyleOptions,
-                  onChanged: (value) => setState(() => _copingStyle = value),
-                ),
-                _ChoiceField(
-                  palette: palette,
-                  question: 'How easy is it for you to ask for help?',
-                  value: _helpSeekingEase,
-                  options: helpSeekingOptions,
-                  onChanged: (value) =>
-                      setState(() => _helpSeekingEase = value),
-                ),
                 _ChoiceField(
                   palette: palette,
                   question:
@@ -270,36 +277,60 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
                   onChanged: (value) =>
                       setState(() => _socialConnectedness = value),
                 ),
+                _ChoiceField(
+                  palette: palette,
+                  question: 'How easy is it for you to ask for help?',
+                  value: _helpSeekingEase,
+                  options: helpSeekingOptions,
+                  onChanged: (value) =>
+                      setState(() => _helpSeekingEase = value),
+                ),
               ],
             ),
             const SizedBox(height: 18),
             _ChoiceSection(
               palette: palette,
-              title: 'Support preferences',
+              title: 'Physical context',
               subtitle:
-                  'This decides what the app should prioritize first when it responds.',
+                  'Only asked because it changes how physical wellbeing answers get interpreted later.',
               children: [
-                _ChoiceField(
-                  palette: palette,
-                  question: 'What kind of support feels most comfortable?',
-                  value: _supportPreference,
-                  options: supportPreferenceOptions,
-                  onChanged: (value) =>
-                      setState(() => _supportPreference = value),
-                ),
-                _ChoiceField(
-                  palette: palette,
-                  question:
-                      'If BAHA checks in a little more closely on one area, what should it be?',
-                  value: _checkinFocus,
-                  options: checkinFocusOptions,
-                  onChanged: (value) => setState(() => _checkinFocus = value),
-                ),
+                if (_shouldAskPeriodsQuestion) ...[
+                  _ChoiceField(
+                    palette: palette,
+                    question: 'Do you experience periods?',
+                    value: _experiencesPeriods,
+                    options: yesNoUnknownOptions,
+                    onChanged: (value) {
+                      setState(() {
+                        _experiencesPeriods = value;
+                        if (value != 'yes') {
+                          _periodImpact = null;
+                        }
+                      });
+                    },
+                  ),
+                  if (_experiencesPeriods == 'yes')
+                    _ChoiceField(
+                      palette: palette,
+                      question:
+                          'When they happen, how much do periods affect energy, pain, or mood?',
+                      value: _periodImpact,
+                      options: periodImpactOptions,
+                      onChanged: (value) =>
+                          setState(() => _periodImpact = value),
+                    ),
+                ] else
+                  Text(
+                    'No additional physical-context question is needed here.',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: palette.muted),
+                  ),
               ],
             ),
             const SizedBox(height: 18),
             AnimatedPrimaryButton(
-              label: 'Save profile and continue',
+              label: 'Finish onboarding',
               icon: Icons.check_rounded,
               onPressed: _save,
             ),

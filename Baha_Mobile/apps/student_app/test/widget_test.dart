@@ -7,9 +7,7 @@ import 'package:student_app/src/ui/student_identity_screen.dart';
 import 'package:student_app/src/ui/student_ready_screen.dart';
 
 void main() {
-  testWidgets('shows development identity prompt when no session exists', (
-    tester,
-  ) async {
+  testWidgets('shows unified role-first identity prompt when no session exists', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: StudentIdentityScreen(
@@ -21,8 +19,8 @@ void main() {
       ),
     );
 
-    expect(find.text('Welcome back'), findsOneWidget);
-    expect(find.text('Enter Student App'), findsOneWidget);
+    expect(find.text('One app, role-based experience'), findsOneWidget);
+    expect(find.text('Continue to sign in'), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpWidget(const SizedBox.shrink());
@@ -129,4 +127,4 @@ void _setLargeSurface(WidgetTester tester) {
   });
 }
 
-Future<void> _noop(_) async {}
+Future<String?> _noop(Object? _, Object? mode) async => null;

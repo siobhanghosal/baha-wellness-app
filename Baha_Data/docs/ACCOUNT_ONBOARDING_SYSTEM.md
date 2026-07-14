@@ -32,6 +32,7 @@ The backend now supports:
 - `GET /auth/onboarding-state`
 - `GET /auth/me`
 - `POST /auth/guardian/link-student`
+- `GET /auth/guardian/consent/platform-participation/{student_profile_id}`
 - `POST /auth/guardian/consent/platform-participation`
 - `GET /auth/guardian/consent/parent-summary-sharing/{student_profile_id}`
 - `POST /auth/guardian/consent/parent-summary-sharing`
@@ -82,6 +83,8 @@ Current behavior:
 
 - adult students can become active immediately after bootstrap
 - minor students bootstrap into `users.status = 'pending'`
+- the backend auto-generates a six-digit `guardian_link_verification_code` for student accounts
+- minor students receive both `student_code` and `guardian_link_verification_code` in onboarding state so the app can show them on the waiting screen
 - a guardian with active consent authority can grant platform participation
 - once granted, the backend activates the student account
 
@@ -115,6 +118,11 @@ Lookup supports:
 - `student_profile_id`
 - `student_code`
 
+Current guardian-link rule:
+
+- for the under-18 flow, the guardian must provide the student code plus the student’s verification code
+- adult students are intentionally excluded from this guardian-linking path
+
 The active relationship is stored in:
 
 - `student_guardian_links`
@@ -128,6 +136,7 @@ The active relationship is stored in:
 - current account status
 - assigned roles
 - profile IDs
+- student code and guardian-link verification code where relevant
 - approval status
 - consent status
 - guardian-link status
@@ -140,6 +149,15 @@ This is the backend contract the Flutter developer should use to decide whether 
 - guardian consent pending
 - approval pending
 - ready/active app access
+
+For the current development-auth mobile flow, the client also uses
+`GET /auth/onboarding-state` as a preflight check before opening a session so it
+can distinguish:
+
+- valid sign-in
+- missing account
+- reused sign-in ID during registration
+- reused email during registration
 
 ## 7. What Is Still Deferred
 
