@@ -1,0 +1,545 @@
+{
+  "campaign_acquisition": [
+    {
+      "organization": "IAP Adolescent Health Academy",
+      "accepted": 63,
+      "rejected": 0,
+      "duplicates": 0,
+      "pdfs": 33,
+      "teacher_resources": 4,
+      "parent_resources": 5,
+      "adolescent_resources": 53
+    },
+    {
+      "organization": "NIMHANS",
+      "accepted": 422,
+      "rejected": 0,
+      "duplicates": 7,
+      "pdfs": 419,
+      "teacher_resources": 13,
+      "parent_resources": 201,
+      "adolescent_resources": 64
+    }
+  ],
+  "source_coverage": [
+    {
+      "organization": "NIMHANS",
+      "accepted_count": 422,
+      "pdf_count": 419,
+      "clinical_profiles": 24,
+      "condition_count": 24
+    },
+    {
+      "organization": "WHO",
+      "accepted_count": 210,
+      "pdf_count": 101,
+      "clinical_profiles": 0,
+      "condition_count": 0
+    },
+    {
+      "organization": "IAP Adolescent Health Academy",
+      "accepted_count": 63,
+      "pdf_count": 33,
+      "clinical_profiles": 25,
+      "condition_count": 25
+    },
+    {
+      "organization": "UNICEF",
+      "accepted_count": 42,
+      "pdf_count": 0,
+      "clinical_profiles": 0,
+      "condition_count": 0
+    },
+    {
+      "organization": "Europe PMC",
+      "accepted_count": 6,
+      "pdf_count": 0,
+      "clinical_profiles": 0,
+      "condition_count": 0
+    }
+  ],
+  "topic_coverage": [
+    {
+      "topic": "depression",
+      "current_count": 6,
+      "target_count": 200,
+      "gap": 194
+    },
+    {
+      "topic": "anxiety",
+      "current_count": 4,
+      "target_count": 200,
+      "gap": 196
+    },
+    {
+      "topic": "stress",
+      "current_count": 7,
+      "target_count": 200,
+      "gap": 193
+    },
+    {
+      "topic": "sleep",
+      "current_count": 2,
+      "target_count": 200,
+      "gap": 198
+    },
+    {
+      "topic": "bullying",
+      "current_count": 0,
+      "target_count": 200,
+      "gap": 200
+    },
+    {
+      "topic": "cyberbullying",
+      "current_count": 1,
+      "target_count": 150,
+      "gap": 149
+    },
+    {
+      "topic": "digital wellness",
+      "current_count": 1,
+      "target_count": 200,
+      "gap": 199
+    },
+    {
+      "topic": "nutrition",
+      "current_count": 71,
+      "target_count": 150,
+      "gap": 79
+    },
+    {
+      "topic": "physical activity",
+      "current_count": 26,
+      "target_count": 150,
+      "gap": 124
+    },
+    {
+      "topic": "adhd",
+      "current_count": 15,
+      "target_count": 100,
+      "gap": 85
+    },
+    {
+      "topic": "autism",
+      "current_count": 1,
+      "target_count": 100,
+      "gap": 99
+    },
+    {
+      "topic": "self harm",
+      "current_count": 0,
+      "target_count": 100,
+      "gap": 100
+    },
+    {
+      "topic": "suicide prevention",
+      "current_count": 31,
+      "target_count": 100,
+      "gap": 69
+    },
+    {
+      "topic": "substance abuse",
+      "current_count": 92,
+      "target_count": 100,
+      "gap": 8
+    }
+  ],
+  "top_10_gaps": [
+    {
+      "topic": "bullying",
+      "current_count": 0,
+      "target_count": 200,
+      "gap": 200
+    },
+    {
+      "topic": "digital wellness",
+      "current_count": 1,
+      "target_count": 200,
+      "gap": 199
+    },
+    {
+      "topic": "sleep",
+      "current_count": 2,
+      "target_count": 200,
+      "gap": 198
+    },
+    {
+      "topic": "anxiety",
+      "current_count": 4,
+      "target_count": 200,
+      "gap": 196
+    },
+    {
+      "topic": "depression",
+      "current_count": 6,
+      "target_count": 200,
+      "gap": 194
+    },
+    {
+      "topic": "stress",
+      "current_count": 7,
+      "target_count": 200,
+      "gap": 193
+    },
+    {
+      "topic": "cyberbullying",
+      "current_count": 1,
+      "target_count": 150,
+      "gap": 149
+    },
+    {
+      "topic": "physical activity",
+      "current_count": 26,
+      "target_count": 150,
+      "gap": 124
+    },
+    {
+      "topic": "self harm",
+      "current_count": 0,
+      "target_count": 100,
+      "gap": 100
+    },
+    {
+      "topic": "autism",
+      "current_count": 1,
+      "target_count": 100,
+      "gap": 99
+    }
+  ],
+  "condition_profiles": {
+    "total": 25,
+    "target": 25,
+    "profiles": [
+      {
+        "condition": "ADHD",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 14:25:52.798238+00:00"
+      },
+      {
+        "condition": "Anger",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 16:52:04.381083+00:00"
+      },
+      {
+        "condition": "Anxiety",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 14:25:52.798238+00:00"
+      },
+      {
+        "condition": "Autism",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 14:25:52.798238+00:00"
+      },
+      {
+        "condition": "Bullying",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 16:52:04.381083+00:00"
+      },
+      {
+        "condition": "Burnout",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 14:25:52.798238+00:00"
+      },
+      {
+        "condition": "Cyberbullying",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 14:23:36.689819+00:00"
+      },
+      {
+        "condition": "Depression",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 14:25:52.798238+00:00"
+      },
+      {
+        "condition": "Emotional Regulation",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 14:25:52.798238+00:00"
+      },
+      {
+        "condition": "Exam Stress",
+        "profile_exists": false,
+        "review_status": null,
+        "updated_at": null
+      },
+      {
+        "condition": "Gaming Addiction",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 14:25:52.798238+00:00"
+      },
+      {
+        "condition": "Grief",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 14:25:52.798238+00:00"
+      },
+      {
+        "condition": "Internet Addiction",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 16:52:04.381083+00:00"
+      },
+      {
+        "condition": "Learning Difficulties",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 14:25:52.798238+00:00"
+      },
+      {
+        "condition": "Loneliness",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 14:25:52.798238+00:00"
+      },
+      {
+        "condition": "Peer Pressure",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 16:52:04.381083+00:00"
+      },
+      {
+        "condition": "Performance Anxiety",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 14:25:52.798238+00:00"
+      },
+      {
+        "condition": "Risk Taking",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 16:52:04.381083+00:00"
+      },
+      {
+        "condition": "School Avoidance",
+        "profile_exists": false,
+        "review_status": null,
+        "updated_at": null
+      },
+      {
+        "condition": "School Refusal",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 14:25:52.798238+00:00"
+      },
+      {
+        "condition": "Self Harm",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 14:25:52.798238+00:00"
+      },
+      {
+        "condition": "Sleep Disorders",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 16:52:04.381083+00:00"
+      },
+      {
+        "condition": "Social Isolation",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 14:25:52.798238+00:00"
+      },
+      {
+        "condition": "Stress",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 16:52:04.381083+00:00"
+      },
+      {
+        "condition": "Substance Abuse",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 16:52:04.381083+00:00"
+      },
+      {
+        "condition": "Suicide Prevention",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 14:25:52.798238+00:00"
+      },
+      {
+        "condition": "Suicide Risk",
+        "profile_exists": true,
+        "review_status": "draft",
+        "updated_at": "2026-06-12 13:45:15.323583+00:00"
+      }
+    ],
+    "missing": [
+      "Exam Stress",
+      "School Avoidance"
+    ]
+  },
+  "knowledge_graph": {
+    "node_count": 9004,
+    "edge_count": 46584,
+    "condition_profile_count": 26,
+    "nodes_by_type": [
+      {
+        "node_type": "Intervention",
+        "count": 3300
+      },
+      {
+        "node_type": "Symptom",
+        "count": 1947
+      },
+      {
+        "node_type": "Escalation Indicator",
+        "count": 1177
+      },
+      {
+        "node_type": "Parent Sign",
+        "count": 967
+      },
+      {
+        "node_type": "Risk Factor",
+        "count": 859
+      },
+      {
+        "node_type": "Teacher Sign",
+        "count": 728
+      },
+      {
+        "node_type": "Condition",
+        "count": 26
+      }
+    ],
+    "edges_by_relationship": [
+      {
+        "relationship": "HAS_INTERVENTION",
+        "count": 18177
+      },
+      {
+        "relationship": "HAS_SYMPTOM",
+        "count": 7405
+      },
+      {
+        "relationship": "HAS_ESCALATION_INDICATOR",
+        "count": 6343
+      },
+      {
+        "relationship": "HAS_PARENT_SIGN",
+        "count": 5493
+      },
+      {
+        "relationship": "HAS_RISK_FACTOR",
+        "count": 4587
+      },
+      {
+        "relationship": "HAS_TEACHER_SIGN",
+        "count": 4579
+      }
+    ]
+  },
+  "campaign_candidate_status": [
+    {
+      "organization": "IAP Adolescent Health Academy",
+      "status": "downloaded",
+      "count": 63
+    },
+    {
+      "organization": "IAP Adolescent Health Academy",
+      "status": "failed",
+      "count": 1
+    },
+    {
+      "organization": "NIMHANS",
+      "status": "downloaded",
+      "count": 422
+    },
+    {
+      "organization": "NIMHANS",
+      "status": "failed",
+      "count": 27
+    }
+  ],
+  "generated_at": "2026-06-12T16:55:33.268135+00:00",
+  "embedding_readiness": {
+    "documents_count": 743,
+    "research_papers_count": 6,
+    "requirements": {
+      "documents": 1000,
+      "research_papers": 500,
+      "maximum_major_topic_gap_percent": 20
+    },
+    "major_topic_gaps": [
+      {
+        "topic": "bullying",
+        "gap_percent": 100.0
+      },
+      {
+        "topic": "digital wellness",
+        "gap_percent": 99.5
+      },
+      {
+        "topic": "sleep",
+        "gap_percent": 99.0
+      },
+      {
+        "topic": "anxiety",
+        "gap_percent": 98.0
+      },
+      {
+        "topic": "depression",
+        "gap_percent": 97.0
+      },
+      {
+        "topic": "stress",
+        "gap_percent": 96.5
+      },
+      {
+        "topic": "cyberbullying",
+        "gap_percent": 99.33
+      },
+      {
+        "topic": "physical activity",
+        "gap_percent": 82.67
+      },
+      {
+        "topic": "self harm",
+        "gap_percent": 100.0
+      },
+      {
+        "topic": "autism",
+        "gap_percent": 99.0
+      },
+      {
+        "topic": "adhd",
+        "gap_percent": 85.0
+      },
+      {
+        "topic": "nutrition",
+        "gap_percent": 52.67
+      },
+      {
+        "topic": "suicide prevention",
+        "gap_percent": 69.0
+      }
+    ],
+    "unmet_topics": [
+      "bullying",
+      "digital wellness",
+      "sleep",
+      "anxiety",
+      "depression",
+      "stress",
+      "cyberbullying",
+      "physical activity",
+      "self harm",
+      "autism",
+      "adhd",
+      "nutrition",
+      "suicide prevention"
+    ],
+    "status": "NOT_READY",
+    "ready": false
+  }
+}

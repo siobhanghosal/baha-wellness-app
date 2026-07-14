@@ -1,0 +1,58 @@
+{
+  "accepted_resources": 10,
+  "embedded_resources": 0,
+  "resource_chunks": 0,
+  "resource_embeddings": 0,
+  "condition_embeddings": 0,
+  "knowledge_embeddings": 0,
+  "resource_index_size": "1640 kB",
+  "condition_index_size": "192 kB",
+  "knowledge_index_size": "3232 kB",
+  "model": "BAAI/bge-large-en-v1.5",
+  "dimensions": 1024,
+  "chunk_size": 1024,
+  "chunk_overlap": 150,
+  "indexes": [
+    {
+      "indexname": "condition_embeddings_condition_profile_id_model_content_has_key",
+      "indexdef": "CREATE UNIQUE INDEX condition_embeddings_condition_profile_id_model_content_has_key ON public.condition_embeddings USING btree (condition_profile_id, model, content_hash)"
+    },
+    {
+      "indexname": "condition_embeddings_ivfflat_idx",
+      "indexdef": "CREATE INDEX condition_embeddings_ivfflat_idx ON public.condition_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists='10')"
+    },
+    {
+      "indexname": "condition_embeddings_pkey",
+      "indexdef": "CREATE UNIQUE INDEX condition_embeddings_pkey ON public.condition_embeddings USING btree (id)"
+    },
+    {
+      "indexname": "knowledge_embeddings_ivfflat_idx",
+      "indexdef": "CREATE INDEX knowledge_embeddings_ivfflat_idx ON public.knowledge_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists='200')"
+    },
+    {
+      "indexname": "knowledge_embeddings_knowledge_node_id_model_content_hash_key",
+      "indexdef": "CREATE UNIQUE INDEX knowledge_embeddings_knowledge_node_id_model_content_hash_key ON public.knowledge_embeddings USING btree (knowledge_node_id, model, content_hash)"
+    },
+    {
+      "indexname": "knowledge_embeddings_pkey",
+      "indexdef": "CREATE UNIQUE INDEX knowledge_embeddings_pkey ON public.knowledge_embeddings USING btree (id)"
+    },
+    {
+      "indexname": "resource_embeddings_chunk_id_model_content_hash_key",
+      "indexdef": "CREATE UNIQUE INDEX resource_embeddings_chunk_id_model_content_hash_key ON public.resource_embeddings USING btree (chunk_id, model, content_hash)"
+    },
+    {
+      "indexname": "resource_embeddings_ivfflat_idx",
+      "indexdef": "CREATE INDEX resource_embeddings_ivfflat_idx ON public.resource_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists='100')"
+    },
+    {
+      "indexname": "resource_embeddings_metadata_idx",
+      "indexdef": "CREATE INDEX resource_embeddings_metadata_idx ON public.resource_embeddings USING btree (organization, topic, audience)"
+    },
+    {
+      "indexname": "resource_embeddings_pkey",
+      "indexdef": "CREATE UNIQUE INDEX resource_embeddings_pkey ON public.resource_embeddings USING btree (id)"
+    }
+  ],
+  "generated_at": "2026-07-13T17:18:15.419270+00:00"
+}

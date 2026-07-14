@@ -1,0 +1,54 @@
+{
+  "remaining_above_ten_percent": [
+    {
+      "topic": "bullying",
+      "current_count": 116,
+      "target_count": 200,
+      "gap_count": 84,
+      "gap_percent": "42.00",
+      "below_ten_percent_gap": false
+    },
+    {
+      "topic": "school refusal",
+      "current_count": 0,
+      "target_count": 75,
+      "gap_count": 75,
+      "gap_percent": "100.00",
+      "below_ten_percent_gap": false
+    },
+    {
+      "topic": "performance anxiety",
+      "current_count": 2,
+      "target_count": 75,
+      "gap_count": 73,
+      "gap_percent": "97.33",
+      "below_ten_percent_gap": false
+    },
+    {
+      "topic": "risk taking",
+      "current_count": 7,
+      "target_count": 75,
+      "gap_count": 68,
+      "gap_percent": "90.67",
+      "below_ten_percent_gap": false
+    },
+    {
+      "topic": "peer pressure",
+      "current_count": 8,
+      "target_count": 75,
+      "gap_count": 67,
+      "gap_percent": "89.33",
+      "below_ten_percent_gap": false
+    },
+    {
+      "topic": "self awareness",
+      "current_count": 14,
+      "target_count": 50,
+      "gap_count": 36,
+      "gap_percent": "72.00",
+      "below_ten_percent_gap": false
+    }
+  ],
+  "all_gaps_below_ten_percent": false,
+  "generated_at": "2026-06-13T15:55:10.137793+00:00"
+}

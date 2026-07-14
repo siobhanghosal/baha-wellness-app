@@ -1,0 +1,491 @@
+{
+  "organizations": [
+    {
+      "organization": "Attendance Works",
+      "accepted": 1096,
+      "rejected": 181,
+      "pdfs": 279,
+      "html": 718
+    },
+    {
+      "organization": "CASEL",
+      "accepted": 923,
+      "rejected": 194,
+      "pdfs": 112,
+      "html": 810
+    },
+    {
+      "organization": "Internet Matters",
+      "accepted": 680,
+      "rejected": 40,
+      "pdfs": 114,
+      "html": 556
+    },
+    {
+      "organization": "Common Sense Media",
+      "accepted": 673,
+      "rejected": 1,
+      "pdfs": 140,
+      "html": 533
+    },
+    {
+      "organization": "American School Counselor Association",
+      "accepted": 557,
+      "rejected": 343,
+      "pdfs": 118,
+      "html": 439
+    },
+    {
+      "organization": "National Association of School Psychologists",
+      "accepted": 313,
+      "rejected": 14,
+      "pdfs": 31,
+      "html": 280
+    },
+    {
+      "organization": "National Center for School Mental Health",
+      "accepted": 126,
+      "rejected": 0,
+      "pdfs": 89,
+      "html": 33
+    },
+    {
+      "organization": "National Institute of Open Schooling",
+      "accepted": 0,
+      "rejected": 5,
+      "pdfs": 0,
+      "html": 0
+    }
+  ],
+  "audience_coverage": [
+    {
+      "organization": "American School Counselor Association",
+      "audience": "adolescent",
+      "resources": 4
+    },
+    {
+      "organization": "American School Counselor Association",
+      "audience": "counselor",
+      "resources": 539
+    },
+    {
+      "organization": "American School Counselor Association",
+      "audience": "parent",
+      "resources": 7
+    },
+    {
+      "organization": "American School Counselor Association",
+      "audience": "teacher",
+      "resources": 7
+    },
+    {
+      "organization": "Attendance Works",
+      "audience": "adolescent",
+      "resources": 29
+    },
+    {
+      "organization": "Attendance Works",
+      "audience": "counselor",
+      "resources": 1
+    },
+    {
+      "organization": "Attendance Works",
+      "audience": "general",
+      "resources": 91
+    },
+    {
+      "organization": "Attendance Works",
+      "audience": "parent",
+      "resources": 285
+    },
+    {
+      "organization": "Attendance Works",
+      "audience": "research",
+      "resources": 4
+    },
+    {
+      "organization": "Attendance Works",
+      "audience": "teacher",
+      "resources": 686
+    },
+    {
+      "organization": "CASEL",
+      "audience": "adolescent",
+      "resources": 54
+    },
+    {
+      "organization": "CASEL",
+      "audience": "general",
+      "resources": 43
+    },
+    {
+      "organization": "CASEL",
+      "audience": "parent",
+      "resources": 375
+    },
+    {
+      "organization": "CASEL",
+      "audience": "teacher",
+      "resources": 451
+    },
+    {
+      "organization": "Common Sense Media",
+      "audience": "adolescent",
+      "resources": 37
+    },
+    {
+      "organization": "Common Sense Media",
+      "audience": "general",
+      "resources": 2
+    },
+    {
+      "organization": "Common Sense Media",
+      "audience": "parent",
+      "resources": 232
+    },
+    {
+      "organization": "Common Sense Media",
+      "audience": "research",
+      "resources": 1
+    },
+    {
+      "organization": "Common Sense Media",
+      "audience": "teacher",
+      "resources": 401
+    },
+    {
+      "organization": "Internet Matters",
+      "audience": "adolescent",
+      "resources": 25
+    },
+    {
+      "organization": "Internet Matters",
+      "audience": "general",
+      "resources": 7
+    },
+    {
+      "organization": "Internet Matters",
+      "audience": "parent",
+      "resources": 617
+    },
+    {
+      "organization": "Internet Matters",
+      "audience": "teacher",
+      "resources": 31
+    },
+    {
+      "organization": "National Association of School Psychologists",
+      "audience": "adolescent",
+      "resources": 5
+    },
+    {
+      "organization": "National Association of School Psychologists",
+      "audience": "counselor",
+      "resources": 288
+    },
+    {
+      "organization": "National Association of School Psychologists",
+      "audience": "parent",
+      "resources": 10
+    },
+    {
+      "organization": "National Association of School Psychologists",
+      "audience": "teacher",
+      "resources": 10
+    },
+    {
+      "organization": "National Center for School Mental Health",
+      "audience": "adolescent",
+      "resources": 47
+    },
+    {
+      "organization": "National Center for School Mental Health",
+      "audience": "counselor",
+      "resources": 4
+    },
+    {
+      "organization": "National Center for School Mental Health",
+      "audience": "general",
+      "resources": 12
+    },
+    {
+      "organization": "National Center for School Mental Health",
+      "audience": "parent",
+      "resources": 46
+    },
+    {
+      "organization": "National Center for School Mental Health",
+      "audience": "research",
+      "resources": 2
+    },
+    {
+      "organization": "National Center for School Mental Health",
+      "audience": "teacher",
+      "resources": 15
+    }
+  ],
+  "candidate_status": [
+    {
+      "organization": "American School Counselor Association",
+      "status": "downloaded",
+      "count": 900
+    },
+    {
+      "organization": "American School Counselor Association",
+      "status": "failed",
+      "count": 1
+    },
+    {
+      "organization": "Attendance Works",
+      "status": "downloaded",
+      "count": 1277
+    },
+    {
+      "organization": "CASEL",
+      "status": "downloaded",
+      "count": 1117
+    },
+    {
+      "organization": "CASEL",
+      "status": "failed",
+      "count": 17
+    },
+    {
+      "organization": "Common Sense Media",
+      "status": "downloaded",
+      "count": 674
+    },
+    {
+      "organization": "Education Endowment Foundation",
+      "status": "failed",
+      "count": 92
+    },
+    {
+      "organization": "Internet Matters",
+      "status": "downloaded",
+      "count": 720
+    },
+    {
+      "organization": "National Association of School Psychologists",
+      "status": "downloaded",
+      "count": 327
+    },
+    {
+      "organization": "National Center for School Mental Health",
+      "status": "downloaded",
+      "count": 126
+    },
+    {
+      "organization": "National Institute of Open Schooling",
+      "status": "discovered",
+      "count": 2217
+    },
+    {
+      "organization": "National Institute of Open Schooling",
+      "status": "downloaded",
+      "count": 5
+    },
+    {
+      "organization": "National Institute of Open Schooling",
+      "status": "failed",
+      "count": 202
+    }
+  ],
+  "topic_coverage": [
+    {
+      "topic": "bullying",
+      "current_count": 116,
+      "target_count": 200,
+      "gap_count": 84,
+      "gap_percent": "42.00",
+      "below_ten_percent_gap": false
+    },
+    {
+      "topic": "school refusal",
+      "current_count": 0,
+      "target_count": 75,
+      "gap_count": 75,
+      "gap_percent": "100.00",
+      "below_ten_percent_gap": false
+    },
+    {
+      "topic": "performance anxiety",
+      "current_count": 2,
+      "target_count": 75,
+      "gap_count": 73,
+      "gap_percent": "97.33",
+      "below_ten_percent_gap": false
+    },
+    {
+      "topic": "risk taking",
+      "current_count": 7,
+      "target_count": 75,
+      "gap_count": 68,
+      "gap_percent": "90.67",
+      "below_ten_percent_gap": false
+    },
+    {
+      "topic": "peer pressure",
+      "current_count": 8,
+      "target_count": 75,
+      "gap_count": 67,
+      "gap_percent": "89.33",
+      "below_ten_percent_gap": false
+    },
+    {
+      "topic": "self awareness",
+      "current_count": 14,
+      "target_count": 50,
+      "gap_count": 36,
+      "gap_percent": "72.00",
+      "below_ten_percent_gap": false
+    },
+    {
+      "topic": "cyberbullying",
+      "current_count": 137,
+      "target_count": 150,
+      "gap_count": 13,
+      "gap_percent": "8.67",
+      "below_ten_percent_gap": true
+    },
+    {
+      "topic": "communication skills",
+      "current_count": 76,
+      "target_count": 50,
+      "gap_count": 0,
+      "gap_percent": "0.00",
+      "below_ten_percent_gap": true
+    },
+    {
+      "topic": "decision making",
+      "current_count": 188,
+      "target_count": 50,
+      "gap_count": 0,
+      "gap_percent": "0.00",
+      "below_ten_percent_gap": true
+    },
+    {
+      "topic": "digital wellness",
+      "current_count": 1158,
+      "target_count": 200,
+      "gap_count": 0,
+      "gap_percent": "0.00",
+      "below_ten_percent_gap": true
+    },
+    {
+      "topic": "emotional intelligence",
+      "current_count": 80,
+      "target_count": 50,
+      "gap_count": 0,
+      "gap_percent": "0.00",
+      "below_ten_percent_gap": true
+    },
+    {
+      "topic": "problem solving",
+      "current_count": 53,
+      "target_count": 50,
+      "gap_count": 0,
+      "gap_percent": "0.00",
+      "below_ten_percent_gap": true
+    },
+    {
+      "topic": "resilience",
+      "current_count": 53,
+      "target_count": 50,
+      "gap_count": 0,
+      "gap_percent": "0.00",
+      "below_ten_percent_gap": true
+    },
+    {
+      "topic": "school avoidance",
+      "current_count": 533,
+      "target_count": 75,
+      "gap_count": 0,
+      "gap_percent": "0.00",
+      "below_ten_percent_gap": true
+    },
+    {
+      "topic": "screen time",
+      "current_count": 80,
+      "target_count": 75,
+      "gap_count": 0,
+      "gap_percent": "0.00",
+      "below_ten_percent_gap": true
+    }
+  ],
+  "remaining_above_ten_percent": [
+    {
+      "topic": "bullying",
+      "current_count": 116,
+      "target_count": 200,
+      "gap_count": 84,
+      "gap_percent": "42.00",
+      "below_ten_percent_gap": false
+    },
+    {
+      "topic": "school refusal",
+      "current_count": 0,
+      "target_count": 75,
+      "gap_count": 75,
+      "gap_percent": "100.00",
+      "below_ten_percent_gap": false
+    },
+    {
+      "topic": "performance anxiety",
+      "current_count": 2,
+      "target_count": 75,
+      "gap_count": 73,
+      "gap_percent": "97.33",
+      "below_ten_percent_gap": false
+    },
+    {
+      "topic": "risk taking",
+      "current_count": 7,
+      "target_count": 75,
+      "gap_count": 68,
+      "gap_percent": "90.67",
+      "below_ten_percent_gap": false
+    },
+    {
+      "topic": "peer pressure",
+      "current_count": 8,
+      "target_count": 75,
+      "gap_count": 67,
+      "gap_percent": "89.33",
+      "below_ten_percent_gap": false
+    },
+    {
+      "topic": "self awareness",
+      "current_count": 14,
+      "target_count": 50,
+      "gap_count": 36,
+      "gap_percent": "72.00",
+      "below_ten_percent_gap": false
+    }
+  ],
+  "all_gaps_below_ten_percent": false,
+  "knowledge_graph": {
+    "skill_nodes": 15,
+    "support_nodes": 26954,
+    "edges": [
+      {
+        "relationship": "HAS_PARENT_SUPPORT",
+        "count": 34963
+      },
+      {
+        "relationship": "HAS_SCHOOL_SUPPORT",
+        "count": 14828
+      },
+      {
+        "relationship": "HAS_SKILL_INTERVENTION",
+        "count": 31724
+      },
+      {
+        "relationship": "HAS_TEACHER_SUPPORT",
+        "count": 23630
+      }
+    ]
+  },
+  "embedding_status": "deferred",
+  "generated_at": "2026-06-13T15:55:10.137793+00:00"
+}
