@@ -266,6 +266,43 @@ void main() {
     expect(exchange.assistantMessage.senderType, 'assistant');
   });
 
+  test('streams chat message exchange events', () async {
+    final client = BahaApiClient(
+      baseUrl: 'http://localhost:8000',
+      httpClient: MockClient((request) async {
+        expect(
+          request.url.path,
+          '/mobile/chat/sessions/5fdff4be-a671-4571-8701-4a3cd420a5f2/messages/stream',
+        );
+        expect(request.method, 'POST');
+        return http.Response(
+          '{"type":"ack","user_message":{"id":"1","chat_session_id":"2","sender_type":"user","message_type":"user_query","ordinal":1,"body":"I feel stressed.","structured_payload":{},"retrieval_filters":{},"safety_labels":[],"created_at":"2026-06-27T09:18:17.716179Z","updated_at":"2026-06-27T09:18:17.716179Z"}}\n'
+          '{"type":"delta","delta":"That sounds heavy. "}\n'
+          '{"type":"delta","delta":"Try one small step next."}\n'
+          '{"type":"complete","assistant_message":{"id":"3","chat_session_id":"2","sender_type":"assistant","message_type":"assistant_answer","ordinal":2,"body":"That sounds heavy. Try one small step next.","structured_payload":{},"retrieval_filters":{},"safety_labels":[],"created_at":"2026-06-27T09:18:17.716179Z","updated_at":"2026-06-27T09:18:17.716179Z"},"backend_used":"openai_conversational","retrieved":[]}\n',
+          200,
+          headers: {'content-type': 'application/x-ndjson'},
+        );
+      }),
+    );
+
+    final events = await client
+        .createChatMessageStream(
+          identity: const DevelopmentIdentity(externalAuthId: 'student-ext-id'),
+          sessionId: '5fdff4be-a671-4571-8701-4a3cd420a5f2',
+          request: const MobileChatMessageCreateRequest(
+            body: 'I feel stressed.',
+          ),
+        )
+        .toList();
+
+    expect(events.first.isAck, isTrue);
+    expect(events[1].delta, 'That sounds heavy. ');
+    expect(events[2].delta, 'Try one small step next.');
+    expect(events.last.isComplete, isTrue);
+    expect(events.last.assistantMessage?.body, contains('small step next'));
+  });
+
   test('lists linked parent students', () async {
     final client = BahaApiClient(
       baseUrl: 'http://localhost:8000',

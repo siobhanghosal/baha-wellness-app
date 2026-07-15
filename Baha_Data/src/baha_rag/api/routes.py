@@ -9,6 +9,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -186,6 +187,10 @@ def _assistant_body(response: ChatResponse) -> str:
             answer.when_to_seek_help.strip(),
         ]
     )
+
+
+def _stream_event(payload: dict[str, object]) -> str:
+    return json.dumps(payload, default=str) + "\n"
 
 
 def _primary_role_from_roles(roles: list[str]) -> str | None:
@@ -1511,6 +1516,234 @@ async def mobile_create_chat_message(
         assistant_message=MobileChatMessage.model_validate(assistant_message_row),
         answer=chat_response.answer,
         retrieved=chat_response.retrieved,
+    )
+
+
+@router.post("/mobile/chat/sessions/{session_id}/messages/stream")
+async def mobile_create_chat_message_stream(
+    session_id: UUID,
+    request: MobileChatMessageCreateRequest,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+    retriever: HybridRetriever = Depends(get_retriever),
+    buddy_chat_service: BuddyChatService = Depends(get_buddy_chat_service),
+) -> StreamingResponse:
+    repository = MobileAppRepository(session)
+    owned = await repository.get_chat_session_owned(
+        session_id=session_id,
+        user_id=actor.user_id,
+        audience_app=actor.app_audience,
+        student_profile_id=actor.student_profile_id if "student" in actor.roles else None,
+    )
+    if owned is None:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    user_message_row = await repository.create_chat_message(
+        chat_session_id=session_id,
+        sender_type="user",
+        message_type="user_query",
+        body=request.body,
+        retrieval_filters_json=json.dumps(request.filters),
+    )
+
+    history_rows = await repository.list_chat_messages(
+        chat_session_id=session_id,
+    )
+    chat_request = ChatRequest(
+        message=request.body,
+        audience=(
+            "adolescent"
+            if actor.app_audience == "student"
+            else actor.app_audience
+        ),
+        filters=request.filters,
+    )
+    history = [
+        {
+            "role": (
+                "assistant" if row["sender_type"] == "assistant" else "user"
+            ),
+            "content": row["body"],
+        }
+        for row in history_rows
+    ]
+    plan = await buddy_chat_service.prepare_reply(
+        request=chat_request,
+        retriever=retriever,
+    )
+
+    async def event_stream() -> AsyncIterator[str]:
+        accumulated = ""
+        backend_used = plan.strategy
+        fallback_reason = plan.fallback_reason
+        chat_response: ChatResponse
+        try:
+            yield _stream_event(
+                {
+                    "type": "ack",
+                    "user_message": MobileChatMessage.model_validate(
+                        user_message_row
+                    ).model_dump(mode="json"),
+                    "backend_used": backend_used,
+                    "fallback_reason": fallback_reason,
+                }
+            )
+
+            if plan.response is not None:
+                chat_response = plan.response
+                accumulated = buddy_chat_service.assistant_text_from_answer(
+                    chat_response.answer
+                )
+                if accumulated:
+                    yield _stream_event({"type": "delta", "delta": accumulated})
+            else:
+                async for delta in buddy_chat_service.stream_reply_text(
+                    request=chat_request,
+                    plan=plan,
+                    history=history,
+                ):
+                    accumulated += delta
+                    yield _stream_event({"type": "delta", "delta": delta})
+                if not accumulated.strip():
+                    fallback_result = await buddy_chat_service.generate(
+                        request=chat_request,
+                        retriever=retriever,
+                        history=history,
+                    )
+                    backend_used = f"{fallback_result.backend_used}_fallback"
+                    fallback_reason = (
+                        fallback_result.fallback_reason
+                        or "stream_returned_no_text"
+                    )
+                    chat_response = fallback_result.response
+                    accumulated = buddy_chat_service.assistant_text_from_answer(
+                        chat_response.answer
+                    )
+                    if accumulated:
+                        yield _stream_event({"type": "delta", "delta": accumulated})
+                    else:
+                        raise ValueError("No assistant text was returned from Buddy.")
+                else:
+                    chat_response = ChatResponse(
+                        answer=buddy_chat_service.text_reply_to_answer(
+                            condition=plan.condition,
+                            perspective=chat_request.audience,
+                            query=chat_request.message,
+                            reply_text=accumulated,
+                            evidence=plan.evidence
+                            if plan.strategy == "openai_grounded"
+                            else [],
+                        ),
+                        retrieved=plan.evidence
+                        if plan.strategy == "openai_grounded"
+                        else [],
+                    )
+
+            safety = assess_safety(request.body)
+            safety_labels = []
+            if safety.emergency_indicators:
+                safety_labels.append("emergency")
+            if safety.diagnostic_request:
+                safety_labels.append("diagnostic_request")
+
+            assistant_message_row = await repository.create_chat_message(
+                chat_session_id=session_id,
+                sender_type="assistant",
+                message_type="assistant_answer",
+                body=accumulated.strip(),
+                structured_payload_json=json.dumps(
+                    {
+                        "answer": chat_response.answer.model_dump(mode="json"),
+                        "generation": {
+                            "backend_used": backend_used,
+                            "fallback_reason": fallback_reason,
+                        },
+                    }
+                ),
+                safety_labels_json=json.dumps(safety_labels),
+            )
+
+            if chat_response.retrieved:
+                await repository.add_chat_answer_citations(
+                    chat_message_id=assistant_message_row["id"],
+                    citations=[
+                        {
+                            "resource_id": result.document_id,
+                            "chunk_id": result.chunk_id,
+                            "citation_label": (
+                                result.citations[0].title
+                                if result.citations
+                                else "Retrieved evidence"
+                            ),
+                            "confidence": result.confidence,
+                        }
+                        for result in chat_response.retrieved
+                    ],
+                )
+
+            safety_disposition = None
+            if safety.emergency_indicators and actor.student_profile_id is not None:
+                signal = await repository.create_monitoring_signal(
+                    student_profile_id=actor.student_profile_id,
+                    signal_type="chatbot_risk_phrase",
+                    severity="emergency",
+                    title="Emergency language detected in chat",
+                    signal_summary="Student chat message contained emergency self-harm or harm indicators.",
+                    derived_facts_json=json.dumps(
+                        {
+                            "message_id": str(user_message_row["id"]),
+                            "session_id": str(session_id),
+                        }
+                    ),
+                )
+                await repository.attach_signal_source(
+                    monitoring_signal_id=signal["id"],
+                    source_type="chat_message",
+                    source_record_id=user_message_row["id"],
+                    contribution_weight=1.0,
+                    summary="Emergency terms detected in student chat message",
+                )
+                await repository.create_escalation_case(
+                    student_profile_id=actor.student_profile_id,
+                    primary_signal_id=signal["id"],
+                    opened_by_user_id=actor.user_id,
+                    case_type="crisis",
+                    severity="emergency",
+                    title="Emergency chat escalation",
+                    summary="Chat message triggered an emergency safeguarding review.",
+                    privacy_override_active=True,
+                    override_reason="Emergency chat signal",
+                )
+                safety_disposition = "emergency"
+
+            await repository.touch_chat_session(
+                chat_session_id=session_id,
+                safety_disposition=safety_disposition,
+            )
+            await session.commit()
+
+            yield _stream_event(
+                {
+                    "type": "complete",
+                    "assistant_message": MobileChatMessage.model_validate(
+                        assistant_message_row
+                    ).model_dump(mode="json"),
+                    "backend_used": backend_used,
+                    "fallback_reason": fallback_reason,
+                    "retrieved": [
+                        result.model_dump(mode="json")
+                        for result in chat_response.retrieved
+                    ],
+                }
+            )
+        except Exception as error:
+            await session.rollback()
+            yield _stream_event({"type": "error", "message": str(error)})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-cache"},
     )
 
 

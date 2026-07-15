@@ -169,6 +169,12 @@ The implemented mobile-facing routes are:
 - `GET /mobile/chat/sessions/{session_id}/messages`
 - `POST /mobile/chat/sessions/{session_id}/messages`
 
+Buddy runtime note:
+
+- the Flutter chat contract does not change as long as Buddy stays behind the same backend endpoint
+- retrieval remains local to BAHA storage and pgvector
+- the current final answer-generation step is OpenAI-backed
+
 ### Student
 
 - `GET /mobile/student/weekly-summary/latest`

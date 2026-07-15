@@ -13,11 +13,22 @@ class _FakeRetriever:
     def __init__(self, results: list[SearchResult]) -> None:
         self._results = results
 
-    async def search(self, query: str, *, top_k: int, filters: dict[str, str]) -> list[SearchResult]:
+    async def search(
+        self,
+        query: str,
+        *,
+        top_k: int,
+        filters: dict[str, str],
+    ) -> list[SearchResult]:
         return self._results
 
 
-def _sample_result(*, confidence: float = 0.78) -> SearchResult:
+def _sample_result(
+    *,
+    confidence: float = 0.78,
+    dense_score: float = 0.71,
+    lexical_score: float = 0.65,
+) -> SearchResult:
     return SearchResult(
         chunk_id=uuid4(),
         document_id=uuid4(),
@@ -39,116 +50,361 @@ def _sample_result(*, confidence: float = 0.78) -> SearchResult:
                 url="https://example.com/stress-guide",
             )
         ],
-        dense_score=0.71,
-        lexical_score=0.65,
+        dense_score=dense_score,
+        lexical_score=lexical_score,
         confidence=confidence,
     )
 
 
-def test_buddy_chat_service_uses_ollama_when_grounded_output_is_valid() -> None:
+def _openai_json_response(
+    *,
+    what_it_is: str = "That sounds like a lot. We can take it one step at a time.",
+    how_to_identify_it: str = "Notice what part feels biggest right now and how it is affecting your day.",
+    what_to_do: str = "Try one small next step first, and reach out to a trusted adult if it keeps building.",
+    when_to_seek_help: str = "Seek extra help if it starts feeling unsafe or too heavy to manage alone.",
+    answerable_from_corpus: bool = True,
+) -> dict[str, object]:
+    return {
+        "model": "gpt-5-nano",
+        "output": [
+            {
+                "type": "message",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "text": json.dumps(
+                            {
+                                "answerable_from_corpus": answerable_from_corpus,
+                                "what_it_is": what_it_is,
+                                "how_to_identify_it": how_to_identify_it,
+                                "what_to_do": what_to_do,
+                                "when_to_seek_help": when_to_seek_help,
+                            }
+                        ),
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def test_buddy_chat_service_keeps_emergency_handling_local() -> None:
+    async def run() -> None:
+        service = BuddyChatService(Settings(buddy_generation_backend="openai"))
+        result = await service.generate(
+            request=ChatRequest(
+                message="I want to hurt myself.",
+                audience="adolescent",
+            ),
+            retriever=_FakeRetriever([]),
+            history=[],
+        )
+
+        assert result.backend_used == "safety_local"
+        assert result.response.answer.condition == "Safety"
+        assert "safety matters" in result.response.answer.what_it_is.lower()
+
+    asyncio.run(run())
+
+
+def test_buddy_chat_service_uses_openai_for_greeting() -> None:
+    async def run() -> None:
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(200, json=_openai_json_response())
+        )
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="https://api.openai.com/v1",
+        ) as client:
+            service = BuddyChatService(
+                Settings(
+                    buddy_generation_backend="openai",
+                    buddy_openai_api_key="test-key",
+                    buddy_openai_base_url="https://api.openai.com/v1",
+                ),
+                http_client=client,
+            )
+            result = await service.generate(
+                request=ChatRequest(message="hello", audience="adolescent"),
+                retriever=_FakeRetriever([]),
+                history=[],
+            )
+
+        assert result.backend_used == "openai_conversational"
+        assert result.response.retrieved == []
+
+    asyncio.run(run())
+
+
+def test_buddy_chat_service_uses_openai_for_supportive_venting() -> None:
     async def run() -> None:
         transport = httpx.MockTransport(
             lambda request: httpx.Response(
                 200,
-                json={
-                    "message": {
-                        "role": "assistant",
-                        "content": json.dumps(
-                            {
-                                "answerable_from_corpus": True,
-                                "what_it_is": "The retrieved BAHA material describes exam stress as pressure that can build up around workload, sleep, and expectations.",
-                                "how_to_identify_it": "The same material points to overwhelmed feelings, sleep disruption, and trouble staying steady with school routines.",
-                                "what_to_do": "It suggests smaller study blocks, sleep support, and reaching out to a trusted adult when the pressure keeps building.",
-                                "when_to_seek_help": "Seek extra support when stress keeps getting worse, starts affecting daily life, or feels too heavy to manage alone.",
-                            }
-                        ),
-                    }
-                },
+                json=_openai_json_response(
+                    what_it_is="That sounds exhausting. I’m glad you said it out loud.",
+                ),
             )
         )
         async with httpx.AsyncClient(
             transport=transport,
-            base_url="http://ollama.local",
+            base_url="https://api.openai.com/v1",
         ) as client:
             service = BuddyChatService(
                 Settings(
-                    buddy_generation_backend="ollama",
-                    buddy_ollama_base_url="http://ollama.local",
-                    buddy_min_retrieval_confidence=0.45,
+                    buddy_generation_backend="openai",
+                    buddy_openai_api_key="test-key",
+                    buddy_openai_base_url="https://api.openai.com/v1",
                 ),
                 http_client=client,
             )
             result = await service.generate(
                 request=ChatRequest(
-                    message="I feel stressed about exams and can't focus.",
+                    message="I feel really overwhelmed and tired lately",
                     audience="adolescent",
                 ),
-                retriever=_FakeRetriever([_sample_result()]),
-                history=[{"role": "user", "content": "I feel behind in school."}],
+                retriever=_FakeRetriever([]),
+                history=[],
             )
 
-        assert result.backend_used == "ollama"
-        assert result.response.answer.what_to_do.startswith("It suggests")
-        assert result.response.answer.confidence > 0
-        assert result.response.retrieved
+        assert result.backend_used == "openai_conversational"
+        assert "glad you said it out loud" in result.response.answer.what_it_is.lower()
 
     asyncio.run(run())
 
 
-def test_buddy_chat_service_returns_scope_guard_for_low_confidence_retrieval() -> None:
-    async def run() -> None:
-        service = BuddyChatService(
-            Settings(
-                buddy_generation_backend="ollama",
-                buddy_min_retrieval_confidence=0.9,
-            ),
-        )
-        result = await service.generate(
-            request=ChatRequest(
-                message="Tell me about a random celebrity scandal.",
-                audience="adolescent",
-            ),
-            retriever=_FakeRetriever([_sample_result(confidence=0.32)]),
-            history=[],
-        )
-
-        assert result.backend_used == "scope_guard"
-        assert result.fallback_reason == "low_retrieval_confidence"
-        assert "only answer using the approved BAHA material" in result.response.answer.what_it_is
-        assert result.response.answer.confidence == 0.0
-
-    asyncio.run(run())
-
-
-def test_buddy_chat_service_falls_back_to_composer_when_ollama_fails() -> None:
+def test_buddy_chat_service_uses_grounded_openai_for_advice_question() -> None:
     async def run() -> None:
         transport = httpx.MockTransport(
-            lambda request: httpx.Response(503, json={"error": "model unavailable"})
+            lambda request: httpx.Response(
+                200,
+                json=_openai_json_response(
+                    what_it_is="The BAHA material describes stress building around exams and expectations.",
+                    how_to_identify_it="It points to overwhelm, disrupted sleep, and difficulty focusing.",
+                    what_to_do="It suggests smaller study blocks, sleep support, and talking to a trusted adult if the pressure keeps growing.",
+                ),
+            )
         )
         async with httpx.AsyncClient(
             transport=transport,
-            base_url="http://ollama.local",
+            base_url="https://api.openai.com/v1",
         ) as client:
             service = BuddyChatService(
                 Settings(
-                    buddy_generation_backend="ollama",
-                    buddy_ollama_base_url="http://ollama.local",
+                    buddy_generation_backend="openai",
+                    buddy_openai_api_key="test-key",
+                    buddy_openai_base_url="https://api.openai.com/v1",
                     buddy_min_retrieval_confidence=0.45,
                 ),
                 http_client=client,
             )
             result = await service.generate(
                 request=ChatRequest(
-                    message="How can I manage exam stress better?",
+                    message="How do I handle school stress?",
                     audience="adolescent",
                 ),
                 retriever=_FakeRetriever([_sample_result()]),
                 history=[],
             )
 
-        assert result.backend_used == "composer"
-        assert result.fallback_reason is not None
-        assert "support" in result.response.answer.what_to_do.lower()
+        assert result.backend_used == "openai_grounded"
         assert result.response.retrieved
+        assert "BAHA material" in result.response.answer.what_it_is
+
+    asyncio.run(run())
+
+
+def test_buddy_chat_service_falls_back_to_conversation_when_retrieval_is_weak() -> None:
+    async def run() -> None:
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(200, json=_openai_json_response())
+        )
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="https://api.openai.com/v1",
+        ) as client:
+            service = BuddyChatService(
+                Settings(
+                    buddy_generation_backend="openai",
+                    buddy_openai_api_key="test-key",
+                    buddy_openai_base_url="https://api.openai.com/v1",
+                    buddy_min_retrieval_confidence=0.9,
+                ),
+                http_client=client,
+            )
+            result = await service.generate(
+                request=ChatRequest(
+                    message="How do I handle bullying?",
+                    audience="adolescent",
+                ),
+                retriever=_FakeRetriever(
+                    [_sample_result(confidence=0.22, dense_score=0.02, lexical_score=0.0)]
+                ),
+                history=[],
+            )
+
+        assert result.backend_used == "openai_conversational"
+        assert result.fallback_reason == "low_retrieval_confidence"
+
+    asyncio.run(run())
+
+
+def test_buddy_chat_service_raises_when_openai_is_not_configured() -> None:
+    async def run() -> None:
+        service = BuddyChatService(
+            Settings(
+                buddy_generation_backend="openai",
+                buddy_openai_api_key="",
+            ),
+        )
+        try:
+            await service.generate(
+                request=ChatRequest(message="hello", audience="adolescent"),
+                retriever=_FakeRetriever([]),
+                history=[],
+            )
+        except ValueError as error:
+            assert "BUDDY_OPENAI_API_KEY" in str(error)
+        else:
+            raise AssertionError("Expected missing OpenAI configuration to fail")
+
+    asyncio.run(run())
+
+
+def test_buddy_chat_service_falls_back_to_conversation_when_grounded_output_is_invalid() -> None:
+    async def run() -> None:
+        calls = {"count": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["count"] += 1
+            if calls["count"] == 1:
+                return httpx.Response(
+                    200,
+                    json={
+                        "model": "gpt-5-nano",
+                        "output": [
+                            {
+                                "type": "message",
+                                "content": [
+                                    {
+                                        "type": "output_text",
+                                        "text": json.dumps(
+                                            {
+                                                "answerable_from_corpus": True,
+                                                "what_it_is": None,
+                                                "how_to_identify_it": None,
+                                                "what_to_do": None,
+                                                "when_to_seek_help": None,
+                                            }
+                                        ),
+                                    }
+                                ],
+                            }
+                        ],
+                    },
+                )
+            return httpx.Response(200, json=_openai_json_response())
+
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            base_url="https://api.openai.com/v1",
+        ) as client:
+            service = BuddyChatService(
+                Settings(
+                    buddy_generation_backend="openai",
+                    buddy_openai_api_key="test-key",
+                    buddy_openai_base_url="https://api.openai.com/v1",
+                ),
+                http_client=client,
+            )
+            result = await service.generate(
+                request=ChatRequest(
+                    message="How can I improve my sleep?",
+                    audience="adolescent",
+                ),
+                retriever=_FakeRetriever([_sample_result()]),
+                history=[],
+            )
+
+        assert result.backend_used == "openai_conversational"
+        assert result.fallback_reason == "invalid_grounded_model_output"
+        assert calls["count"] == 2
+
+    asyncio.run(run())
+
+
+def test_buddy_chat_service_raises_when_openai_request_fails() -> None:
+    async def run() -> None:
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(503, json={"error": "model unavailable"})
+        )
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="https://api.openai.com/v1",
+        ) as client:
+            service = BuddyChatService(
+                Settings(
+                    buddy_generation_backend="openai",
+                    buddy_openai_api_key="test-key",
+                    buddy_openai_base_url="https://api.openai.com/v1",
+                ),
+                http_client=client,
+            )
+            try:
+                await service.generate(
+                    request=ChatRequest(message="hello", audience="adolescent"),
+                    retriever=_FakeRetriever([]),
+                    history=[],
+                )
+            except httpx.HTTPStatusError:
+                return
+            raise AssertionError("Expected OpenAI request failure to propagate")
+
+    asyncio.run(run())
+
+
+def test_buddy_stream_parser_does_not_duplicate_done_text() -> None:
+    class _FakeStreamResponse:
+        async def aiter_lines(self):
+            events = [
+                'data: {"type":"response.output_text.delta","delta":"Hi"}',
+                'data: {"type":"response.output_text.delta","delta":" there"}',
+                'data: {"type":"response.output_text.done","text":"Hi there"}',
+                'data: [DONE]',
+            ]
+            for item in events:
+                yield item
+
+    async def run() -> None:
+        service = BuddyChatService(Settings(buddy_generation_backend="openai"))
+        deltas = [
+            chunk
+            async for chunk in service._iter_openai_stream_text(_FakeStreamResponse())  # type: ignore[arg-type]
+        ]
+        assert deltas == ["Hi", " there"]
+
+    asyncio.run(run())
+
+
+def test_buddy_stream_parser_uses_completed_text_as_fallback() -> None:
+    class _FakeStreamResponse:
+        async def aiter_lines(self):
+            events = [
+                (
+                    'data: {"type":"response.completed","response":{"output":['
+                    '{"type":"message","content":[{"type":"output_text","text":"Hello there"}]}]}}'
+                ),
+                'data: [DONE]',
+            ]
+            for item in events:
+                yield item
+
+    async def run() -> None:
+        service = BuddyChatService(Settings(buddy_generation_backend="openai"))
+        deltas = [
+            chunk
+            async for chunk in service._iter_openai_stream_text(_FakeStreamResponse())  # type: ignore[arg-type]
+        ]
+        assert deltas == ["Hello there"]
 
     asyncio.run(run())

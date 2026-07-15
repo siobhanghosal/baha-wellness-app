@@ -249,6 +249,17 @@ Returns persisted messages for a chat session.
 
 Stores a user message, generates a cited assistant response, stores both, and raises emergency monitoring items when required.
 
+`POST /mobile/chat/sessions/{session_id}/messages/stream`
+
+Streams Buddy chat events for the mobile client while still persisting the final assistant message at the end.
+
+Stream behavior:
+
+- first emits an `ack` event with the persisted user message
+- then emits zero or more `delta` events as assistant text arrives from OpenAI
+- finally emits a `complete` event with the persisted assistant message and retrieval metadata
+- emits an `error` event if generation fails after the stream has started
+
 ### Counselor / BAHA app
 
 `GET /mobile/counselor/queue`

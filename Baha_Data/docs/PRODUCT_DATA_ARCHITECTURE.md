@@ -59,7 +59,7 @@ Important current runtime status:
 
 - the local backend currently has product content for app screens
 - but the retrieval-backed chatbot knowledge index is still effectively unpopulated
-- that means BAHA Buddy can now run through the local LLM architecture, but it will correctly stay in scope-guard mode until approved corpus material is imported and indexed into the retrieval tables
+- that means BAHA Buddy can now run through the OpenAI-backed grounded-chat architecture, but it will correctly stay in scope-guard mode until approved corpus material is imported and indexed into the retrieval tables
 
 For the first Buddy retrieval activation pass, do **not** point the chatbot at the full raw corpus immediately.
 

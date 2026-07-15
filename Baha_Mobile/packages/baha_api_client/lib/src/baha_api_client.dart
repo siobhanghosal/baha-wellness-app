@@ -5,6 +5,56 @@ import 'package:http/http.dart' as http;
 
 import 'baha_api_exception.dart';
 
+class BuddyChatStreamEvent {
+  const BuddyChatStreamEvent({
+    required this.type,
+    this.delta,
+    this.message,
+    this.userMessage,
+    this.assistantMessage,
+    this.backendUsed,
+    this.fallbackReason,
+    this.retrieved = const [],
+  });
+
+  final String type;
+  final String? delta;
+  final String? message;
+  final MobileChatMessage? userMessage;
+  final MobileChatMessage? assistantMessage;
+  final String? backendUsed;
+  final String? fallbackReason;
+  final List<Map<String, dynamic>> retrieved;
+
+  bool get isAck => type == 'ack';
+  bool get isDelta => type == 'delta';
+  bool get isComplete => type == 'complete';
+  bool get isError => type == 'error';
+
+  factory BuddyChatStreamEvent.fromJson(Map<String, dynamic> json) {
+    return BuddyChatStreamEvent(
+      type: json['type'] as String? ?? 'unknown',
+      delta: json['delta'] as String?,
+      message: json['message'] as String?,
+      userMessage: json['user_message'] is Map
+          ? MobileChatMessage.fromJson(
+              Map<String, dynamic>.from(json['user_message'] as Map),
+            )
+          : null,
+      assistantMessage: json['assistant_message'] is Map
+          ? MobileChatMessage.fromJson(
+              Map<String, dynamic>.from(json['assistant_message'] as Map),
+            )
+          : null,
+      backendUsed: json['backend_used'] as String?,
+      fallbackReason: json['fallback_reason'] as String?,
+      retrieved: (json['retrieved'] as List<dynamic>? ?? const [])
+          .map((value) => Map<String, dynamic>.from(value as Map))
+          .toList(),
+    );
+  }
+}
+
 class BahaApiClient {
   BahaApiClient({required String baseUrl, http.Client? httpClient})
     : _baseUrl = baseUrl.endsWith('/')
@@ -334,6 +384,47 @@ class BahaApiClient {
     return MobileChatExchangeResponse.fromJson(payload);
   }
 
+  Stream<BuddyChatStreamEvent> createChatMessageStream({
+    required DevelopmentIdentity identity,
+    required String sessionId,
+    required MobileChatMessageCreateRequest request,
+  }) async* {
+    final httpRequest = http.Request(
+      'POST',
+      Uri.parse('$_baseUrl/mobile/chat/sessions/$sessionId/messages/stream'),
+    );
+    httpRequest.headers.addAll(_headers(identity));
+    httpRequest.body = jsonEncode(request.toJson());
+
+    final response = await _httpClient.send(httpRequest);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final rawBody = await response.stream.bytesToString();
+      final payload = _tryDecodeMap(rawBody);
+      _ensureSuccess(response.statusCode, payload);
+      throw BahaApiException(
+        statusCode: response.statusCode,
+        message: rawBody.isEmpty ? 'Unexpected API error.' : rawBody,
+      );
+    }
+
+    await for (final line
+        in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) {
+        continue;
+      }
+      final payload = Map<String, dynamic>.from(jsonDecode(trimmed) as Map);
+      final event = BuddyChatStreamEvent.fromJson(payload);
+      if (event.isError) {
+        throw BahaApiException(
+          statusCode: 500,
+          message: event.message ?? 'Buddy streaming failed.',
+        );
+      }
+      yield event;
+    }
+  }
+
   Future<List<MobileLinkedStudentSummary>> listParentStudents({
     required DevelopmentIdentity identity,
   }) async {
@@ -455,6 +546,24 @@ class BahaApiClient {
       statusCode: response.statusCode,
       message: 'Expected a JSON object response.',
     );
+  }
+
+  Map<String, dynamic> _tryDecodeMap(String rawBody) {
+    if (rawBody.trim().isEmpty) {
+      return const <String, dynamic>{};
+    }
+    try {
+      final decoded = jsonDecode(rawBody);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+    } on FormatException {
+      return const <String, dynamic>{};
+    }
+    return const <String, dynamic>{};
   }
 
   List<Map<String, dynamic>> _decodeList(http.Response response) {

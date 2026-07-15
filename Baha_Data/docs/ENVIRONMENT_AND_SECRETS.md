@@ -85,40 +85,42 @@ Current expected meaning:
 - `CRAWL_DOWNLOAD_DELAY_SECONDS`
 - `CRAWL_DEPTH_LIMIT`
 
-## 8. Local Buddy LLM
+## 8. Buddy OpenAI Generation
 
 - `BUDDY_GENERATION_BACKEND`
-- `BUDDY_OLLAMA_BASE_URL`
-- `BUDDY_OLLAMA_MODEL`
-- `BUDDY_OLLAMA_TIMEOUT_SECONDS`
-- `BUDDY_OLLAMA_KEEP_ALIVE`
-- `BUDDY_OLLAMA_THINK`
+- `BUDDY_OPENAI_API_KEY`
+- `BUDDY_OPENAI_BASE_URL`
+- `BUDDY_OPENAI_MODEL`
+- `BUDDY_OPENAI_TIMEOUT_SECONDS`
 - `BUDDY_HISTORY_WINDOW`
 - `BUDDY_MIN_RETRIEVAL_CONFIDENCE`
 
-Current intended local values:
+Buddy now uses a single answer-generation path on top of the same local retrieval stack:
+
+- `openai`: OpenAI Responses API generation with retrieved BAHA evidence
+
+Current OpenAI example:
 
 ```bash
-BUDDY_GENERATION_BACKEND=ollama
-BUDDY_OLLAMA_BASE_URL=http://localhost:11434
-BUDDY_OLLAMA_MODEL=qwen3:4b
-BUDDY_OLLAMA_TIMEOUT_SECONDS=60
-BUDDY_OLLAMA_KEEP_ALIVE=10m
-BUDDY_OLLAMA_THINK=false
+BUDDY_GENERATION_BACKEND=openai
+BUDDY_OPENAI_API_KEY=...
+BUDDY_OPENAI_BASE_URL=https://api.openai.com/v1
+BUDDY_OPENAI_MODEL=gpt-5-nano
+BUDDY_OPENAI_TIMEOUT_SECONDS=60
 BUDDY_HISTORY_WINDOW=6
-BUDDY_MIN_RETRIEVAL_CONFIDENCE=0.45
+BUDDY_MIN_RETRIEVAL_CONFIDENCE=0.35
 ```
 
-Docker note:
+Model note:
 
-- if the backend is running directly on your host machine, `BUDDY_OLLAMA_BASE_URL=http://localhost:11434` is correct
-- if the backend is running through `docker compose`, the API container must use `http://host.docker.internal:11434`
-- the repository `docker-compose.yml` now applies that container-side override automatically for local Mac/Docker development
+- the repository default is now `gpt-5-nano`
+- actual availability still depends on the OpenAI account and model access enabled for that environment
 
 Operational note:
 
-- the backend now supports a local `Ollama` runtime for `BAHA Buddy`
-- if `Ollama` is down or the model is missing, Buddy falls back to the deterministic evidence composer instead of crashing
+- retrieval stays local to BAHA's Postgres/pgvector stack
+- `openai` changes only the final answer-generation step, not the retrieval layer
+- if OpenAI is unavailable or misconfigured, Buddy should fail loudly at the API layer rather than silently falling back to a different model path
 
 ## 9. Hosted Deployment Guidance
 

@@ -68,8 +68,8 @@ Remaining practical gap:
 - learning feed, module detail, content detail, and module progress writes
 - expanded student demo course corpus with multiple modules, quick guides, and reflection content
 - support contacts and help-request submission
-- Buddy session list, session creation, message history, and live message send
-- Buddy answer generation through the backend retrieval layer, with local-LLM support available when the backend is configured with `Ollama`
+- Buddy session list, session creation, message history, and progressive live message streaming
+- Buddy answer generation through the backend OpenAI runtime, with retrieval only used when grounded BAHA evidence is helpful
 - calendar planning data from check-in templates and modules
 - profile/settings identity and consent display from current actor and onboarding state
 
@@ -138,14 +138,16 @@ This app currently depends on:
 - `POST /mobile/chat/sessions`
 - `GET /mobile/chat/sessions/{session_id}/messages`
 - `POST /mobile/chat/sessions/{session_id}/messages`
+- `POST /mobile/chat/sessions/{session_id}/messages/stream`
 
 ## Current Quality Notes
 
 - the student app is meant to run against the local backend by default during development
-- the Buddy screen uses the same existing UI, but real local-LLM responses require the backend host machine to have `Ollama` running with `qwen3:4b` pulled
-- when the backend is running via `docker compose`, the API container now reaches host `Ollama` through `http://host.docker.internal:11434`
+- the Buddy screen now sends messages through the streaming route so the reply bubble can fill progressively instead of waiting for one blocking response
+- Buddy conversation and grounded advice both come from the backend OpenAI runtime; retrieval remains backend-local
 - when using a physical Android phone over USB, the app depends on `adb reverse tcp:8000 tcp:8000`
 - if the USB cable is removed, backend-backed screens will stop working unless the phone is pointed to a LAN-accessible or hosted backend
+- if Buddy chat suddenly returns `404` on the stream route after a code update, rebuild/restart the backend container because the old API process is still serving the previous route set
 - deeper student screens now have retryable error states instead of raw exception pages, but they still need real-device QA for spacing and navigation polish
 - a newly registered student account may not have a generated weekly summary row yet; the app now falls back to a first-use placeholder dashboard instead of failing the home screen
 - empty student dashboards no longer render demo factor graphs; they now stay empty until real check-ins exist

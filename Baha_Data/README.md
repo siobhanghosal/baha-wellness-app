@@ -14,7 +14,7 @@ The implementation follows nine layers:
 4. Embedding: `BAAI/bge-large-en-v1.5` through `sentence-transformers`, with a deterministic hash backend for local tests.
 5. Vector database: PostgreSQL plus pgvector, full-text indexes, versioned documents, chunks, embeddings, citations, and taxonomy.
 6. Retrieval: dense vector search, PostgreSQL full-text lexical search, metadata filters, knowledge-graph expansion, source-diverse reranking, and weighted confidence scoring.
-7. LLM reasoning: evidence-bounded response composer with safety guardrails and citation-only answers.
+7. LLM reasoning: a Buddy generation layer that uses OpenAI for final answer generation while staying grounded in locally retrieved BAHA evidence and safety guardrails.
 8. API: FastAPI endpoints for search, views, resources, interventions, conditions, and chat.
 9. Dashboard: analytics services for source coverage, condition coverage, retrieval quality, freshness, and embedding statistics.
 
@@ -28,7 +28,7 @@ Default local backend for Flutter and mobile API work:
 
 ```bash
 cp .env.example .env
-docker compose up --build
+docker compose -f docker-compose.yml up --build
 ```
 
 The API will be available at `http://localhost:8000`.
@@ -47,6 +47,19 @@ If you need the full acquisition and retrieval runtime locally, use:
 docker build -f Dockerfile.full -t baha_data-api:full .
 ```
 
+If you want the stronger Buddy demo runtime against the imported Solomon corpus, use:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.buddy-demo.yml up --build
+```
+
+That keeps the same database but switches the API container to the full retrieval runtime and `EMBEDDING_BACKEND=bge`.
+If you previously started the Buddy demo override and want to go back to the lighter mobile/API runtime, recreate the API with:
+
+```bash
+docker compose -f docker-compose.yml up -d --build --force-recreate api
+```
+
 For Android emulator testing, use `http://10.0.2.2:8000` as the API base URL.
 For a physical device on the same network, use your machine's LAN IP instead of `localhost`.
 
@@ -55,6 +68,35 @@ For local syntax checks without installing dependencies:
 ```bash
 python3 -m compileall src tests
 ```
+
+Buddy note:
+
+- retrieval stays local to the BAHA Postgres/pgvector stack
+- the final answer-generation step now runs through OpenAI only
+- `BUDDY_GENERATION_BACKEND` remains fixed to `openai`
+- the default configured model string is now `gpt-5-nano`
+- Buddy now uses two OpenAI-backed reply modes under one server-side safety layer:
+  - conversational OpenAI replies for greetings, venting, and general supportive conversation
+  - retrieval-grounded OpenAI replies for advice-style wellbeing questions where approved BAHA evidence is useful
+- the hard scope gate is now softened:
+  - weak or missing retrieval falls back to conversational OpenAI instead of a cold refusal
+  - only emergency handling stays strictly server-controlled
+- the mobile runtime now also exposes `POST /mobile/chat/sessions/{session_id}/messages/stream`
+  - this lets the Flutter Buddy UI render the assistant reply progressively while the backend is still receiving deltas from OpenAI
+  - the final assistant message is still persisted normally at the end of the stream
+- actual OpenAI model availability should still be verified against the specific API account being used
+
+If a currently running local API returns `404` for the new Buddy stream route after pulling these changes, it usually means the old container/process is still running. Recreate the API container:
+
+```bash
+docker compose -f docker-compose.yml up -d --build --force-recreate api
+```
+
+Optional branch artifact note:
+
+- the `Solomon_RAG_Vector_DB` branch includes an LFS-tracked Postgres dump at `backups/baha_rag_20260714-183725.dump`
+- that dump is useful as a restore/import source for retrieval experiments, but it is not required by the current backend runtime and was not made a boot-time dependency
+- the current local workflow for using that donor corpus is documented in [docs/BUDDY_DEMO_RAG_SETUP.md](/Users/sudharshan/Desktop/PES/RF%20Internship/Baha_Data/docs/BUDDY_DEMO_RAG_SETUP.md)
 
 ## Safety Contract
 

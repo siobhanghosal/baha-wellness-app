@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 import json
-from typing import Any
+import re
+from typing import Any, Literal
 
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from baha_rag.config import Settings
-from baha_rag.generation.composer import EvidenceComposer
 from baha_rag.safety import SAFETY_NOTE, assess_safety
 from baha_rag.schemas import ChatRequest, ChatResponse, EvidenceAnswer, Perspective, SearchResult
 from baha_rag.taxonomy import find_conditions
@@ -30,6 +30,15 @@ class BuddyGenerationResult:
     fallback_reason: str | None = None
 
 
+@dataclass(frozen=True)
+class BuddyReplyPlan:
+    condition: str
+    strategy: Literal["safety_local", "openai_conversational", "openai_grounded"]
+    evidence: list[SearchResult]
+    response: ChatResponse | None = None
+    fallback_reason: str | None = None
+
+
 class BuddyChatService:
     def __init__(
         self,
@@ -47,16 +56,136 @@ class BuddyChatService:
         retriever: Any,
         history: list[dict[str, str]] | None = None,
     ) -> BuddyGenerationResult:
+        history = history or []
         if self.settings.buddy_chat_mode == "generic_demo":
             return BuddyGenerationResult(
                 response=ChatResponse(
-                    answer=self._generic_demo_answer(
-                        query=request.message,
+                    answer=self.text_reply_to_answer(
+                        condition=self._resolve_condition(request.message),
                         perspective=request.audience,
+                        query=request.message,
+                        reply_text=(
+                            "I’m here with you. Tell me a little more about what is going on, "
+                            "or ask about sleep, stress, school, mood, or friendships."
+                        ),
+                        evidence=[],
                     ),
                     retrieved=[],
                 ),
                 backend_used="generic_demo",
+            )
+
+        plan = await self.prepare_reply(
+            request=request,
+            retriever=retriever,
+        )
+        if plan.response is not None:
+            return BuddyGenerationResult(
+                response=plan.response,
+                backend_used=plan.strategy,
+                fallback_reason=plan.fallback_reason,
+            )
+
+        if not self.settings.buddy_openai_api_key.strip():
+            raise ValueError("BUDDY_OPENAI_API_KEY is not configured.")
+
+        grounded_draft: BuddyDraftAnswer | None = None
+        if plan.strategy == "openai_grounded":
+            grounded_draft = await self._generate_structured_with_openai(
+                request=request,
+                condition=plan.condition,
+                evidence=plan.evidence,
+                history=history,
+                grounded=True,
+            )
+            if grounded_draft is not None and grounded_draft.answerable_from_corpus:
+                return BuddyGenerationResult(
+                    response=ChatResponse(
+                        answer=self._draft_to_answer(
+                            condition=plan.condition,
+                            perspective=request.audience,
+                            query=request.message,
+                            evidence=plan.evidence,
+                            draft=grounded_draft,
+                        ),
+                        retrieved=plan.evidence,
+                    ),
+                    backend_used="openai_grounded",
+                    fallback_reason=plan.fallback_reason,
+                )
+
+        conversational_draft = await self._generate_structured_with_openai(
+            request=request,
+            condition=plan.condition,
+            evidence=[],
+            history=history,
+            grounded=False,
+        )
+        if conversational_draft is not None:
+            fallback_reason = plan.fallback_reason
+            if grounded_draft is None and plan.strategy == "openai_grounded":
+                fallback_reason = fallback_reason or "invalid_grounded_model_output"
+            if grounded_draft is not None and not grounded_draft.answerable_from_corpus:
+                fallback_reason = fallback_reason or "grounded_answer_unavailable"
+            return BuddyGenerationResult(
+                response=ChatResponse(
+                    answer=self._draft_to_answer(
+                        condition=plan.condition,
+                        perspective=request.audience,
+                        query=request.message,
+                        evidence=[],
+                        draft=conversational_draft,
+                    ),
+                    retrieved=plan.evidence if plan.strategy == "openai_grounded" else [],
+                ),
+                backend_used="openai_conversational",
+                fallback_reason=fallback_reason,
+            )
+
+        return BuddyGenerationResult(
+            response=ChatResponse(
+                answer=self._out_of_scope_answer(
+                    condition=plan.condition,
+                    perspective=request.audience,
+                    query=request.message,
+                    emergency=False,
+                ),
+                retrieved=plan.evidence,
+            ),
+            backend_used="local_fallback",
+            fallback_reason=plan.fallback_reason or "invalid_model_output",
+        )
+
+    async def prepare_reply(
+        self,
+        *,
+        request: ChatRequest,
+        retriever: Any,
+    ) -> BuddyReplyPlan:
+        safety = assess_safety(request.message)
+        condition = self._resolve_condition(request.message)
+        if safety.emergency_indicators:
+            return BuddyReplyPlan(
+                condition="Safety",
+                strategy="safety_local",
+                evidence=[],
+                response=ChatResponse(
+                    answer=self._emergency_answer(
+                        perspective=request.audience,
+                        query=request.message,
+                    ),
+                    retrieved=[],
+                ),
+            )
+
+        if not self._should_ground_with_retrieval(
+            message=request.message,
+            condition=condition,
+        ):
+            return BuddyReplyPlan(
+                condition=condition,
+                strategy="openai_conversational",
+                evidence=[],
             )
 
         results = await retriever.search(
@@ -64,150 +193,409 @@ class BuddyChatService:
             top_k=request.top_k,
             filters=request.filters,
         )
-        condition = next(iter(find_conditions(request.message)), "General Wellbeing")
-        composer = EvidenceComposer()
-        fallback_answer = composer.compose(
-            condition=condition,
-            perspective=request.audience,
-            query=request.message,
-            evidence=results,
-        )
-
         if not results:
-            return BuddyGenerationResult(
-                response=ChatResponse(
-                    answer=self._out_of_scope_answer(
-                        condition=condition,
-                        perspective=request.audience,
-                        query=request.message,
-                        emergency=False,
-                    ),
-                    retrieved=[],
-                ),
-                backend_used="scope_guard",
+            return BuddyReplyPlan(
+                condition=condition,
+                strategy="openai_conversational",
+                evidence=[],
                 fallback_reason="no_retrieval_results",
             )
 
         if (
             results[0].confidence < self.settings.buddy_min_retrieval_confidence
-            and not self.settings.buddy_demo_permissive_mode
+            and not self._has_usable_grounding_signal(results)
         ):
-            return BuddyGenerationResult(
-                response=ChatResponse(
-                    answer=self._out_of_scope_answer(
-                        condition=condition,
-                        perspective=request.audience,
-                        query=request.message,
-                        emergency=bool(assess_safety(request.message).emergency_indicators),
-                    ),
-                    retrieved=results,
-                ),
-                backend_used="scope_guard",
+            return BuddyReplyPlan(
+                condition=condition,
+                strategy="openai_conversational",
+                evidence=results,
                 fallback_reason="low_retrieval_confidence",
             )
 
-        if self.settings.buddy_generation_backend != "ollama":
-            return BuddyGenerationResult(
-                response=ChatResponse(answer=fallback_answer, retrieved=results),
-                backend_used="composer",
-            )
-
-        try:
-            draft = await self._generate_with_ollama(
-                request=request,
-                condition=condition,
-                evidence=results,
-                history=history or [],
-            )
-        except (httpx.HTTPError, ValueError, json.JSONDecodeError) as exc:
-            return BuddyGenerationResult(
-                response=ChatResponse(answer=fallback_answer, retrieved=results),
-                backend_used="composer",
-                fallback_reason=f"ollama_unavailable:{type(exc).__name__}",
-            )
-
-        answer = self._draft_to_answer(
+        return BuddyReplyPlan(
             condition=condition,
-            perspective=request.audience,
-            query=request.message,
+            strategy="openai_grounded",
             evidence=results,
-            draft=draft,
         )
-        if not draft.answerable_from_corpus:
-            answer = (
-                fallback_answer
-                if self.settings.buddy_demo_permissive_mode
-                else self._out_of_scope_answer(
-                    condition=condition,
-                    perspective=request.audience,
-                    query=request.message,
-                    emergency=bool(assess_safety(request.message).emergency_indicators),
-                )
+
+    async def stream_reply_text(
+        self,
+        *,
+        request: ChatRequest,
+        plan: BuddyReplyPlan,
+        history: list[dict[str, str]] | None = None,
+    ) -> AsyncIterator[str]:
+        history = history or []
+        if plan.strategy == "openai_grounded":
+            async for delta in self._stream_openai_reply_text(
+                request=request,
+                condition=plan.condition,
+                evidence=plan.evidence,
+                history=history,
+                grounded=True,
+            ):
+                yield delta
+            return
+
+        async for delta in self._stream_openai_reply_text(
+            request=request,
+            condition=plan.condition,
+            evidence=[],
+            history=history,
+            grounded=False,
+        ):
+            yield delta
+
+    def assistant_text_from_answer(self, answer: EvidenceAnswer) -> str:
+        return " ".join(
+            part.strip()
+            for part in (
+                answer.what_it_is,
+                answer.what_to_do,
+                answer.when_to_seek_help,
             )
-
-        return BuddyGenerationResult(
-            response=ChatResponse(answer=answer, retrieved=results),
-            backend_used="ollama",
+            if part.strip()
         )
 
-    async def _generate_with_ollama(
+    def text_reply_to_answer(
+        self,
+        *,
+        condition: str,
+        perspective: Perspective,
+        query: str,
+        reply_text: str,
+        evidence: list[SearchResult],
+    ) -> EvidenceAnswer:
+        safety = assess_safety(query)
+        return EvidenceAnswer(
+            perspective=perspective,
+            condition=condition,
+            what_it_is=reply_text.strip(),
+            how_to_identify_it=(
+                "This reply was delivered in conversational chat mode and may combine emotional support with concise guidance."
+            ),
+            what_to_do=reply_text.strip(),
+            when_to_seek_help=(
+                "Tell a trusted adult right away and contact local emergency help immediately if there is self-harm risk, suicidal thoughts, abuse, overdose, or immediate danger."
+                if safety.emergency_indicators
+                else "If this keeps getting worse, feels too heavy to manage alone, or starts affecting your safety or daily life, talk to a trusted adult or qualified professional."
+            ),
+            safety_note=SAFETY_NOTE,
+            evidence_sources=self._dedupe_citations(evidence),
+            confidence=(
+                round(
+                    sum(item.confidence for item in evidence[:5])
+                    / max(len(evidence[:5]), 1),
+                    4,
+                )
+                if evidence
+                else 0.55
+            ),
+        )
+
+    def _has_usable_grounding_signal(self, results: list[SearchResult]) -> bool:
+        lexical_hits = sum(1 for item in results[:4] if item.lexical_score > 0)
+        strong_dense_hit = any(item.dense_score >= 0.35 for item in results[:3])
+        return lexical_hits >= 2 or strong_dense_hit
+
+    def _conversation_mode(self, message: str) -> str:
+        lowered = " ".join(message.lower().split())
+        stripped = lowered.strip(" .!?")
+        if stripped in {
+            "hi",
+            "hello",
+            "hey",
+            "hey there",
+            "yo",
+            "good morning",
+            "good afternoon",
+            "good evening",
+            "thanks",
+            "thank you",
+            "ok",
+            "okay",
+        }:
+            return "social"
+
+        supportive_phrases = (
+            "i feel",
+            "i'm feeling",
+            "i am feeling",
+            "i'm tired",
+            "i am tired",
+            "rough day",
+            "bad day",
+            "i feel alone",
+            "i'm overwhelmed",
+            "i am overwhelmed",
+            "i'm stressed",
+            "i am stressed",
+            "nobody gets me",
+            "no one gets me",
+            "i'm done",
+            "i am done",
+            "i hate this",
+            "i can't do this",
+        )
+        if "?" not in message and any(phrase in lowered for phrase in supportive_phrases):
+            return "supportive"
+
+        return "grounded"
+
+    def _should_ground_with_retrieval(self, *, message: str, condition: str) -> bool:
+        if condition == "General Wellbeing":
+            return False
+        lowered = message.lower()
+        guidance_phrases = (
+            "how can i",
+            "how do i",
+            "what can i do",
+            "what should i do",
+            "any tips",
+            "help me",
+            "improve",
+            "manage",
+            "cope",
+            "deal with",
+            "handle",
+            "support",
+            "why am i",
+            "how to",
+        )
+        if any(phrase in lowered for phrase in guidance_phrases):
+            return True
+        return "?" in message and self._seems_within_baha_scope(message)
+
+    def _resolve_condition(self, message: str) -> str:
+        lowered = message.lower()
+        keyword_map = (
+            (("sleep", "tired", "insomnia", "bedtime", "wake up"), "Sleep"),
+            (("stress", "overwhelmed", "pressure", "burnout"), "Stress"),
+            (("anxious", "anxiety", "panic", "worried", "nervous"), "Anxiety"),
+            (("sad", "down", "empty", "crying", "upset"), "Low Mood"),
+            (("friend", "friendship", "lonely", "left out", "group chat"), "Friendships"),
+            (("phone", "screen", "social media", "gaming", "internet"), "Digital Wellbeing"),
+            (("school", "exam", "study", "homework", "focus"), "School Pressure"),
+        )
+        for terms, label in keyword_map:
+            if any(term in lowered for term in terms):
+                return label
+        return next(iter(find_conditions(message)), "General Wellbeing")
+
+    def _seems_within_baha_scope(self, message: str) -> bool:
+        lowered = message.lower()
+        domain_terms = (
+            "sleep",
+            "stress",
+            "school",
+            "exam",
+            "study",
+            "focus",
+            "mood",
+            "friend",
+            "friendship",
+            "lonely",
+            "anxiety",
+            "worried",
+            "panic",
+            "sad",
+            "down",
+            "energy",
+            "routine",
+            "phone",
+            "screen",
+            "social media",
+            "gaming",
+            "wellbeing",
+            "health",
+            "overwhelmed",
+            "tired",
+            "bullying",
+            "pressure",
+        )
+        first_person_support = (
+            "i feel",
+            "i'm",
+            "i am",
+            "my sleep",
+            "my stress",
+            "my mood",
+            "my friends",
+            "my family",
+            "my school",
+        )
+        return any(term in lowered for term in domain_terms) or any(
+            phrase in lowered for phrase in first_person_support
+        )
+
+    async def _generate_structured_with_openai(
         self,
         *,
         request: ChatRequest,
         condition: str,
         evidence: list[SearchResult],
         history: list[dict[str, str]],
-    ) -> BuddyDraftAnswer:
-        system_prompt = self._system_prompt()
-        evidence_block = self._evidence_block(
-            condition=condition,
-            audience=request.audience,
-            query=request.message,
-            evidence=evidence,
-        )
-        messages = [{"role": "system", "content": system_prompt}]
-        messages.extend(self._sanitize_history(history))
-        messages.append(
-            {
-                "role": "user",
-                "content": evidence_block,
-            }
-        )
+        grounded: bool,
+    ) -> BuddyDraftAnswer | None:
         payload = {
-            "model": self.settings.buddy_ollama_model,
-            "messages": messages,
-            "format": BuddyDraftAnswer.model_json_schema(),
-            "stream": False,
-            "think": self.settings.buddy_ollama_think,
-            "keep_alive": self.settings.buddy_ollama_keep_alive,
-            "options": {
-                "temperature": 0.2,
-                "num_predict": 420,
+            "model": self.settings.buddy_openai_model,
+            "instructions": (
+                self._openai_grounded_system_prompt()
+                if grounded
+                else self._openai_conversational_system_prompt()
+            ),
+            "input": self._openai_input_block(
+                request=request,
+                condition=condition,
+                evidence=evidence,
+                history=history,
+                grounded=grounded,
+            ),
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": "buddy_draft_answer",
+                    "schema": self._openai_output_schema(),
+                }
+            },
+            "max_output_tokens": 240,
+            "reasoning": {"effort": "minimal"},
+        }
+        if self._http_client is not None:
+            client = self._http_client
+            response = await client.post(
+                "/responses",
+                headers={
+                    "Authorization": (
+                        f"Bearer {self.settings.buddy_openai_api_key}"
+                    ),
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+        else:
+            async with httpx.AsyncClient(
+                base_url=self.settings.buddy_openai_base_url.rstrip("/"),
+                timeout=self.settings.buddy_openai_timeout_seconds,
+            ) as client:
+                response = await client.post(
+                    "/responses",
+                    headers={
+                        "Authorization": (
+                            f"Bearer {self.settings.buddy_openai_api_key}"
+                        ),
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                )
+        response.raise_for_status()
+        body = response.json()
+        content = self._extract_openai_output_text(body)
+        if not content:
+            return None
+        try:
+            return BuddyDraftAnswer.model_validate_json(content)
+        except ValidationError:
+            return None
+
+    async def _stream_openai_reply_text(
+        self,
+        *,
+        request: ChatRequest,
+        condition: str,
+        evidence: list[SearchResult],
+        history: list[dict[str, str]],
+        grounded: bool,
+    ) -> AsyncIterator[str]:
+        payload = {
+            "model": self.settings.buddy_openai_model,
+            "instructions": (
+                self._openai_grounded_text_system_prompt()
+                if grounded
+                else self._openai_conversational_text_system_prompt()
+            ),
+            "input": self._openai_input_block(
+                request=request,
+                condition=condition,
+                evidence=evidence,
+                history=history,
+                grounded=grounded,
+            ),
+            "stream": True,
+            "max_output_tokens": 240,
+            "reasoning": {"effort": "minimal"},
+            "text": {
+                "format": {"type": "text"},
+                "verbosity": "low",
             },
         }
-        async with self._client() as client:
-            response = await client.post("/api/chat", json=payload)
-            response.raise_for_status()
-        body = response.json()
-        content = (
-            body.get("message", {}).get("content", "").strip()
-            if isinstance(body, dict)
-            else ""
-        )
-        if not content:
-            raise ValueError("Ollama response did not include assistant content")
-        return BuddyDraftAnswer.model_validate_json(content)
 
-    @asynccontextmanager
-    async def _client(self) -> Any:
         if self._http_client is not None:
-            yield self._http_client
+            async with self._http_client.stream(
+                "POST",
+                "/responses",
+                headers={
+                    "Authorization": f"Bearer {self.settings.buddy_openai_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            ) as response:
+                response.raise_for_status()
+                async for delta in self._iter_openai_stream_text(response):
+                    yield delta
             return
+
         async with httpx.AsyncClient(
-            base_url=self.settings.buddy_ollama_base_url.rstrip("/"),
-            timeout=self.settings.buddy_ollama_timeout_seconds,
+            base_url=self.settings.buddy_openai_base_url.rstrip("/"),
+            timeout=self.settings.buddy_openai_timeout_seconds,
         ) as client:
-            yield client
+            async with client.stream(
+                "POST",
+                "/responses",
+                headers={
+                    "Authorization": f"Bearer {self.settings.buddy_openai_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            ) as response:
+                response.raise_for_status()
+                async for delta in self._iter_openai_stream_text(response):
+                    yield delta
+
+    async def _iter_openai_stream_text(
+        self,
+        response: httpx.Response,
+    ) -> AsyncIterator[str]:
+        saw_delta = False
+        fallback_text = ""
+        async for raw_line in response.aiter_lines():
+            line = raw_line.strip()
+            if not line or not line.startswith("data:"):
+                continue
+            data = line[5:].strip()
+            if not data or data == "[DONE]":
+                continue
+            try:
+                event = json.loads(data)
+            except json.JSONDecodeError:
+                continue
+            if event.get("type") == "error":
+                message = (
+                    event.get("error", {}).get("message")
+                    or event.get("message")
+                    or "OpenAI streaming request failed."
+                )
+                raise ValueError(str(message))
+            delta = self._extract_openai_stream_delta(event)
+            if delta:
+                saw_delta = True
+                yield delta
+                continue
+            fallback_candidate = self._extract_openai_stream_completed_text(event)
+            if fallback_candidate:
+                fallback_text = fallback_candidate
+        if not saw_delta and fallback_text:
+            yield fallback_text
 
     def _draft_to_answer(
         self,
@@ -241,6 +629,32 @@ class BuddyChatService:
             confidence=confidence,
         )
 
+    def _emergency_answer(
+        self,
+        *,
+        perspective: Perspective,
+        query: str,
+    ) -> EvidenceAnswer:
+        return EvidenceAnswer(
+            perspective=perspective,
+            condition="Safety",
+            what_it_is=(
+                "I’m really glad you reached out. Your safety matters most right now."
+            ),
+            how_to_identify_it=(
+                "This sounds urgent, so the safest next step is to involve a real person near you immediately."
+            ),
+            what_to_do=(
+                "Please tell a trusted adult near you right now, or call local emergency services or an appropriate crisis line immediately."
+            ),
+            when_to_seek_help=(
+                "Do not stay with this alone. Get immediate help now."
+            ),
+            safety_note=SAFETY_NOTE,
+            evidence_sources=[],
+            confidence=1.0,
+        )
+
     def _out_of_scope_answer(
         self,
         *,
@@ -260,123 +674,18 @@ class BuddyChatService:
             perspective=perspective,
             condition=condition,
             what_it_is=(
-                "I can only answer using the approved BAHA material loaded into this system. I do not have enough matching material to answer that confidently without going beyond the current corpus."
+                "I can stay with you here, but I don’t have enough reliable BAHA material to answer that specific question well."
             ),
             how_to_identify_it=(
-                "I should not guess or invent facts outside the approved material. If you want, ask about stress, sleep, friendships, digital habits, school pressure, check-ins, or other wellbeing topics already covered in BAHA."
+                "I don’t want to guess or make things up. I’m better at wellbeing topics like stress, sleep, school pressure, friendships, routines, and mood."
             ),
             what_to_do=(
-                "Please rephrase the question around a BAHA-supported wellbeing topic, or ask a counselor, teacher, parent, or other trusted adult for situation-specific guidance."
+                "If you want, ask it in a wellbeing way, or just tell me what’s been going on and I can help you think it through more gently."
             ),
             when_to_seek_help=when_to_seek_help,
             safety_note=SAFETY_NOTE,
             evidence_sources=[],
             confidence=0.0,
-        )
-
-    def _generic_demo_answer(
-        self,
-        *,
-        query: str,
-        perspective: Perspective,
-    ) -> EvidenceAnswer:
-        lowered = query.lower()
-        safety = assess_safety(query)
-
-        if any(term in lowered for term in ("stress", "overwhelmed", "pressure", "burnout")):
-            condition = "Stress"
-            what_it_is = (
-                "It sounds like things may be piling up and your mind has not had enough room to slow down."
-            )
-            how_to_identify_it = (
-                "Common signs can be feeling tense, restless, tired, distracted, or like small tasks suddenly feel bigger than usual."
-            )
-            what_to_do = (
-                "Try one small reset first: pause, take a few slow breaths, choose one task only, and ask yourself what would make the next 10 minutes easier."
-            )
-        elif any(term in lowered for term in ("sleep", "tired", "insomnia", "late at night")):
-            condition = "Sleep"
-            what_it_is = (
-                "It sounds like your body and mind may not be getting the rest they need to fully reset."
-            )
-            how_to_identify_it = (
-                "You might notice trouble falling asleep, waking up tired, low energy in the day, or feeling more irritable than usual."
-            )
-            what_to_do = (
-                "A simple place to start is a calmer wind-down routine: reduce screens before bed, dim lights, and give yourself a short quiet routine at the same time each night."
-            )
-        elif any(term in lowered for term in ("friend", "friendship", "reply", "group chat", "left out", "lonely")):
-            condition = "Friendships"
-            what_it_is = (
-                "It sounds like this may be about friendship pressure, expectations, or feeling unsure how to respond without making things worse."
-            )
-            how_to_identify_it = (
-                "A sign is when you feel tense about messages, worried about disappointing people, or like you have to stay available all the time."
-            )
-            what_to_do = (
-                "Try a calm, honest response and a small boundary. For example: say you care about the friendship, but you may not always reply immediately."
-            )
-        elif any(term in lowered for term in ("phone", "screen", "social media", "instagram", "youtube", "gaming", "game")):
-            condition = "Digital Wellbeing"
-            what_it_is = (
-                "It sounds like digital habits may be affecting your mood, focus, sleep, or daily balance."
-            )
-            how_to_identify_it = (
-                "You might notice losing track of time, feeling drained after scrolling, or staying online longer than you meant to."
-            )
-            what_to_do = (
-                "Try changing just one habit first, like setting a stopping time, taking short breaks, or keeping one part of the day screen-light."
-            )
-        elif any(term in lowered for term in ("anxious", "anxiety", "worried", "panic", "nervous")):
-            condition = "Anxiety"
-            what_it_is = (
-                "It sounds like your mind may be staying on alert, even when you want it to settle."
-            )
-            how_to_identify_it = (
-                "That can look like racing thoughts, tightness in the body, worrying ahead of time, or finding it hard to relax."
-            )
-            what_to_do = (
-                "Start small: slow your breathing, name what is worrying you, and focus on one manageable next step instead of the whole situation at once."
-            )
-        elif any(term in lowered for term in ("sad", "down", "empty", "crying", "upset")):
-            condition = "Low Mood"
-            what_it_is = (
-                "It sounds like you may be carrying a heavy feeling that is affecting your energy or motivation."
-            )
-            how_to_identify_it = (
-                "Signs can include wanting to withdraw, low motivation, feeling flat, or not enjoying things as much as usual."
-            )
-            what_to_do = (
-                "Try not to handle it all alone. A small helpful step can be reaching out to one trusted person and choosing one gentle activity that feels manageable today."
-            )
-        else:
-            condition = "General Wellbeing"
-            what_it_is = (
-                "It sounds like something is on your mind, and taking a moment to slow it down is a good first step."
-            )
-            how_to_identify_it = (
-                "A useful check is to notice what you are feeling, what seems to trigger it, and whether it is affecting sleep, mood, school, or relationships."
-            )
-            what_to_do = (
-                "Start with one small action: pause, breathe slowly, name the main issue, and decide whether you need rest, support, or one practical next step."
-            )
-
-        when_to_seek_help = (
-            "Tell a trusted adult right away and contact local emergency help immediately if there is self-harm risk, suicidal thoughts, abuse, overdose, or immediate danger."
-            if safety.emergency_indicators
-            else "If this keeps getting worse, feels too heavy to manage alone, or starts affecting your safety, daily life, or relationships, talk to a trusted adult or qualified professional."
-        )
-
-        return EvidenceAnswer(
-            perspective=perspective,
-            condition=condition,
-            what_it_is=what_it_is,
-            how_to_identify_it=how_to_identify_it,
-            what_to_do=what_to_do,
-            when_to_seek_help=when_to_seek_help,
-            safety_note=SAFETY_NOTE,
-            evidence_sources=[],
-            confidence=0.7,
         )
 
     def _sanitize_history(self, history: list[dict[str, str]]) -> list[dict[str, str]]:
@@ -389,16 +698,174 @@ class BuddyChatService:
             sanitized.append({"role": role, "content": content})
         return sanitized
 
-    def _system_prompt(self) -> str:
+    def _openai_grounded_system_prompt(self) -> str:
         return (
             "You are BAHA Buddy, a retrieval-grounded wellbeing assistant inside the BAHA product. "
             "You are not a therapist, you do not diagnose, and you must not invent facts. "
-            "Only answer using the evidence snippets provided in the final user message. "
-            "If the snippets do not support the question clearly, set answerable_from_corpus to false. "
-            "Do not provide medication advice, legal advice, or unsupported crisis instructions. "
-            "Do not mention sources that are not in the provided evidence. "
-            "Keep the tone calm, supportive, age-appropriate, and non-clinical."
+            "Only answer using the approved evidence snippets provided in the user input. "
+            "If the evidence is relevant but incomplete, answer conservatively and stay close to the snippets. "
+            "If the evidence is not enough to give grounded factual advice, set answerable_from_corpus to false instead of inventing detail. "
+            "Write in a warm, natural, concise way for a young user. "
+            "Default to short paragraphs, not essays or bullet-heavy lists, unless the evidence strongly requires a short list. "
+            "Keep each field compact and conversational. "
+            "Return only valid JSON with the exact keys: "
+            "answerable_from_corpus, what_it_is, how_to_identify_it, what_to_do, when_to_seek_help. "
+            "Do not wrap the JSON in markdown fences or add any extra prose."
         )
+
+    def _openai_conversational_system_prompt(self) -> str:
+        return (
+            "You are BAHA Buddy, a warm wellbeing companion inside the BAHA product. "
+            "You can have natural conversation, acknowledge feelings, and offer gentle wellbeing-oriented support. "
+            "You are not a therapist and you do not diagnose. "
+            "If the user asks about something unrelated to youth wellbeing, answer briefly and gently steer back toward wellbeing support. "
+            "Keep the tone concise, natural, and human, not robotic. "
+            "Return only valid JSON with the exact keys: "
+            "answerable_from_corpus, what_it_is, how_to_identify_it, what_to_do, when_to_seek_help. "
+            "Set answerable_from_corpus to true for this conversational mode. "
+            "Do not wrap the JSON in markdown fences or add any extra prose."
+        )
+
+    def _openai_grounded_text_system_prompt(self) -> str:
+        return (
+            "You are BAHA Buddy. Reply in a warm, natural, concise way. "
+            "Use only the approved evidence provided for factual advice. "
+            "Do not diagnose or invent facts. "
+            "If the evidence is limited, say that simply and stay conservative. "
+            "Write 3 to 6 short sentences total, as a normal chat reply."
+        )
+
+    def _openai_conversational_text_system_prompt(self) -> str:
+        return (
+            "You are BAHA Buddy. Reply like a calm, supportive, natural chat companion. "
+            "You are not a therapist and you do not diagnose. "
+            "You can have light conversation, acknowledge feelings, and offer gentle wellbeing-oriented next steps. "
+            "If the question is outside your main wellbeing role, answer briefly and redirect kindly. "
+            "Keep the reply concise, human, and no more than 4 short sentences."
+        )
+
+    def _openai_input_block(
+        self,
+        *,
+        request: ChatRequest,
+        condition: str,
+        evidence: list[SearchResult],
+        history: list[dict[str, str]],
+        grounded: bool,
+    ) -> str:
+        evidence_block = (
+            "Use only the following approved evidence snippets:\n\n"
+            f"{self._openai_evidence_block(evidence)}"
+            if grounded
+            else "No external evidence snippets are supplied for this reply. Rely on brief, supportive, non-diagnostic conversation only."
+        )
+        return (
+            f"Audience: {request.audience}\n"
+            f"Detected topic: {condition}\n"
+            f"User question: {request.message}\n"
+            "Conversation so far:\n"
+            f"{self._history_block(history)}\n\n"
+            "Response style:\n"
+            "- sound calm, warm, and human\n"
+            "- keep it concise\n"
+            "- prefer 2 to 4 sentences total worth of content per field, not essays\n"
+            "- no diagnosis\n"
+            f"- {'no invented facts beyond the evidence' if grounded else 'no diagnosis and no pretending to know private details'}\n"
+            f"- {'if the evidence is weak, set answerable_from_corpus to false' if grounded else 'keep the support general and emotionally intelligent'}\n\n"
+            f"{evidence_block}"
+        )
+
+    def _history_block(self, history: list[dict[str, str]]) -> str:
+        sanitized = self._sanitize_history(history)
+        if not sanitized:
+            return "(no prior conversation)"
+        return "\n".join(
+            f"{item['role'].title()}: {item['content']}" for item in sanitized
+        )
+
+    def _openai_evidence_block(self, evidence: list[SearchResult]) -> str:
+        lines: list[str] = []
+        for index, item in enumerate(evidence[:3], start=1):
+            citation = item.citations[0] if item.citations else None
+            title = citation.title if citation else "Approved evidence"
+            organization = citation.organization if citation else item.metadata.organization
+            snippet = self._clip_snippet(item.text, max_words=48)
+            lines.append(
+                (
+                    f"[{index}] Title: {title}\n"
+                    f"Organization: {organization}\n"
+                    f"Confidence: {item.confidence:.2f}\n"
+                    f"Snippet: {snippet}"
+                )
+            )
+        return "\n\n".join(lines)
+
+    def _clip_snippet(self, text: str, max_words: int = 85) -> str:
+        cleaned = re.sub(r"\s+", " ", text).strip()
+        words = cleaned.split(" ")
+        if len(words) <= max_words:
+            return cleaned
+        return " ".join(words[:max_words]).rstrip(" ,;:") + "..."
+
+    def _extract_openai_output_text(self, payload: dict[str, Any]) -> str:
+        output = payload.get("output", [])
+        texts: list[str] = []
+        for item in output:
+            if item.get("type") != "message":
+                continue
+            for content in item.get("content", []):
+                if content.get("type") == "output_text" and content.get("text"):
+                    texts.append(str(content["text"]).strip())
+        return "\n".join(text for text in texts if text)
+
+    def _extract_openai_stream_delta(self, event: dict[str, Any]) -> str:
+        if event.get("type") == "response.output_text.delta":
+            return str(event.get("delta") or "")
+        delta = event.get("delta")
+        if isinstance(delta, str):
+            return delta
+        output_text = event.get("output_text")
+        if isinstance(output_text, str):
+            return output_text
+        return ""
+
+    def _extract_openai_stream_completed_text(self, event: dict[str, Any]) -> str:
+        if event.get("type") == "response.output_text.done":
+            return str(event.get("text") or "").strip()
+        if event.get("type") == "response.output_item.done":
+            item = event.get("item", {})
+            if item.get("type") != "message":
+                return ""
+            texts: list[str] = []
+            for content in item.get("content", []):
+                if content.get("type") == "output_text" and content.get("text"):
+                    texts.append(str(content["text"]).strip())
+            return " ".join(text for text in texts if text)
+        if event.get("type") == "response.completed":
+            return self._extract_openai_output_text(
+                event.get("response", {}) if isinstance(event.get("response"), dict) else {}
+            ).strip()
+        return ""
+
+    def _openai_output_schema(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "answerable_from_corpus": {"type": "boolean"},
+                "what_it_is": {"type": "string"},
+                "how_to_identify_it": {"type": "string"},
+                "what_to_do": {"type": "string"},
+                "when_to_seek_help": {"type": "string"},
+            },
+            "required": [
+                "answerable_from_corpus",
+                "what_it_is",
+                "how_to_identify_it",
+                "what_to_do",
+                "when_to_seek_help",
+            ],
+            "additionalProperties": False,
+        }
 
     def _dedupe_citations(self, evidence: list[SearchResult]) -> list[Any]:
         seen: set[tuple[str, str, str | None]] = set()
@@ -411,35 +878,3 @@ class BuddyChatService:
                 seen.add(key)
                 citations.append(citation)
         return citations
-
-    def _evidence_block(
-        self,
-        *,
-        condition: str,
-        audience: Perspective,
-        query: str,
-        evidence: list[SearchResult],
-    ) -> str:
-        lines = [
-            f"Audience: {audience}",
-            f"Detected topic: {condition}",
-            f"User question: {query}",
-            "Use only the following approved evidence snippets:",
-        ]
-        for index, item in enumerate(evidence[:5], start=1):
-            citation = item.citations[0] if item.citations else None
-            title = citation.title if citation else "Approved evidence"
-            organization = citation.organization if citation else item.metadata.organization
-            snippet = " ".join(item.text.split())
-            lines.append(
-                (
-                    f"[{index}] Title: {title}\n"
-                    f"Organization: {organization}\n"
-                    f"Confidence: {item.confidence:.2f}\n"
-                    f"Snippet: {snippet}"
-                )
-            )
-        lines.append(
-            "Return only JSON matching the requested schema. Do not add markdown fences or extra prose."
-        )
-        return "\n\n".join(lines)

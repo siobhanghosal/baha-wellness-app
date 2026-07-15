@@ -1,0 +1,8 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.full
+    environment:
+      EMBEDDING_BACKEND: bge
+      BUDDY_CHAT_MODE: grounded

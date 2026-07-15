@@ -191,12 +191,10 @@ Flow:
 1. fetch `GET /mobile/chat/sessions`
 2. create session if none exists
 3. fetch `GET /mobile/chat/sessions/{session_id}/messages`
-4. post messages with `POST /mobile/chat/sessions/{session_id}/messages`
-5. backend retrieves approved BAHA evidence for the message
-6. backend uses the local Buddy generation path:
-   - `Ollama` + `qwen3:4b` when available
-   - deterministic evidence-composer fallback when the local model is unavailable
-7. if retrieval is weak or outside corpus scope, backend returns a bounded "I can only answer from approved BAHA material" response instead of guessing
+4. send live chat messages through `POST /mobile/chat/sessions/{session_id}/messages/stream`
+5. show `ack`, `delta`, and `complete` events in the same Buddy thread so the assistant reply appears progressively
+6. backend uses conversational OpenAI for general support messages and retrieval-grounded OpenAI for advice-style wellbeing questions
+7. if retrieval is weak, backend falls back to conversational OpenAI instead of a cold refusal
 8. if emergency language is detected, backend creates the signal and escalation case
 
 Frontend rule:

@@ -311,9 +311,12 @@ class StudentBuddyChatScreen extends StatefulWidget {
 
 class _StudentBuddyChatScreenState extends State<StudentBuddyChatScreen> {
   final _messageController = TextEditingController();
+  final _scrollController = ScrollController();
   late Future<List<MobileChatMessage>> _future;
   List<MobileChatMessage>? _messages;
   bool _sending = false;
+  Timer? _loadingTimer;
+  int _loadingFrame = 0;
 
   @override
   void initState() {
@@ -323,7 +326,9 @@ class _StudentBuddyChatScreenState extends State<StudentBuddyChatScreen> {
 
   @override
   void dispose() {
+    _loadingTimer?.cancel();
     _messageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -341,6 +346,7 @@ class _StudentBuddyChatScreenState extends State<StudentBuddyChatScreen> {
       _future = _load();
     });
     await _future;
+    _scrollToBottom();
   }
 
   Future<void> _send() async {
@@ -353,36 +359,193 @@ class _StudentBuddyChatScreenState extends State<StudentBuddyChatScreen> {
       );
       return;
     }
-    setState(() => _sending = true);
+    final now = DateTime.now().toUtc();
+    final pendingUserId = 'pending-user-${now.microsecondsSinceEpoch}';
+    final pendingAssistantId = 'pending-assistant-${now.microsecondsSinceEpoch}';
+    final optimisticUser = MobileChatMessage(
+      id: pendingUserId,
+      chatSessionId: widget.session.id,
+      senderType: 'user',
+      messageType: 'user_query',
+      ordinal: (_messages?.length ?? 0) + 1,
+      body: body,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final optimisticAssistant = MobileChatMessage(
+      id: pendingAssistantId,
+      chatSessionId: widget.session.id,
+      senderType: 'assistant',
+      messageType: 'assistant_pending',
+      ordinal: (_messages?.length ?? 0) + 2,
+      body: '',
+      createdAt: now,
+      updatedAt: now,
+    );
+    _messageController.clear();
+    setState(() {
+      _sending = true;
+      _messages = <MobileChatMessage>[
+        ...?_messages,
+        optimisticUser,
+        optimisticAssistant,
+      ];
+    });
+    _startThinkingAnimation();
+    _scrollToBottom();
     try {
-      final exchange = await widget.apiClient.createChatMessage(
+      await for (final event in widget.apiClient.createChatMessageStream(
         identity: widget.identity,
         sessionId: widget.session.id,
         request: MobileChatMessageCreateRequest(body: body),
-      );
-      if (!mounted) {
-        return;
+      )) {
+        if (!mounted) {
+          return;
+        }
+        if (event.isAck && event.userMessage != null) {
+          setState(() {
+            _messages = _replaceMessage(
+              _messages,
+              pendingUserId,
+              event.userMessage!,
+            );
+          });
+          _scrollToBottom();
+          continue;
+        }
+        if (event.isDelta) {
+          final partialBody = _currentMessageBody(pendingAssistantId) + (event.delta ?? '');
+          setState(() {
+            _messages = _replaceMessage(
+              _messages,
+              pendingAssistantId,
+              _updatedMessage(
+                _findMessage(pendingAssistantId) ?? optimisticAssistant,
+                body: partialBody,
+              ),
+            );
+          });
+          _scrollToBottom();
+          continue;
+        }
+        if (event.isComplete && event.assistantMessage != null) {
+          setState(() {
+            _messages = _replaceMessage(
+              _messages,
+              pendingAssistantId,
+              event.assistantMessage!,
+            );
+          });
+          _scrollToBottom();
+        }
       }
-      _messageController.clear();
-      setState(() {
-        _messages = <MobileChatMessage>[
-          ...?_messages,
-          exchange.userMessage,
-          exchange.assistantMessage,
-        ];
-      });
     } catch (error) {
       if (!mounted) {
         return;
       }
+      setState(() {
+        _messages = _replaceMessage(
+          _messages,
+          pendingAssistantId,
+          _updatedMessage(
+            _findMessage(pendingAssistantId) ?? optimisticAssistant,
+            body: 'Buddy could not reply right now. Please try again.',
+            messageType: 'assistant_error',
+          ),
+        );
+      });
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('$error')));
     } finally {
+      _stopThinkingAnimation();
       if (mounted) {
         setState(() => _sending = false);
       }
     }
+  }
+
+  void _startThinkingAnimation() {
+    _loadingTimer?.cancel();
+    _loadingTimer = Timer.periodic(const Duration(milliseconds: 420), (_) {
+      if (!mounted || !_sending) {
+        return;
+      }
+      setState(() {
+        _loadingFrame = (_loadingFrame + 1) % 3;
+      });
+    });
+  }
+
+  void _stopThinkingAnimation() {
+    _loadingTimer?.cancel();
+    _loadingTimer = null;
+    _loadingFrame = 0;
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) {
+        return;
+      }
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  MobileChatMessage? _findMessage(String id) {
+    final messages = _messages;
+    if (messages == null) {
+      return null;
+    }
+    for (final message in messages) {
+      if (message.id == id) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  String _currentMessageBody(String id) {
+    return _findMessage(id)?.body ?? '';
+  }
+
+  List<MobileChatMessage> _replaceMessage(
+    List<MobileChatMessage>? messages,
+    String id,
+    MobileChatMessage replacement,
+  ) {
+    final items = <MobileChatMessage>[...?messages];
+    final index = items.indexWhere((message) => message.id == id);
+    if (index == -1) {
+      items.add(replacement);
+      return items;
+    }
+    items[index] = replacement;
+    return items;
+  }
+
+  MobileChatMessage _updatedMessage(
+    MobileChatMessage message, {
+    String? body,
+    String? messageType,
+  }) {
+    return MobileChatMessage(
+      id: message.id,
+      chatSessionId: message.chatSessionId,
+      senderType: message.senderType,
+      messageType: messageType ?? message.messageType,
+      ordinal: message.ordinal,
+      body: body ?? message.body,
+      structuredPayload: message.structuredPayload,
+      retrievalFilters: message.retrievalFilters,
+      safetyLabels: message.safetyLabels,
+      createdAt: message.createdAt,
+      updatedAt: DateTime.now().toUtc(),
+    );
   }
 
   @override
@@ -428,6 +591,8 @@ class _StudentBuddyChatScreenState extends State<StudentBuddyChatScreen> {
                       return _ChatMessageList(
                         messages: _messages!,
                         palette: palette,
+                        controller: _scrollController,
+                        loadingFrame: _loadingFrame,
                       );
                     }
                     if (snapshot.connectionState != ConnectionState.done) {
@@ -470,6 +635,8 @@ class _StudentBuddyChatScreenState extends State<StudentBuddyChatScreen> {
                     return _ChatMessageList(
                       messages: messages,
                       palette: palette,
+                      controller: _scrollController,
+                      loadingFrame: _loadingFrame,
                     );
                   },
                 ),
@@ -516,10 +683,17 @@ class _StudentBuddyChatScreenState extends State<StudentBuddyChatScreen> {
 }
 
 class _ChatMessageList extends StatelessWidget {
-  const _ChatMessageList({required this.messages, required this.palette});
+  const _ChatMessageList({
+    required this.messages,
+    required this.palette,
+    required this.controller,
+    required this.loadingFrame,
+  });
 
   final List<MobileChatMessage> messages;
   final PrototypePalette palette;
+  final ScrollController controller;
+  final int loadingFrame;
 
   @override
   Widget build(BuildContext context) {
@@ -538,11 +712,20 @@ class _ChatMessageList extends StatelessWidget {
     }
     final theme = Theme.of(context).textTheme;
     return ListView.builder(
+      controller: controller,
       padding: const EdgeInsets.all(16),
       itemCount: messages.length,
       itemBuilder: (context, index) {
         final message = messages[index];
         final isUser = message.senderType == 'user';
+        final isPendingAssistant =
+            message.senderType == 'assistant' &&
+            message.messageType == 'assistant_pending';
+        final displayedBody = isPendingAssistant
+            ? (message.body.isEmpty
+                  ? 'Buddy is thinking${'.' * (loadingFrame + 1)}'
+                  : '${message.body}  ')
+            : message.body;
         return Align(
           alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
           child: Container(
@@ -561,7 +744,12 @@ class _ChatMessageList extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(message.body, style: theme.bodyLarge),
+                  Text(
+                    displayedBody,
+                    style: theme.bodyLarge?.copyWith(
+                      color: isPendingAssistant ? palette.text : null,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     _formatDateTime(message.createdAt),

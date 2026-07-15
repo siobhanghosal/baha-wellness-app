@@ -711,7 +711,7 @@ class AuthRepository:
                   metadata = jsonb_set(
                     coalesce(metadata, '{}'::jsonb),
                     '{guardian_link_verification_code}',
-                    to_jsonb(:code::text),
+                    to_jsonb(cast(:code as text)),
                     true
                   ),
                   updated_at = now()

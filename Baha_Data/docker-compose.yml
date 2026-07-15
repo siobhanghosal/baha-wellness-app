@@ -20,15 +20,10 @@ services:
   api:
     build: .
     env_file:
-      - .env.example
+      - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://baha:baha@postgres:5432/baha_rag
       STORAGE_ROOT: /app/storage/raw
-      EMBEDDING_BACKEND: hash
-      BUDDY_GENERATION_BACKEND: composer
-      BUDDY_CHAT_MODE: generic_demo
-      BUDDY_OLLAMA_BASE_URL: http://host.docker.internal:11434
-      BUDDY_DEMO_PERMISSIVE_MODE: "true"
     ports:
       - "8000:8000"
     volumes:

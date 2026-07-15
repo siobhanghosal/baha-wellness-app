@@ -1,4 +1,4 @@
-# BAHA Buddy Local LLM Architecture
+# BAHA Buddy Generation Architecture
 
 ## 1. Purpose
 
@@ -7,46 +7,46 @@ This document defines how `BAHA Buddy` now works in the backend.
 The goal is:
 
 - keep the existing Flutter Buddy UI unchanged
-- answer through a local model runtime
-- stay strictly grounded in the approved BAHA corpus
+- answer through a single OpenAI generation backend
+- keep factual wellbeing advice grounded in the approved BAHA corpus
 - avoid therapy, diagnosis, and unsupported advice
+- still allow natural conversation for greetings, venting, and simple support
 
 ## 2. Model Choice
 
-Current default:
+Current generation backend:
 
-- runtime: `Ollama`
-- model: `qwen3:4b`
+- `openai`
+
+Current default model:
+
+- `gpt-5-nano`
 
 Why this is the current default:
 
-- it is light enough for local development on modest Apple Silicon hardware
-- it is materially stronger than tiny 1B to 2B class models for instruction following
-- it is still much easier to run locally than 8B and above
-
-As of the official Qwen3 release on April 29, 2025, Qwen lists `Qwen3-4B` as an Apache 2.0 open-weight dense model with `32K` context and explicitly recommends local use through tools such as `Ollama`.
-
-Sources:
-
-- <https://qwenlm.github.io/blog/qwen3/>
-- <https://docs.ollama.com/api/chat>
+- it keeps the mobile client thin and moves generation entirely to the backend
+- it removes the operational overhead of shipping and supervising a local model runtime inside the demo stack
+- it is intended as the lower-cost OpenAI path for this project’s grounded-chat use case
 
 ## 3. High-Level Runtime
 
 Buddy generation now follows this flow:
 
 1. student sends a message from the existing Buddy screen
-2. backend persists the user message in `chat_messages`
-3. backend retrieves relevant approved evidence from the BAHA corpus
-4. backend decides whether retrieval is strong enough to answer safely
-5. if retrieval is strong enough:
-   - backend sends a constrained prompt plus retrieved evidence to local `Ollama`
-   - model returns structured JSON only
-6. if retrieval is weak or missing:
-   - backend does **not** let the model guess
-   - backend returns an explicit scope-limited response
-7. backend stores the assistant answer and any citations
-8. emergency language still creates safeguarding signal/case server-side
+2. backend first checks for emergency language
+3. if emergency language is present:
+   - backend returns the server-owned emergency response
+   - backend creates safeguarding signal/case server-side
+4. otherwise backend decides whether the message needs retrieval grounding
+5. if the message is casual, emotional, or general conversation:
+   - backend calls `OpenAI` in conversational mode with no retrieval evidence
+6. if the message is an advice-style wellbeing question:
+   - backend retrieves relevant approved evidence from the BAHA corpus
+   - backend calls `OpenAI` in grounded mode with trimmed evidence
+7. if retrieval is weak:
+   - backend falls back to conversational OpenAI instead of a cold refusal
+8. mobile can use the stream route so Buddy text appears progressively
+9. backend stores the final assistant answer and any citations
 
 ## 4. Scope Guard
 
@@ -55,26 +55,33 @@ The most important design rule is:
 - the model is not the source of truth
 - retrieval is the source of truth
 
-The local model is used only to rewrite retrieved evidence into a friendlier answer shape.
+The OpenAI model is now used for all normal Buddy replies.
 
-The backend blocks unsupported answering in three ways:
+The scope rule is now:
 
-- if retrieval returns no evidence, Buddy responds that the question is outside the approved material
-- if top retrieval confidence is below the configured threshold, Buddy responds that it cannot answer from the current corpus
-- if the model itself says the evidence is insufficient, backend converts that into the same bounded out-of-scope answer
+- grounded factual advice should come only from retrieved BAHA evidence
+- supportive conversation may still happen without retrieval
+- emergency handling stays outside the model
 
-This is intentionally stricter than a general chatbot.
+That means the hard gate is softer than before:
+
+- outside-scope or weak-retrieval messages no longer get a cold system refusal by default
+- instead, Buddy can still respond naturally in conversational mode while avoiding factual claims beyond the corpus
+- the model is still not allowed to diagnose or act like a therapist
 
 ## 5. Prompt Contract
 
-The Buddy prompt tells the model to:
+Buddy now uses two prompt families:
 
-- use only the evidence snippets included in the request
-- avoid inventing facts or external resources
-- avoid diagnosis
-- avoid therapy framing
-- avoid medication/legal advice
-- return only JSON matching the required schema
+- grounded prompt:
+  - use only the supplied approved evidence for factual advice
+  - avoid inventing facts or external resources
+  - avoid diagnosis
+  - stay concise and natural
+- conversational prompt:
+  - support greetings, venting, and general wellbeing talk naturally
+  - gently redirect if the topic is unrelated to BAHA wellbeing support
+  - avoid diagnosis and therapy framing
 
 The model returns a draft with:
 
@@ -85,6 +92,13 @@ The model returns a draft with:
 - `answerable_from_corpus`
 
 The backend then wraps that into the existing `EvidenceAnswer` contract already used by the mobile API.
+
+For the mobile streaming route, the backend also requests a plain text streamed reply from OpenAI so the Flutter UI can render deltas progressively while still persisting the final assistant message at the end.
+
+Implementation note:
+
+- with `gpt-5-nano`, Buddy now explicitly requests `reasoning.effort=minimal` for both structured and streamed reply generation
+- this avoids the failure mode where the model spends the whole output budget on hidden reasoning tokens and returns an incomplete response with no visible assistant text
 
 ## 6. Why This Is Safer Than A Free-Form Local Chatbot
 
@@ -111,68 +125,55 @@ Not:
 Relevant environment variables:
 
 - `BUDDY_GENERATION_BACKEND`
-- `BUDDY_OLLAMA_BASE_URL`
-- `BUDDY_OLLAMA_MODEL`
-- `BUDDY_OLLAMA_TIMEOUT_SECONDS`
-- `BUDDY_OLLAMA_KEEP_ALIVE`
-- `BUDDY_OLLAMA_THINK`
+- `BUDDY_OPENAI_API_KEY`
+- `BUDDY_OPENAI_BASE_URL`
+- `BUDDY_OPENAI_MODEL`
+- `BUDDY_OPENAI_TIMEOUT_SECONDS`
 - `BUDDY_HISTORY_WINDOW`
 - `BUDDY_MIN_RETRIEVAL_CONFIDENCE`
 
-Current intended local values:
+Relevant route surfaces:
+
+- `POST /mobile/chat/sessions/{session_id}/messages`
+- `POST /mobile/chat/sessions/{session_id}/messages/stream`
+
+Example OpenAI configuration:
 
 ```bash
-BUDDY_GENERATION_BACKEND=ollama
-BUDDY_OLLAMA_BASE_URL=http://localhost:11434
-BUDDY_OLLAMA_MODEL=qwen3:4b
-BUDDY_OLLAMA_TIMEOUT_SECONDS=60
-BUDDY_OLLAMA_KEEP_ALIVE=10m
-BUDDY_OLLAMA_THINK=false
+BUDDY_GENERATION_BACKEND=openai
+BUDDY_OPENAI_API_KEY=...
+BUDDY_OPENAI_BASE_URL=https://api.openai.com/v1
+BUDDY_OPENAI_MODEL=gpt-5-nano
+BUDDY_OPENAI_TIMEOUT_SECONDS=60
 BUDDY_HISTORY_WINDOW=6
-BUDDY_MIN_RETRIEVAL_CONFIDENCE=0.45
+BUDDY_MIN_RETRIEVAL_CONFIDENCE=0.35
 ```
 
-Runtime note:
+Model note:
 
-- host-native backend process: use `http://localhost:11434`
-- Dockerized backend process: use `http://host.docker.internal:11434`
-- this repository's `docker-compose.yml` now injects the Docker-safe value so the API container can reach a host-installed `Ollama`
+- the repo default is `gpt-5-nano` because that is the model string currently requested for this project
+- actual availability should still be verified in the OpenAI account used for the demo environment
 
-## 8. Fallback Behavior
+## 8. Failure Behavior
 
-If `Ollama` is unavailable or returns invalid output:
+If OpenAI is unavailable, misconfigured, or returns invalid output:
 
-- the backend falls back to the existing deterministic evidence composer
-- the chat still works
-- the stored assistant payload records that fallback occurred
-
-This means:
-
-- the app does not break if the local model is down
-- but the real local-LLM experience only exists when `Ollama` is installed, running, and has `qwen3:4b` pulled
+- Buddy should fail clearly at the API layer during development
+- grounded generation may fall back to conversational OpenAI when the grounded draft is unusable
+- there is no secondary non-OpenAI model path
 
 ## 9. Current Local Repo Status
 
-As of July 5, 2026 local verification:
+As of July 15, 2026 local verification:
 
-- `Ollama` is installed locally
-- `qwen3:4b` is pulled locally
-- the Dockerized backend is configured to reach host `Ollama`
 - the mobile Buddy endpoint is live
+- retrieval remains local to BAHA's database
+- final answer generation is OpenAI-backed for both conversational and grounded Buddy replies
+- emergency handling remains server-side
+- the Flutter transport layer now supports progressive Buddy message streaming
+- if the running local backend has not been rebuilt yet, the new stream route will return `404` until the API container/process is restarted
 
-Current remaining data gap:
-
-- the retrieval index tables are still empty in the local database:
-  - `acquired_resources = 0`
-  - `resource_chunks = 0`
-  - `knowledge_embeddings = 0`
-
-So right now Buddy behaves correctly but conservatively:
-
-- it returns the bounded out-of-scope response
-- it does **not** yet give evidence-backed wellbeing guidance from the larger corpus
-
-To move from "safe local chatbot runtime" to "actually informed chatbot", the next backend data step is:
+To move from "safe grounded chatbot runtime" to "actually informed chatbot", the next backend data step is:
 
 1. import or map approved BAHA corpus material into the retrieval-backed acquisition/knowledge tables
 2. run embedding activation so `resource_chunks`, `resource_embeddings`, `condition_embeddings`, and `knowledge_embeddings` are populated
@@ -196,7 +197,7 @@ Why this is the right order:
 Current practical runtime note:
 
 - default local `docker compose` still uses `EMBEDDING_BACKEND=hash`
-- that is acceptable for an end-to-end Buddy demo activation pass
+- that is acceptable for the current demo-oriented Buddy behavior
 - true `BGE` retrieval validation still requires the full retrieval runtime from `Dockerfile.full` or a repaired host Python retrieval environment
 
 So the practical near-term activation sequence is:
@@ -209,9 +210,9 @@ So the practical near-term activation sequence is:
 Current local verification result:
 
 - the curated shortlist can now be imported and indexed in the lightweight runtime
-- but hash-backed retrieval ranking is still too weak for a high-quality Buddy demo
-- the local smoke test still scope-guarded the sample student prompts because top confidences remained below the Buddy threshold or ranked the wrong chunk first
+- Buddy now feels better for demo use because conversation is no longer split between visibly different local and model-generated tones
+- the main remaining quality gap is still deeper retrieval quality for less common or more complex grounded questions
 
-So the data pipeline work is now unblocked, but the next real quality step is still:
+So the next real quality step after the demo is still:
 
 - run the same shortlist in a full retrieval runtime with true `BGE` embeddings
