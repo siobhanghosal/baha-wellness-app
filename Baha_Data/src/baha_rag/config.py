@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     buddy_openai_base_url: str = "https://api.openai.com/v1"
     buddy_openai_model: str = "gpt-5-nano"
     buddy_openai_timeout_seconds: float = 60.0
-    buddy_history_window: int = 6
+    buddy_history_window: int = 10
     buddy_min_retrieval_confidence: float = 0.45
     storage_root: str = "storage/raw"
     crawl_concurrent_requests: int = 8

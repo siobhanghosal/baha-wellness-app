@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'prototype_models.dart';
 
-const studentCards = [
+const studentPrimaryCards = [
   UiCardItem(
     title: 'Daily Check-in',
     subtitle:
@@ -11,6 +11,23 @@ const studentCards = [
     icon: Icons.favorite_rounded,
     color: Color(0xFF14B8A6),
   ),
+  UiCardItem(
+    title: 'BAHA Buddy',
+    subtitle: 'Ask safe questions with approved guidance.',
+    tag: 'Chat',
+    icon: Icons.smart_toy_rounded,
+    color: Color(0xFFEC4899),
+  ),
+  UiCardItem(
+    title: 'SOS Help',
+    subtitle: 'Clear next steps when something feels unsafe.',
+    tag: 'Safety',
+    icon: Icons.health_and_safety_rounded,
+    color: Color(0xFFDC2626),
+  ),
+];
+
+const activityCards = [
   UiCardItem(
     title: 'Comet Sequence',
     subtitle: 'Watch the pattern, remember it, and repeat it before it fades.',
@@ -39,23 +56,9 @@ const studentCards = [
     icon: Icons.explore_rounded,
     color: Color(0xFF06B6D4),
   ),
-  UiCardItem(
-    title: 'BAHA Buddy',
-    subtitle: 'Ask safe questions with approved guidance.',
-    tag: 'Chat',
-    icon: Icons.smart_toy_rounded,
-    color: Color(0xFFEC4899),
-  ),
-  UiCardItem(
-    title: 'SOS Help',
-    subtitle: 'Clear next steps when something feels unsafe.',
-    tag: 'Safety',
-    icon: Icons.health_and_safety_rounded,
-    color: Color(0xFFDC2626),
-  ),
 ];
 
-const learning = [
+const learningCards = [
   UiCardItem(
     title: 'Sleep Reset',
     subtitle: 'Build a wind-down routine that does not feel like punishment.',
@@ -85,6 +88,13 @@ const learning = [
     color: Color(0xFFF97316),
   ),
 ];
+
+const studentCards = [
+  ...studentPrimaryCards,
+  ...activityCards,
+];
+
+const learning = learningCards;
 
 const roleActions = [
   UiCardItem(

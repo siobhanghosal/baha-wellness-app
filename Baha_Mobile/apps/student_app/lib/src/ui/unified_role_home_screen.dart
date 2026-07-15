@@ -811,6 +811,24 @@ class _GuardianStudentSummaryScreenState
                 (summaryMap['trend_labels'] as List<dynamic>? ?? const [])
                     .map((value) => value.toString())
                     .toList();
+            final conversationStarter =
+                summaryMap['safe_talking_point']?.toString() ??
+                summaryMap['conversation_starter']?.toString() ??
+                (summaryMap['best_progress'] != null
+                    ? 'Ask what part of the week felt a little easier and what helped.'
+                    : 'Start with a calm check-in: “How has this week felt for you overall?”');
+            final watchNextWeek =
+                summaryMap['watch_area']?.toString() ??
+                (flags.isNotEmpty
+                    ? 'Keep an eye on ${flags.first.toLowerCase()} next week and notice whether it repeats.'
+                    : 'Watch for any repeated shift in sleep, mood, stress, or connection rather than reacting to one difficult day.');
+            final supportAction =
+                summaryMap['support_nudge']?.toString() ??
+                'Keep support low-pressure: listen first, reflect what you notice, and offer one small practical step.';
+            final whatChanged =
+                summaryMap['week_story']?.toString() ??
+                summaryMap['headline']?.toString() ??
+                'BAHA is still building a clearer weekly pattern story for this student.';
             final accessGranted = data.platform.status == 'granted';
             final summaryGranted = data.summaryConsent.status == 'granted';
             return ListView(
@@ -915,6 +933,39 @@ class _GuardianStudentSummaryScreenState
                           title: 'Support nudge',
                           value:
                               '${summaryMap['support_nudge'] ?? 'No support suggestion yet.'}',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  GlassPanel(
+                    palette: palette,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SectionTitle(
+                          title: 'How to respond this week',
+                          subtitle:
+                              'A privacy-safe parent action layer built on the summary, not the child’s private entries.',
+                        ),
+                        _SummaryBlock(
+                          title: 'What changed',
+                          value: whatChanged,
+                        ),
+                        const SizedBox(height: 10),
+                        _SummaryBlock(
+                          title: 'Conversation starter',
+                          value: conversationStarter,
+                        ),
+                        const SizedBox(height: 10),
+                        _SummaryBlock(
+                          title: 'What to watch next week',
+                          value: watchNextWeek,
+                        ),
+                        const SizedBox(height: 10),
+                        _SummaryBlock(
+                          title: 'Support action to try',
+                          value: supportAction,
                         ),
                       ],
                     ),

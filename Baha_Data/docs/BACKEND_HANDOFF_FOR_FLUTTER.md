@@ -286,6 +286,9 @@ Implemented mobile status right now:
     - Exam Stress
   - richer block-rendered student learning content
   - structure-aware module progress display
+  - a discovery split between `Learning` and `Activities`
+  - home recommendations that can point either to a Learn lane or a short activity based on recent check-in patterns
+  - post-check-in personalized takeaway copy based on today's factors versus recent averages
 
 Current content strategy reference:
 
@@ -310,6 +313,11 @@ Current content strategy reference:
   - `POST /auth/guardian/consent/parent-summary-sharing`
   - `POST /auth/guardian/consent/platform-participation`
   - `GET /mobile/support-contacts`
+  - a response-oriented weekly summary layer:
+    - what changed
+    - conversation starter
+    - what to watch next week
+    - support action to try
 - teacher and counselor apps are still scaffolded shells awaiting their first real slices
   - `GET /mobile/student/modules`
   - `POST /mobile/student/modules/{module_id}/progress`
@@ -321,6 +329,8 @@ Current content strategy reference:
   - `POST /mobile/chat/sessions`
   - `GET /mobile/chat/sessions/{session_id}/messages`
   - `POST /mobile/chat/sessions/{session_id}/messages`
+  - `POST /mobile/chat/sessions/{session_id}/messages/stream`
+  - short remembered session context injected server-side for better within-session continuity
 
 Latest verified mobile/backend handshake:
 

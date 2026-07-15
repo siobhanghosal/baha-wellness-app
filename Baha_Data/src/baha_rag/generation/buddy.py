@@ -688,15 +688,124 @@ class BuddyChatService:
             confidence=0.0,
         )
 
-    def _sanitize_history(self, history: list[dict[str, str]]) -> list[dict[str, str]]:
+    def _sanitize_history(
+        self,
+        history: list[dict[str, str]],
+        *,
+        limit: int | None = None,
+    ) -> list[dict[str, str]]:
         sanitized: list[dict[str, str]] = []
-        for item in history[-self.settings.buddy_history_window :]:
+        selected = history[-limit:] if limit is not None else history
+        for item in selected:
             role = item.get("role")
             content = " ".join((item.get("content") or "").split()).strip()
             if role not in {"user", "assistant"} or not content:
                 continue
             sanitized.append({"role": role, "content": content})
         return sanitized
+
+    def _session_memory_block(self, history: list[dict[str, str]]) -> str:
+        sanitized = self._sanitize_history(
+            history,
+            limit=max(self.settings.buddy_history_window * 3, 18),
+        )
+        if not sanitized:
+            return "(no established session context yet)"
+        user_messages = [
+            item["content"] for item in sanitized if item["role"] == "user"
+        ]
+        if not user_messages:
+            return "(no user-specific context yet)"
+
+        contexts = self._remembered_contexts(user_messages)
+        factors = self._remembered_wellbeing_factors(user_messages)
+        facts = self._remembered_user_facts(user_messages)
+        latest_user_line = self._clip_snippet(user_messages[-1], max_words=18)
+
+        lines = [f"Latest user concern: {latest_user_line}"]
+        if contexts:
+            lines.append(
+                "Remembered life context from earlier in this session: "
+                + ", ".join(contexts)
+            )
+        if factors:
+            lines.append(
+                "Repeated wellbeing themes mentioned so far: "
+                + ", ".join(factors)
+            )
+        if facts:
+            lines.extend(f"Remembered fact: {fact}" for fact in facts[:4])
+        lines.append(
+            "If the user asks what they mentioned earlier, answer from this remembered context and the visible conversation history directly."
+        )
+        return "\n".join(lines)
+
+    def _remembered_contexts(self, user_messages: list[str]) -> list[str]:
+        context_map = (
+            ("work", ("work", "job", "office", "boss", "coworker", "shift")),
+            (
+                "school",
+                ("school", "class", "exam", "college", "teacher", "homework"),
+            ),
+            (
+                "friends",
+                ("friend", "friends", "friendship", "group chat", "left out"),
+            ),
+            ("family", ("family", "parent", "parents", "mom", "dad", "home")),
+        )
+        remembered: list[str] = []
+        lowered_messages = [message.lower() for message in user_messages]
+        for label, terms in context_map:
+            if any(any(term in message for term in terms) for message in lowered_messages):
+                remembered.append(label)
+        return remembered
+
+    def _remembered_wellbeing_factors(self, user_messages: list[str]) -> list[str]:
+        factor_order = (
+            "Sleep",
+            "Stress",
+            "Anxiety",
+            "Low Mood",
+            "Friendships",
+            "Digital Wellbeing",
+            "School Pressure",
+        )
+        seen: list[str] = []
+        for message in user_messages:
+            condition = self._resolve_condition(message)
+            if condition in factor_order and condition not in seen:
+                seen.append(condition)
+        return seen
+
+    def _remembered_user_facts(self, user_messages: list[str]) -> list[str]:
+        facts: list[str] = []
+        fact_patterns = (
+            (
+                re.compile(r"\btrouble at work\b", re.IGNORECASE),
+                "The user said they were having trouble at work.",
+            ),
+            (
+                re.compile(r"\btrouble at school\b", re.IGNORECASE),
+                "The user said they were having trouble at school.",
+            ),
+            (
+                re.compile(r"\b(can't|cannot|couldn't|could not)\s+sleep\b", re.IGNORECASE),
+                "The user said sleep has been difficult.",
+            ),
+            (
+                re.compile(r"\b(feel|feeling)\s+overwhelmed\b", re.IGNORECASE),
+                "The user said they felt overwhelmed.",
+            ),
+            (
+                re.compile(r"\b(feel|feeling)\s+stressed\b", re.IGNORECASE),
+                "The user said they felt stressed.",
+            ),
+        )
+        joined = "\n".join(user_messages)
+        for pattern, statement in fact_patterns:
+            if pattern.search(joined):
+                facts.append(statement)
+        return facts
 
     def _openai_grounded_system_prompt(self) -> str:
         return (
@@ -705,6 +814,8 @@ class BuddyChatService:
             "Only answer using the approved evidence snippets provided in the user input. "
             "If the evidence is relevant but incomplete, answer conservatively and stay close to the snippets. "
             "If the evidence is not enough to give grounded factual advice, set answerable_from_corpus to false instead of inventing detail. "
+            "Pay attention to remembered session context and conversation history so your reply stays continuous across turns. "
+            "If the user asks what they mentioned earlier, answer directly from the visible session context instead of ignoring it. "
             "Write in a warm, natural, concise way for a young user. "
             "Default to short paragraphs, not essays or bullet-heavy lists, unless the evidence strongly requires a short list. "
             "Keep each field compact and conversational. "
@@ -719,6 +830,8 @@ class BuddyChatService:
             "You can have natural conversation, acknowledge feelings, and offer gentle wellbeing-oriented support. "
             "You are not a therapist and you do not diagnose. "
             "If the user asks about something unrelated to youth wellbeing, answer briefly and gently steer back toward wellbeing support. "
+            "Use remembered session context so the conversation feels continuous and attentive. "
+            "If the user asks what they said earlier, answer from the remembered context and visible history directly. "
             "Keep the tone concise, natural, and human, not robotic. "
             "Return only valid JSON with the exact keys: "
             "answerable_from_corpus, what_it_is, how_to_identify_it, what_to_do, when_to_seek_help. "
@@ -731,6 +844,7 @@ class BuddyChatService:
             "You are BAHA Buddy. Reply in a warm, natural, concise way. "
             "Use only the approved evidence provided for factual advice. "
             "Do not diagnose or invent facts. "
+            "Use remembered session context so the reply stays continuous across turns. "
             "If the evidence is limited, say that simply and stay conservative. "
             "Write 3 to 6 short sentences total, as a normal chat reply."
         )
@@ -740,6 +854,7 @@ class BuddyChatService:
             "You are BAHA Buddy. Reply like a calm, supportive, natural chat companion. "
             "You are not a therapist and you do not diagnose. "
             "You can have light conversation, acknowledge feelings, and offer gentle wellbeing-oriented next steps. "
+            "Use remembered session context so the user feels heard across multiple turns. "
             "If the question is outside your main wellbeing role, answer briefly and redirect kindly. "
             "Keep the reply concise, human, and no more than 4 short sentences."
         )
@@ -763,6 +878,8 @@ class BuddyChatService:
             f"Audience: {request.audience}\n"
             f"Detected topic: {condition}\n"
             f"User question: {request.message}\n"
+            "Remembered session context:\n"
+            f"{self._session_memory_block(history)}\n\n"
             "Conversation so far:\n"
             f"{self._history_block(history)}\n\n"
             "Response style:\n"
@@ -776,7 +893,10 @@ class BuddyChatService:
         )
 
     def _history_block(self, history: list[dict[str, str]]) -> str:
-        sanitized = self._sanitize_history(history)
+        sanitized = self._sanitize_history(
+            history,
+            limit=self.settings.buddy_history_window,
+        )
         if not sanitized:
             return "(no prior conversation)"
         return "\n".join(

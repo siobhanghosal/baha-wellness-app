@@ -75,6 +75,7 @@ Buddy note:
 - the final answer-generation step now runs through OpenAI only
 - `BUDDY_GENERATION_BACKEND` remains fixed to `openai`
 - the default configured model string is now `gpt-5-nano`
+- Buddy now synthesizes a short remembered session context from recent user turns so it can carry forward simple facts inside one conversation
 - Buddy now uses two OpenAI-backed reply modes under one server-side safety layer:
   - conversational OpenAI replies for greetings, venting, and general supportive conversation
   - retrieval-grounded OpenAI replies for advice-style wellbeing questions where approved BAHA evidence is useful
@@ -85,6 +86,22 @@ Buddy note:
   - this lets the Flutter Buddy UI render the assistant reply progressively while the backend is still receiving deltas from OpenAI
   - the final assistant message is still persisted normally at the end of the stream
 - actual OpenAI model availability should still be verified against the specific API account being used
+
+Current demo-facing mobile UX improvements:
+
+- the student home dashboard stays in a real empty state until live check-in data exists
+- once data exists, the dashboard adds narrative callouts:
+  - `What changed`
+  - `What improved`
+  - `What to watch`
+  - `What to try next`
+- the post-check-in result view now shows a short personalized takeaway based on today's factors versus recent averages
+- student discovery is now clearly separated into `Learning` and `Activities`
+- the parent weekly summary now includes a privacy-safe response layer with:
+  - `What changed`
+  - `Conversation starter`
+  - `What to watch next week`
+  - `Support action to try`
 
 If a currently running local API returns `404` for the new Buddy stream route after pulling these changes, it usually means the old container/process is still running. Recreate the API container:
 

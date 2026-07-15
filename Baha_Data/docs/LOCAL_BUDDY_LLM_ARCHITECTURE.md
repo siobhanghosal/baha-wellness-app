@@ -46,7 +46,8 @@ Buddy generation now follows this flow:
 7. if retrieval is weak:
    - backend falls back to conversational OpenAI instead of a cold refusal
 8. mobile can use the stream route so Buddy text appears progressively
-9. backend stores the final assistant answer and any citations
+9. backend synthesizes a short remembered session context from recent turns
+10. backend stores the final assistant answer and any citations
 
 ## 4. Scope Guard
 
@@ -99,6 +100,7 @@ Implementation note:
 
 - with `gpt-5-nano`, Buddy now explicitly requests `reasoning.effort=minimal` for both structured and streamed reply generation
 - this avoids the failure mode where the model spends the whole output budget on hidden reasoning tokens and returns an incomplete response with no visible assistant text
+- Buddy also now injects a compact remembered-context block ahead of the visible chat history so the model can carry forward simple session facts such as work, school, friends, family, sleep trouble, stress, or overwhelm across one conversation
 
 ## 6. Why This Is Safer Than A Free-Form Local Chatbot
 
@@ -145,7 +147,7 @@ BUDDY_OPENAI_API_KEY=...
 BUDDY_OPENAI_BASE_URL=https://api.openai.com/v1
 BUDDY_OPENAI_MODEL=gpt-5-nano
 BUDDY_OPENAI_TIMEOUT_SECONDS=60
-BUDDY_HISTORY_WINDOW=6
+BUDDY_HISTORY_WINDOW=10
 BUDDY_MIN_RETRIEVAL_CONFIDENCE=0.35
 ```
 
@@ -171,6 +173,7 @@ As of July 15, 2026 local verification:
 - final answer generation is OpenAI-backed for both conversational and grounded Buddy replies
 - emergency handling remains server-side
 - the Flutter transport layer now supports progressive Buddy message streaming
+- Buddy now carries a lightweight rolling session memory into prompts for better within-session continuity
 - if the running local backend has not been rebuilt yet, the new stream route will return `404` until the API container/process is restarted
 
 To move from "safe grounded chatbot runtime" to "actually informed chatbot", the next backend data step is:

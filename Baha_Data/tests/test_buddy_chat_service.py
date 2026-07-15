@@ -249,6 +249,47 @@ def test_buddy_chat_service_falls_back_to_conversation_when_retrieval_is_weak() 
     asyncio.run(run())
 
 
+def test_buddy_chat_service_includes_session_memory_context_in_prompt() -> None:
+    async def run() -> None:
+        captured_payload: dict[str, object] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal captured_payload
+            captured_payload = json.loads(request.content.decode())
+            return httpx.Response(200, json=_openai_json_response())
+
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            base_url="https://api.openai.com/v1",
+        ) as client:
+            service = BuddyChatService(
+                Settings(
+                    buddy_generation_backend="openai",
+                    buddy_openai_api_key="test-key",
+                    buddy_openai_base_url="https://api.openai.com/v1",
+                ),
+                http_client=client,
+            )
+            await service.generate(
+                request=ChatRequest(
+                    message="Did I say I was having trouble at school or work?",
+                    audience="adolescent",
+                ),
+                retriever=_FakeRetriever([]),
+                history=[
+                    {"role": "user", "content": "I had trouble at work today."},
+                    {"role": "assistant", "content": "That sounds difficult."},
+                ],
+            )
+
+        input_block = str(captured_payload.get("input") or "")
+        assert "Remembered session context" in input_block
+        assert "work" in input_block.lower()
+        assert "trouble at work" in input_block.lower()
+
+    asyncio.run(run())
+
+
 def test_buddy_chat_service_raises_when_openai_is_not_configured() -> None:
     async def run() -> None:
         service = BuddyChatService(

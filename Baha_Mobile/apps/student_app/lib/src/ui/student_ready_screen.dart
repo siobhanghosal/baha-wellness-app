@@ -419,6 +419,7 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
               onOpenProfileSetup: _openProfileSetup,
               onOpenCheckins: _openCheckins,
               onOpenSupport: _openSupport,
+              onCardTap: _handleCardAction,
               onClearIdentity: _resetIdentityFromChildRoute,
             ),
             StudentReferenceExploreTab(
@@ -517,6 +518,7 @@ class StudentReferenceHomeTab extends StatefulWidget {
     required this.onOpenProfileSetup,
     required this.onOpenCheckins,
     required this.onOpenSupport,
+    required this.onCardTap,
     required this.onClearIdentity,
     super.key,
   });
@@ -531,6 +533,7 @@ class StudentReferenceHomeTab extends StatefulWidget {
   final Future<StudentWellbeingProfile?> Function() onOpenProfileSetup;
   final Future<void> Function() onOpenCheckins;
   final Future<void> Function() onOpenSupport;
+  final ValueChanged<UiCardItem> onCardTap;
   final Future<void> Function() onClearIdentity;
 
   @override
@@ -548,10 +551,15 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
   }
 
   Future<_StudentDashboardData> _load() async {
-    final checkins = await widget.apiClient.listStudentCheckins(
-      identity: widget.identity,
-      limit: 7,
-    );
+    final results = await Future.wait<Object>([
+      widget.apiClient.listStudentCheckins(
+        identity: widget.identity,
+        limit: 7,
+      ),
+      widget.apiClient.listStudentModules(identity: widget.identity),
+    ]);
+    final checkins = results[0] as List<StudentCheckinSummary>;
+    final modules = results[1] as List<StudentModuleSummary>;
     final details = await Future.wait<StudentCheckinDetail>(
       checkins
           .where((checkin) => checkin.submittedAt != null)
@@ -573,6 +581,7 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
     return _StudentDashboardData(
       summary: summary,
       checkins: checkins,
+      modules: modules,
       details: details,
       trendPoints: trendPoints,
     );
@@ -667,6 +676,15 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
           );
           final dashboardCallouts = _dashboardCallouts(
             summary: data.summary,
+            points: data.trendPoints,
+            profile: widget.profile,
+          );
+          final learnRecommendations = _recommendedLearnCards(
+            modules: data.modules,
+            points: data.trendPoints,
+            profile: widget.profile,
+          );
+          final activityRecommendations = _recommendedActivityCards(
             points: data.trendPoints,
             profile: widget.profile,
           );
@@ -855,6 +873,61 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                 ],
               ),
               const SizedBox(height: 14),
+              if (learnRecommendations.isNotEmpty || activityRecommendations.isNotEmpty)
+                GlassPanel(
+                  palette: palette,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
+                        title: 'Recommended next',
+                        subtitle:
+                            'BAHA turns your recent patterns into a small next step instead of leaving you with charts alone.',
+                      ),
+                      if (learnRecommendations.isNotEmpty) ...[
+                        Text(
+                          'Learn',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 10),
+                        ...learnRecommendations.take(2).map(
+                          (item) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: ActionCard(
+                              palette: palette,
+                              item: item,
+                              onTap: () => widget.onCardTap(item),
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (learnRecommendations.isNotEmpty &&
+                          activityRecommendations.isNotEmpty)
+                        const SizedBox(height: 8),
+                      if (activityRecommendations.isNotEmpty) ...[
+                        Text(
+                          'Activities',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 10),
+                        ...activityRecommendations.take(2).map(
+                          (item) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: ActionCard(
+                              palette: palette,
+                              item: item,
+                              onTap: () => widget.onCardTap(item),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              if (learnRecommendations.isNotEmpty || activityRecommendations.isNotEmpty)
+                const SizedBox(height: 14),
               if (data.checkins.isNotEmpty)
                 GlassPanel(
                   palette: palette,
@@ -903,34 +976,80 @@ class StudentReferenceExploreTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = [...studentCards, ...learning];
     return LayoutBuilder(
       key: const ValueKey('student-discover'),
-      builder: (context, constraints) => GridView.builder(
+      builder: (context, constraints) => ListView(
         padding: const EdgeInsets.all(22),
-        itemCount: items.length,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: adaptiveGridCount(constraints.maxWidth),
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          mainAxisExtent: constraints.maxWidth < 420
-              ? 268
-              : constraints.maxWidth < 620
-              ? 236
-              : 212,
-        ),
-        itemBuilder: (context, index) {
-          final item = items[index];
-          return ActionCard(
-                palette: palette,
-                item: item,
-                onTap: () => onCardTap(item),
-              )
-              .animate(delay: (index * 50).ms)
-              .fadeIn()
-              .scale(begin: const Offset(.95, .95));
-        },
+        children: [
+          const SectionTitle(
+            title: 'Learning',
+            subtitle:
+                'Guided modules and quick guides for sleep, stress, confidence, and digital habits.',
+          ),
+          _ExploreGrid(
+            palette: palette,
+            constraints: constraints,
+            items: learningCards,
+            onCardTap: onCardTap,
+          ),
+          const SizedBox(height: 18),
+          const SectionTitle(
+            title: 'Activities',
+            subtitle:
+                'Breathing resets, cognitive mini-games, check-ins, and Story World live here as practice spaces.',
+          ),
+          _ExploreGrid(
+            palette: palette,
+            constraints: constraints,
+            items: [...studentPrimaryCards, ...activityCards],
+            onCardTap: onCardTap,
+          ),
+        ],
       ),
+    );
+  }
+}
+
+class _ExploreGrid extends StatelessWidget {
+  const _ExploreGrid({
+    required this.palette,
+    required this.constraints,
+    required this.items,
+    required this.onCardTap,
+  });
+
+  final PrototypePalette palette;
+  final BoxConstraints constraints;
+  final List<UiCardItem> items;
+  final ValueChanged<UiCardItem> onCardTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: items.length,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: adaptiveGridCount(constraints.maxWidth),
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        mainAxisExtent: constraints.maxWidth < 420
+            ? 268
+            : constraints.maxWidth < 620
+            ? 236
+            : 212,
+      ),
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return ActionCard(
+              palette: palette,
+              item: item,
+              onTap: () => onCardTap(item),
+            )
+            .animate(delay: (index * 50).ms)
+            .fadeIn()
+            .scale(begin: const Offset(.95, .95));
+      },
     );
   }
 }
@@ -2938,6 +3057,16 @@ class _StudentCalendarData {
   final List<StudentModuleSummary> modules;
 }
 
+class _StudentCheckinResultData {
+  const _StudentCheckinResultData({
+    required this.detail,
+    required this.previousDetails,
+  });
+
+  final StudentCheckinDetail detail;
+  final List<StudentCheckinDetail> previousDetails;
+}
+
 List<_DashboardCallout> _dashboardCallouts({
   required StudentWeeklySummary summary,
   required List<WellbeingTrendPoint> points,
@@ -2951,30 +3080,304 @@ List<_DashboardCallout> _dashboardCallouts({
   final supportNudge = payload['support_nudge']?.toString().trim();
 
   if (weekStory != null && weekStory.isNotEmpty) {
-    callouts.add(_DashboardCallout(label: 'Story', value: weekStory));
+    callouts.add(_DashboardCallout(label: 'What changed', value: weekStory));
   }
   if (bestProgress != null && bestProgress.isNotEmpty) {
-    callouts.add(_DashboardCallout(label: 'Best sign', value: bestProgress));
+    callouts.add(_DashboardCallout(label: 'What improved', value: bestProgress));
   } else {
     final derived = _derivedImprovement(points);
     if (derived != null) {
-      callouts.add(_DashboardCallout(label: 'Best sign', value: derived));
+      callouts.add(_DashboardCallout(label: 'What improved', value: derived));
     }
   }
   if (watchArea != null && watchArea.isNotEmpty) {
-    callouts.add(_DashboardCallout(label: 'Watch area', value: watchArea));
+    callouts.add(_DashboardCallout(label: 'What to watch', value: watchArea));
   } else {
     final derived = _derivedWatchArea(points, profile);
     if (derived != null) {
-      callouts.add(_DashboardCallout(label: 'Watch area', value: derived));
+      callouts.add(_DashboardCallout(label: 'What to watch', value: derived));
     }
   }
   if (supportNudge != null && supportNudge.isNotEmpty) {
     callouts.add(
-      _DashboardCallout(label: 'BAHA suggests', value: supportNudge),
+      _DashboardCallout(label: 'What to try next', value: supportNudge),
     );
   }
   return callouts.take(4).toList();
+}
+
+List<_DashboardCallout> _checkinTakeaways({
+  required StudentCheckinDetail detail,
+  required WellbeingTrendPoint today,
+  required List<WellbeingTrendPoint> previous,
+}) {
+  final takeaways = <_DashboardCallout>[];
+  final factors = today.factorScores;
+
+  double? averageFor(String key) {
+    if (previous.isEmpty) {
+      return null;
+    }
+    final values = previous
+        .map((point) => point.factorScores[key])
+        .whereType<double>()
+        .toList();
+    if (values.isEmpty) {
+      return null;
+    }
+    return values.reduce((a, b) => a + b) / values.length;
+  }
+
+  for (final factorKey in const [
+    'stress',
+    'sleep',
+    'mood',
+    'energy',
+    'connectedness',
+    'physical_wellbeing',
+  ]) {
+    final todayValue = factors[factorKey];
+    final average = averageFor(factorKey);
+    if (todayValue == null || average == null) {
+      continue;
+    }
+    final delta = todayValue - average;
+    if (delta >= 0.7) {
+      takeaways.add(
+        _DashboardCallout(
+          label: 'Compared with recent days',
+          value:
+              'Today looks more ${_factorLabel(factorKey).toLowerCase()}-heavy than your recent average.',
+        ),
+      );
+      break;
+    }
+    if (delta <= -0.7) {
+      takeaways.add(
+        _DashboardCallout(
+          label: 'Compared with recent days',
+          value:
+              'Today looks lighter on ${_factorLabel(factorKey).toLowerCase()} than your recent average.',
+        ),
+      );
+      break;
+    }
+  }
+
+  final sleep = factors['sleep'] ?? 0;
+  final energy = factors['energy'] ?? 0;
+  final mood = factors['mood'] ?? 0;
+  final stress = factors['stress'] ?? 0;
+  final connection = factors['connectedness'] ?? 0;
+  if (sleep >= 2 && energy >= 2) {
+    takeaways.add(
+      const _DashboardCallout(
+        label: 'Linked pattern',
+        value:
+            'Sleep and energy moved together today, so improving one may help the other.',
+      ),
+    );
+  } else if (stress >= 2 && mood >= 2) {
+    takeaways.add(
+      const _DashboardCallout(
+        label: 'Linked pattern',
+        value:
+            'Stress and mood both looked elevated today, so a reset plus one small practical step would make sense next.',
+      ),
+    );
+  } else if (connection >= 2) {
+    takeaways.add(
+      const _DashboardCallout(
+        label: 'Social signal',
+        value:
+            'Connection looked strained today, so a low-pressure social support step may matter more than pushing productivity.',
+      ),
+    );
+  }
+
+  if (detail.answers.length <= 6) {
+    takeaways.add(
+      const _DashboardCallout(
+        label: 'Why it stayed short',
+        value:
+            'BAHA kept this check-in short and only expanded where your answers suggested a follow-up was worth asking.',
+      ),
+    );
+  }
+
+  return takeaways.take(3).toList();
+}
+
+List<UiCardItem> _recommendedLearnCards({
+  required List<StudentModuleSummary> modules,
+  required List<WellbeingTrendPoint> points,
+  required StudentWellbeingProfile? profile,
+}) {
+  if (modules.isEmpty) {
+    return const [];
+  }
+  final desiredThemes = <String>[
+    ..._recommendedThemeNames(points: points, profile: profile),
+  ];
+  final availableThemes = modules.map((module) => module.theme.toLowerCase()).toSet();
+  final matches = <String>[];
+  for (final theme in desiredThemes) {
+    if (availableThemes.contains(theme.toLowerCase()) && !matches.contains(theme)) {
+      matches.add(theme);
+    }
+  }
+  final fallback = modules
+      .map((module) => module.theme)
+      .where((theme) => !matches.contains(theme))
+      .toSet()
+      .take(2)
+      .toList();
+  return [
+    ...matches.take(2),
+    ...fallback,
+  ].take(2).map((theme) {
+    final started = modules.any(
+      (module) =>
+          module.theme.toLowerCase() == theme.toLowerCase() &&
+          module.completionPercent > 0,
+    );
+    switch (theme.toLowerCase()) {
+      case 'sleep':
+        return UiCardItem(
+          title: 'Sleep Reset',
+          subtitle:
+              'Because sleep looks like a live theme right now, ${started ? 'continue' : 'try'} this next.',
+          tag: started ? 'Continue' : 'Try next',
+          icon: Icons.bedtime_rounded,
+          color: const Color(0xFF6366F1),
+        );
+      case 'digital wellness':
+        return UiCardItem(
+          title: 'Digital Wellness',
+          subtitle:
+              'Because attention and routine may be drifting, ${started ? 'continue' : 'open'} this guide next.',
+          tag: started ? 'Continue' : 'Guide',
+          icon: Icons.phone_android_rounded,
+          color: const Color(0xFF0EA5E9),
+        );
+      case 'peer pressure':
+        return UiCardItem(
+          title: 'Peer Pressure',
+          subtitle:
+              'Because connection looks important this week, ${started ? 'continue' : 'try'} this social confidence lane next.',
+          tag: started ? 'Continue' : 'Story',
+          icon: Icons.groups_2_rounded,
+          color: const Color(0xFFEC4899),
+        );
+      case 'exam stress':
+      default:
+        return UiCardItem(
+          title: 'Exam Stress',
+          subtitle:
+              'Because stress and energy seem linked, ${started ? 'continue' : 'start'} this toolkit next.',
+          tag: started ? 'Continue' : 'Toolkit',
+          icon: Icons.edit_note_rounded,
+          color: const Color(0xFFF97316),
+        );
+    }
+  }).toList();
+}
+
+List<String> _recommendedThemeNames({
+  required List<WellbeingTrendPoint> points,
+  required StudentWellbeingProfile? profile,
+}) {
+  if (points.isEmpty) {
+    return const ['Sleep', 'Digital Wellness'];
+  }
+  final latest = points.last.factorScores;
+  final entries = latest.entries.toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+  final topFactors = entries.take(2).map((entry) => entry.key).toList();
+  final themes = <String>[];
+  for (final factor in topFactors) {
+    switch (factor) {
+      case 'sleep':
+        themes.add('Sleep');
+      case 'stress':
+      case 'energy':
+        themes.add('Exam Stress');
+      case 'connectedness':
+        themes.add('Peer Pressure');
+      case 'mood':
+        themes.add('Peer Pressure');
+      case 'physical_wellbeing':
+        themes.add('Sleep');
+    }
+  }
+  if (profile?.profileTags.contains('digital_overload') == true) {
+    themes.add('Digital Wellness');
+  }
+  return themes.toSet().toList();
+}
+
+List<UiCardItem> _recommendedActivityCards({
+  required List<WellbeingTrendPoint> points,
+  required StudentWellbeingProfile? profile,
+}) {
+  if (points.isEmpty) {
+    return const [
+      UiCardItem(
+        title: 'Calm Breathing',
+        subtitle: 'A quick reset before your first check-in or module.',
+        tag: 'Start here',
+        icon: Icons.air_rounded,
+        color: Color(0xFF3B82F6),
+      ),
+    ];
+  }
+  final latest = points.last.factorScores;
+  final recommendations = <UiCardItem>[];
+  if ((latest['stress'] ?? 0) >= 2 || (latest['anxiety'] ?? 0) >= 2) {
+    recommendations.add(
+      const UiCardItem(
+        title: 'Calm Breathing',
+        subtitle: 'Stress looks elevated, so a 60-second reset is the best first move.',
+        tag: 'Reset',
+        icon: Icons.air_rounded,
+        color: Color(0xFF3B82F6),
+      ),
+    );
+  }
+  if ((latest['connectedness'] ?? 0) >= 2) {
+    recommendations.add(
+      const UiCardItem(
+        title: 'Story World',
+        subtitle: 'Social confidence looks worth practicing, so this is a good narrative activity next.',
+        tag: 'Practice',
+        icon: Icons.explore_rounded,
+        color: Color(0xFF06B6D4),
+      ),
+    );
+  }
+  if ((latest['energy'] ?? 0) >= 2 || (latest['mood'] ?? 0) >= 2) {
+    recommendations.add(
+      const UiCardItem(
+        title: 'Comet Sequence',
+        subtitle: 'This gives your attention something light and structured before a heavier task.',
+        tag: 'Memory',
+        icon: Icons.auto_awesome_rounded,
+        color: Color(0xFF8B5CF6),
+      ),
+    );
+  }
+  if (recommendations.isEmpty) {
+    recommendations.add(
+      const UiCardItem(
+        title: 'Focus Catch',
+        subtitle: 'A short coordination break keeps the app useful even on steadier days.',
+        tag: 'Reflex',
+        icon: Icons.ads_click_rounded,
+        color: Color(0xFFF97316),
+      ),
+    );
+  }
+  return recommendations.take(2).toList();
 }
 
 String? _derivedImprovement(List<WellbeingTrendPoint> points) {
@@ -3173,10 +3576,15 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   }
 
   Future<_StudentDashboardData> _load() async {
-    final checkins = await widget.apiClient.listStudentCheckins(
-      identity: widget.identity,
-      limit: 5,
-    );
+    final results = await Future.wait<Object>([
+      widget.apiClient.listStudentCheckins(
+        identity: widget.identity,
+        limit: 5,
+      ),
+      widget.apiClient.listStudentModules(identity: widget.identity),
+    ]);
+    final checkins = results[0] as List<StudentCheckinSummary>;
+    final modules = results[1] as List<StudentModuleSummary>;
     final details = await Future.wait<StudentCheckinDetail>(
       checkins
           .where((checkin) => checkin.submittedAt != null)
@@ -3197,6 +3605,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     return _StudentDashboardData(
       summary: summary,
       checkins: checkins,
+      modules: modules,
       details: details,
       trendPoints: buildTrendPointsFromDetails(details),
     );
@@ -3993,14 +4402,40 @@ class StudentCheckinDetailScreen extends StatefulWidget {
 
 class _StudentCheckinDetailScreenState
     extends State<StudentCheckinDetailScreen> {
-  late Future<StudentCheckinDetail> _future;
+  late Future<_StudentCheckinResultData> _future;
 
   @override
   void initState() {
     super.initState();
-    _future = widget.apiClient.getStudentCheckinDetail(
+    _future = _load();
+  }
+
+  Future<_StudentCheckinResultData> _load() async {
+    final detail = await widget.apiClient.getStudentCheckinDetail(
       identity: widget.identity,
       responseSetId: widget.responseSetId,
+    );
+    final history = await widget.apiClient.listStudentCheckins(
+      identity: widget.identity,
+      limit: 5,
+    );
+    final historyDetails = await Future.wait<StudentCheckinDetail>(
+      history
+          .where(
+            (item) =>
+                item.submittedAt != null && item.id != widget.responseSetId,
+          )
+          .take(4)
+          .map(
+            (item) => widget.apiClient.getStudentCheckinDetail(
+              identity: widget.identity,
+              responseSetId: item.id,
+            ),
+          ),
+    );
+    return _StudentCheckinResultData(
+      detail: detail,
+      previousDetails: historyDetails,
     );
   }
 
@@ -4014,7 +4449,7 @@ class _StudentCheckinDetailScreenState
       data: buildTheme(palette),
       child: AnimatedGradientScaffold(
         palette: palette,
-        child: FutureBuilder<StudentCheckinDetail>(
+        child: FutureBuilder<_StudentCheckinResultData>(
           future: _future,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
@@ -4053,11 +4488,7 @@ class _StudentCheckinDetailScreenState
                         OutlinedButton.icon(
                           onPressed: () {
                             setState(() {
-                              _future = widget.apiClient
-                                  .getStudentCheckinDetail(
-                                    identity: widget.identity,
-                                    responseSetId: widget.responseSetId,
-                                  );
+                              _future = _load();
                             });
                           },
                           icon: const Icon(Icons.refresh_rounded),
@@ -4069,8 +4500,17 @@ class _StudentCheckinDetailScreenState
                 ],
               );
             }
-            final detail = snapshot.data!;
+            final result = snapshot.data!;
+            final detail = result.detail;
             final trendPoint = buildTrendPointsFromDetails([detail]).single;
+            final priorPoints = buildTrendPointsFromDetails(
+              result.previousDetails,
+            );
+            final takeaways = _checkinTakeaways(
+              detail: detail,
+              today: trendPoint,
+              previous: priorPoints,
+            );
             return ListView(
               padding: const EdgeInsets.all(22),
               children: [
@@ -4095,6 +4535,30 @@ class _StudentCheckinDetailScreenState
                   ],
                 ),
                 const SizedBox(height: 18),
+                if (takeaways.isNotEmpty)
+                  GlassPanel(
+                    palette: palette,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SectionTitle(
+                          title: 'What BAHA noticed today',
+                          subtitle:
+                              'A quick reflection based on this check-in and your recent pattern, not a diagnosis.',
+                        ),
+                        ...takeaways.map(
+                          (takeaway) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _ProfileInfoRow(
+                              label: takeaway.label,
+                              value: takeaway.value,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (takeaways.isNotEmpty) const SizedBox(height: 18),
                 GlassPanel(
                   palette: palette,
                   child: Column(
@@ -4239,12 +4703,14 @@ class _StudentDashboardData {
   const _StudentDashboardData({
     required this.summary,
     required this.checkins,
+    required this.modules,
     required this.details,
     required this.trendPoints,
   });
 
   final StudentWeeklySummary summary;
   final List<StudentCheckinSummary> checkins;
+  final List<StudentModuleSummary> modules;
   final List<StudentCheckinDetail> details;
   final List<WellbeingTrendPoint> trendPoints;
 }
