@@ -115,4 +115,39 @@ void main() {
     expect(controller.identity, isNull);
     expect(controller.stage, SessionStage.splash);
   });
+
+  test(
+    'attemptEntry blocks sign in when selected role does not match account',
+    () async {
+      SharedPreferences.setMockInitialValues(const {});
+      final client = BahaApiClient(
+        baseUrl: 'http://localhost:8000',
+        httpClient: MockClient((request) async {
+          expect(request.url.path, '/auth/onboarding-state');
+          expect(request.url.queryParameters['entry_mode'], 'sign_in');
+          return http.Response(
+            '{"has_baha_user":true,"identity_match_mode":"external_auth_id","external_auth_id":"student1","roles":["student"],"primary_role":"student","approval_status":"not_required","consent_status":"granted","guardian_link_status":"linked","linked_student_count":0,"linked_guardian_count":0,"next_step":"ready"}',
+            200,
+          );
+        }),
+      );
+      final controller = AppSessionController(apiClient: client);
+
+      final message = await controller.attemptEntry(
+        const DevelopmentIdentity(
+          externalAuthId: 'student1',
+          password: 'Student1Pass!',
+          requestedRole: AppRequestedRole.guardian,
+        ),
+        registerMode: false,
+      );
+
+      expect(
+        message,
+        'No parent or guardian account was found for this sign-in ID. Choose the correct role or use a different account.',
+      );
+      expect(controller.identity, isNull);
+      expect(controller.stage, SessionStage.splash);
+    },
+  );
 }

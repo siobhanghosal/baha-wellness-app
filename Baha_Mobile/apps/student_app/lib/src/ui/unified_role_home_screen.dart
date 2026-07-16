@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:baha_api_client/baha_api_client.dart';
 import 'package:baha_shared_models/baha_shared_models.dart';
 import 'package:flutter/material.dart';
@@ -267,8 +269,8 @@ class _GuardianLinkWaitingScreenState extends State<GuardianLinkWaitingScreen> {
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _linking ? null : widget.onChangeIdentity,
-              icon: const Icon(Icons.switch_account_rounded),
-              label: const Text('Switch account'),
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Log out and switch account'),
             ),
           ],
         ),
@@ -600,6 +602,7 @@ class _GuardianReadyScreenState extends State<GuardianReadyScreen> {
               loading: _loading,
               errorMessage: _errorMessage,
               students: _students,
+              selectedStudent: _selectedStudent,
               selectedStudentProfileId: _selectedStudentProfileId,
               selectedSummary: _selectedSummary,
               summaryAccessMessageByStudent: _summaryAccessMessageByStudent,
@@ -727,6 +730,7 @@ class _GuardianHomeTab extends StatelessWidget {
     required this.loading,
     required this.errorMessage,
     required this.students,
+    required this.selectedStudent,
     required this.selectedStudentProfileId,
     required this.selectedSummary,
     required this.summaryAccessMessageByStudent,
@@ -752,6 +756,7 @@ class _GuardianHomeTab extends StatelessWidget {
   final bool loading;
   final String? errorMessage;
   final List<MobileLinkedStudentSummary> students;
+  final MobileLinkedStudentSummary? selectedStudent;
   final String? selectedStudentProfileId;
   final ParentWeeklySummary? selectedSummary;
   final Map<String, String> summaryAccessMessageByStudent;
@@ -775,6 +780,7 @@ class _GuardianHomeTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final summary = selectedSummary?.summary ?? const <String, dynamic>{};
+    final selectedStudent = this.selectedStudent;
     return Theme(
       data: buildTheme(palette),
       child: AnimatedGradientScaffold(
@@ -862,7 +868,7 @@ class _GuardianHomeTab extends StatelessWidget {
                       ),
                     ),
                   ] else ...[
-                    if (selectedSummary != null) ...[
+                    if (selectedSummary != null && selectedStudent != null) ...[
                       GlassPanel(
                         palette: palette,
                         child: Column(
@@ -924,6 +930,55 @@ class _GuardianHomeTab extends StatelessWidget {
                                     ?.copyWith(color: palette.muted),
                               ),
                             ],
+                            const SizedBox(height: 16),
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: [
+                                FilledButton.icon(
+                                  onPressed: () =>
+                                      onOpenSummary(selectedStudent),
+                                  icon: const Icon(Icons.insights_rounded),
+                                  label: const Text('Open full summary'),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: () => onRefresh(),
+                                  icon: const Icon(Icons.refresh_rounded),
+                                  label: const Text('Refresh snapshot'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                    ],
+                    if (selectedSummary != null && selectedStudent != null) ...[
+                      GlassPanel(
+                        palette: palette,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SectionTitle(
+                              title: 'Parent next steps',
+                              subtitle:
+                                  'Simple prompts you can use right away.',
+                            ),
+                            _GuardianNarrativeCard(
+                              palette: palette,
+                              title: 'Conversation starter',
+                              body:
+                                  '${summary['safe_talking_point'] ?? summary['conversation_starter'] ?? 'Start small: ask what felt easiest this week and what felt heavier.'}',
+                              icon: Icons.forum_rounded,
+                            ),
+                            const SizedBox(height: 12),
+                            _GuardianNarrativeCard(
+                              palette: palette,
+                              title: 'One thing to watch next',
+                              body:
+                                  '${summary['watch_area'] ?? 'Watch for repeated shifts rather than reacting to one difficult day.'}',
+                              icon: Icons.visibility_rounded,
+                            ),
                           ],
                         ),
                       ),
@@ -937,7 +992,7 @@ class _GuardianHomeTab extends StatelessWidget {
                           const SectionTitle(
                             title: 'Linked students',
                             subtitle:
-                                'Approve access, turn on summaries, and open each student view.',
+                                'Student app access lets your child use BAHA. Parent summary access lets you view their high-level weekly trends.',
                           ),
                           ...students.map((student) {
                             final platformConsent =
@@ -1497,12 +1552,36 @@ class GuardianProfileScreen extends StatefulWidget {
 }
 
 class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
+  static const _weeklyDigestKey = 'baha.guardian.notifications.weekly_digest';
+  static const _supportNudgeKey = 'baha.guardian.notifications.support_nudge';
+
   late Future<List<MobileSupportContact>> _future;
+  bool _weeklyDigestEnabled = true;
+  bool _supportNudgesEnabled = true;
 
   @override
   void initState() {
     super.initState();
     _future = widget.apiClient.listSupportContacts(identity: widget.identity);
+    unawaited(_loadPreferences());
+  }
+
+  Future<void> _loadPreferences() async {
+    final preferences = await SharedPreferences.getInstance();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _weeklyDigestEnabled =
+          preferences.getBool(_weeklyDigestKey) ?? _weeklyDigestEnabled;
+      _supportNudgesEnabled =
+          preferences.getBool(_supportNudgeKey) ?? _supportNudgesEnabled;
+    });
+  }
+
+  Future<void> _setPreference(String key, bool value) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(key, value);
   }
 
   @override
@@ -1529,7 +1608,7 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                   kicker: 'Parent profile',
                   title: widget.actor.displayName,
                   subtitle:
-                      'Account details, privacy reminders, support contacts, and session controls for the parent experience.',
+                      'Account details, privacy reminders, support contacts, and session controls in one place.',
                   actions: [
                     const Pill(
                       icon: Icons.lock_outline_rounded,
@@ -1540,6 +1619,33 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                       label: '${widget.linkedStudents.length} linked',
                     ),
                   ],
+                ),
+                const SizedBox(height: 18),
+                GlassPanel(
+                  palette: palette,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
+                        title: 'Account snapshot',
+                        subtitle:
+                            'See your account details, linked children, and parent-side controls in one place.',
+                      ),
+                      _GuardianProfileInfoRow(
+                        label: 'Role',
+                        value: widget.actor.primaryRole,
+                      ),
+                      _GuardianProfileInfoRow(
+                        label: 'Linked children',
+                        value: '${widget.linkedStudents.length}',
+                      ),
+                      if ((widget.actor.schoolName ?? '').isNotEmpty)
+                        _GuardianProfileInfoRow(
+                          label: 'School',
+                          value: widget.actor.schoolName!,
+                        ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 18),
                 GlassPanel(
@@ -1566,9 +1672,97 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SectionTitle(
+                        title: 'Notifications',
+                        subtitle:
+                            'Local reminders for the parent side so the experience feels complete and configurable.',
+                      ),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Weekly family digest reminder'),
+                        subtitle: const Text(
+                          'Keeps the parent profile ready for a calm weekly review.',
+                        ),
+                        value: _weeklyDigestEnabled,
+                        onChanged: (value) {
+                          setState(() => _weeklyDigestEnabled = value);
+                          unawaited(_setPreference(_weeklyDigestKey, value));
+                        },
+                      ),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Support nudge reminders'),
+                        subtitle: const Text(
+                          'Keeps conversation starters and support ideas easy to revisit.',
+                        ),
+                        value: _supportNudgesEnabled,
+                        onChanged: (value) {
+                          setState(() => _supportNudgesEnabled = value);
+                          unawaited(_setPreference(_supportNudgeKey, value));
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                GlassPanel(
+                  palette: palette,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
+                        title: 'Appearance and app',
+                        subtitle:
+                            'Keep the parent view visually consistent with the rest of the unified app.',
+                      ),
+                      Row(
+                        children: [
+                          const Expanded(child: Text('Theme mode')),
+                          ThemeModeToggle(palette: palette),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Accent palette',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: AppColorTheme.values.map((theme) {
+                          return ChoiceChip(
+                            label: Text(theme.label),
+                            selected: themeController?.colorTheme == theme,
+                            selectedColor: palette.primary.withValues(
+                              alpha: .18,
+                            ),
+                            onSelected: (_) {
+                              unawaited(themeController?.setColorTheme(theme));
+                              setState(() {});
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 14),
+                      _GuardianProfileInfoRow(
+                        label: 'Sign-in ID',
+                        value: widget.identity.externalAuthId,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                GlassPanel(
+                  palette: palette,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
                         title: 'Support contacts',
                         subtitle:
-                            'Useful contact points surfaced from the backend for the current parent audience.',
+                            'Useful contact points you can reach from the parent side of BAHA.',
                       ),
                       if (snapshot.connectionState != ConnectionState.done)
                         const Padding(
@@ -1623,8 +1817,8 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
                 const SizedBox(height: 18),
                 OutlinedButton.icon(
                   onPressed: widget.onClearIdentity,
-                  icon: const Icon(Icons.switch_account_rounded),
-                  label: const Text('Switch account'),
+                  icon: const Icon(Icons.logout_rounded),
+                  label: const Text('Log out and switch account'),
                 ),
               ],
             );
@@ -2174,11 +2368,11 @@ class _GuardianStudentCard extends StatelessWidget {
             runSpacing: 10,
             children: [
               _GuardianStatusPill(
-                label: 'Access ${_titleCase(platformStatus)}',
+                label: 'Student app: ${_titleCase(platformStatus)}',
                 ok: platformStatus == 'granted',
               ),
               _GuardianStatusPill(
-                label: 'Summaries ${_titleCase(summaryStatus)}',
+                label: 'Parent summary: ${_titleCase(summaryStatus)}',
                 ok: summaryStatus == 'granted' && summaryAccessMessage == null,
               ),
               if ((student.ageCohort ?? '').isNotEmpty)
@@ -2212,7 +2406,7 @@ class _GuardianStudentCard extends StatelessWidget {
                 FilledButton.tonalIcon(
                   onPressed: busy ? null : onGrantSummary,
                   icon: const Icon(Icons.visibility_rounded),
-                  label: const Text('Enable summaries'),
+                  label: const Text('Approve summary view'),
                 ),
               OutlinedButton.icon(
                 onPressed: busy ? null : onOpenSummary,
@@ -2324,24 +2518,39 @@ class _GuardianStudentSummaryScreenState
 
   @override
   Widget build(BuildContext context) {
-    final palette = appPaletteForTheme(AppColorTheme.growth);
+    final themeController = ThemeScope.maybeOf(context);
+    final palette = appPaletteForTheme(
+      themeController?.colorTheme ?? AppColorTheme.growth,
+      isDark: themeController?.isDark ?? false,
+    );
     return Theme(
       data: buildTheme(palette),
-      child: Scaffold(
-        appBar: AppBar(title: Text(widget.student.studentName)),
-        body: FutureBuilder<_GuardianStudentSummaryViewModel>(
+      child: AnimatedGradientScaffold(
+        palette: palette,
+        child: FutureBuilder<_GuardianStudentSummaryViewModel>(
           future: _future,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
               return ListView(
                 padding: const EdgeInsets.all(22),
-                children: [ShimmerBlock(palette: palette)],
+                children: [
+                  DashboardTopBar(palette: palette),
+                  _GuardianBackRow(palette: palette),
+                  ShimmerBlock(palette: palette),
+                ],
               );
             }
             if (snapshot.hasError) {
               return ListView(
                 padding: const EdgeInsets.all(22),
-                children: [Text('${snapshot.error}')],
+                children: [
+                  DashboardTopBar(palette: palette),
+                  _GuardianBackRow(palette: palette),
+                  GlassPanel(
+                    palette: palette,
+                    child: Text('${snapshot.error}'),
+                  ),
+                ],
               );
             }
             final data = snapshot.data;
@@ -2384,6 +2593,8 @@ class _GuardianStudentSummaryScreenState
             return ListView(
               padding: const EdgeInsets.all(22),
               children: [
+                DashboardTopBar(palette: palette),
+                _GuardianBackRow(palette: palette),
                 HeroHeader(
                   palette: palette,
                   kicker: 'Parent summary',
@@ -2391,13 +2602,18 @@ class _GuardianStudentSummaryScreenState
                   subtitle:
                       'This view is intentionally high-level. It shows weekly trends and concern signals without exposing private daily answers.',
                   actions: [
+                    if ((widget.student.ageCohort ?? '').isNotEmpty)
+                      Pill(
+                        icon: Icons.person_outline_rounded,
+                        label: widget.student.ageCohort!.replaceAll('_', ' '),
+                      ),
                     Pill(
                       icon: Icons.approval_rounded,
-                      label: 'Access ${data.platform.status}',
+                      label: 'Student app: ${data.platform.status}',
                     ),
                     Pill(
                       icon: Icons.visibility_rounded,
-                      label: 'Summaries ${data.summaryConsent.status}',
+                      label: 'Parent summary: ${data.summaryConsent.status}',
                     ),
                   ],
                 ),
@@ -2498,6 +2714,25 @@ class _GuardianStudentSummaryScreenState
                           title: 'Support nudge',
                           value:
                               '${summaryMap['support_nudge'] ?? 'No support suggestion yet.'}',
+                        ),
+                        const SizedBox(height: 14),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            FilledButton.icon(
+                              onPressed: () => setState(() {
+                                _future = _load();
+                              }),
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('Refresh summary'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () => Navigator.of(context).pop(),
+                              icon: const Icon(Icons.arrow_back_rounded),
+                              label: const Text('Back to parent home'),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -2606,6 +2841,33 @@ class _GuardianStudentSummaryScreenState
   }
 }
 
+class _GuardianBackRow extends StatelessWidget {
+  const _GuardianBackRow({required this.palette});
+
+  final PrototypePalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.arrow_back_rounded),
+          ),
+          Text(
+            'Back',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SummaryBlock extends StatelessWidget {
   const _SummaryBlock({required this.title, required this.value});
 
@@ -2626,6 +2888,35 @@ class _SummaryBlock extends StatelessWidget {
         const SizedBox(height: 4),
         Text(value),
       ],
+    );
+  }
+}
+
+class _GuardianProfileInfoRow extends StatelessWidget {
+  const _GuardianProfileInfoRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+          Expanded(child: Text(value)),
+        ],
+      ),
     );
   }
 }
@@ -2677,8 +2968,8 @@ class _RolePlaceholderScreen extends StatelessWidget {
             const SizedBox(height: 18),
             OutlinedButton.icon(
               onPressed: onClearIdentity,
-              icon: const Icon(Icons.switch_account_rounded),
-              label: const Text('Switch account'),
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Log out and switch account'),
             ),
           ],
         ),

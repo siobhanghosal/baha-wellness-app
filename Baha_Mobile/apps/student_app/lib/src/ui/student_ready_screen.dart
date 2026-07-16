@@ -108,15 +108,6 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
     );
   }
 
-  Future<void> _openBuddy() async {
-    await _pushRoute(
-      builder: (context) => StudentBuddyDirectScreen(
-        apiClient: widget.apiClient,
-        identity: widget.identity,
-      ),
-    );
-  }
-
   Future<void> _openSupport() async {
     await _pushRoute(
       builder: (context) => StudentHelpRequestScreen(
@@ -456,19 +447,19 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
               ageBand: _profile?.ageBand ?? widget.actor?.ageCohort,
               onCardTap: _handleCardAction,
             ),
-            StudentReferenceBuddyTab(
-              palette: palette,
+            StudentBuddyScreen(
               apiClient: widget.apiClient,
               identity: widget.identity,
-              onOpenBuddy: _openBuddy,
-              onOpenSupport: _openSupport,
             ),
             StudentReferenceProfileTab(
               palette: palette,
+              apiClient: widget.apiClient,
+              identity: widget.identity,
               actor: widget.actor,
               onboardingState: widget.onboardingState,
               environment: widget.environment,
               onActionTap: _handleCardAction,
+              onClearIdentity: _resetIdentityFromChildRoute,
             ),
           ];
 
@@ -976,7 +967,7 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                     children: [
                       const SectionTitle(
                         title: 'Recent activity',
-                        subtitle: 'Real check-ins from the backend.',
+                        subtitle: 'Your latest check-ins.',
                       ),
                       ...data.checkins
                           .take(3)
@@ -994,7 +985,7 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
               const SizedBox(height: 18),
               OutlinedButton(
                 onPressed: widget.onClearIdentity,
-                child: const Text('Switch development identity'),
+                child: const Text('Log out and switch account'),
               ),
             ],
           );
@@ -1143,7 +1134,7 @@ class _StudentReferenceBuddyTabState extends State<StudentReferenceBuddyTab> {
         builder: (context, snapshot) {
           final sessionLabel = snapshot.hasData
               ? '${snapshot.data!.length} live sessions'
-              : 'Live backend chat';
+              : 'Live chat';
           return ListView(
             key: const ValueKey('student-buddy'),
             padding: const EdgeInsets.all(22),
@@ -1188,8 +1179,8 @@ class _StudentReferenceBuddyTabState extends State<StudentReferenceBuddyTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SectionTitle(
-                        title: 'Recent backend sessions',
-                        subtitle: 'These are real chat sessions from the API.',
+                        title: 'Recent sessions',
+                        subtitle: 'Pick up a conversation you started earlier.',
                       ),
                       ...snapshot.data!
                           .take(3)
@@ -1244,130 +1235,404 @@ class _StudentReferenceBuddyTabState extends State<StudentReferenceBuddyTab> {
   }
 }
 
-class StudentReferenceProfileTab extends StatelessWidget {
+class StudentReferenceProfileTab extends StatefulWidget {
   const StudentReferenceProfileTab({
     required this.palette,
+    required this.apiClient,
+    required this.identity,
     required this.actor,
     required this.onboardingState,
     required this.environment,
     required this.onActionTap,
+    required this.onClearIdentity,
     super.key,
   });
 
   final PrototypePalette palette;
+  final BahaApiClient apiClient;
+  final DevelopmentIdentity identity;
   final MobileActor? actor;
   final AuthOnboardingState? onboardingState;
   final StudentAppEnvironment environment;
   final ValueChanged<UiCardItem> onActionTap;
+  final Future<void> Function() onClearIdentity;
+
+  @override
+  State<StudentReferenceProfileTab> createState() =>
+      _StudentReferenceProfileTabState();
+}
+
+class _StudentReferenceProfileTabState
+    extends State<StudentReferenceProfileTab> {
+  late Future<_StudentProfileSnapshot> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  Future<_StudentProfileSnapshot> _load() async {
+    StudentLinkingState? linkingState;
+    List<StudentModuleSummary> modules = const [];
+    try {
+      final results = await Future.wait<Object>([
+        widget.apiClient.getStudentLinkingState(identity: widget.identity),
+        widget.apiClient.listStudentModules(identity: widget.identity),
+      ]);
+      linkingState = results[0] as StudentLinkingState;
+      modules = results[1] as List<StudentModuleSummary>;
+    } catch (_) {}
+    return _StudentProfileSnapshot(
+      linkingState: linkingState,
+      modules: modules,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final accountLabel =
-        actor?.displayName ?? onboardingState?.displayName ?? 'Student profile';
-    final privacyLabel = onboardingState?.legalConsentBand ?? 'minor_managed';
-    final approvalLabel = onboardingState?.approvalStatus ?? 'approved';
-    return ListView(
-      key: const ValueKey('student-profile'),
-      padding: const EdgeInsets.all(22),
-      children: [
-        DashboardTopBar(palette: palette),
-        HeroHeader(
-          palette: palette,
-          kicker: 'Profile',
-          title: 'Your style and progress',
-          subtitle: 'Manage your profile, privacy, and app preferences.',
-          actions: [
-            Pill(icon: Icons.palette_rounded, label: palette.name),
-            Pill(icon: Icons.verified_user_rounded, label: approvalLabel),
-          ],
-        ),
-        const SizedBox(height: 18),
-        GlassPanel(
-          palette: palette,
-          child: Column(
-            children: [
-              FloatingMascot(palette: palette),
-              const SizedBox(height: 14),
-              Text(
-                accountLabel,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              Text(
-                actor?.ageCohort ?? onboardingState?.ageCohort ?? '13_14',
-                style: TextStyle(color: palette.muted),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        GlassPanel(
-          palette: palette,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SectionTitle(
-                title: 'Privacy snapshot',
-                subtitle: 'Your current account and consent details.',
-              ),
-              _ProfileInfoRow(label: 'Consent band', value: privacyLabel),
-              _ProfileInfoRow(
-                label: 'Consent status',
-                value: onboardingState?.consentStatus ?? 'not_required',
-              ),
-              _ProfileInfoRow(
-                label: 'Primary role',
-                value:
-                    actor?.primaryRole ??
-                    onboardingState?.primaryRole ??
-                    'student',
-              ),
-              if ((onboardingState?.studentCode ?? '').isNotEmpty)
-                _ProfileInfoRow(
-                  label: 'Student ID',
-                  value: onboardingState!.studentCode!,
-                ),
-              _ProfileInfoRow(
-                label: 'Parent summary sharing',
-                value:
-                    (actor?.studentMetadata['parent_summary_sharing_enabled']
-                            as bool? ??
-                        false)
-                    ? 'enabled'
-                    : 'disabled',
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        GlassPanel(
-          palette: palette,
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SectionTitle(
-                title: 'Parent linking',
-                subtitle:
-                    'Use Settings to generate a one-time 6-digit pairing code whenever you want to link a parent or guardian.',
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        ...roleActions.map(
-          (item) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: ActionCard(
-              palette: palette,
-              item: item,
-              onTap: () => onActionTap(item),
+        widget.actor?.displayName ??
+        widget.onboardingState?.displayName ??
+        'Student profile';
+    final privacyLabel =
+        widget.onboardingState?.legalConsentBand ?? 'minor_managed';
+    final approvalLabel = widget.onboardingState?.approvalStatus ?? 'approved';
+    return FutureBuilder<_StudentProfileSnapshot>(
+      future: _future,
+      builder: (context, snapshot) {
+        final linkingState = snapshot.data?.linkingState;
+        final badges = _earnedStudentBadges(
+          snapshot.data?.modules ?? const [],
+          ageBand: widget.actor?.ageCohort ?? widget.onboardingState?.ageCohort,
+        );
+        final parentSummarySharingEnabled =
+            linkingState?.parentSummarySharingEnabled ??
+            (widget.actor?.studentMetadata['parent_summary_sharing_enabled']
+                    as bool? ??
+                false);
+        return ListView(
+          key: const ValueKey('student-profile'),
+          padding: const EdgeInsets.all(22),
+          children: [
+            DashboardTopBar(palette: widget.palette),
+            HeroHeader(
+              palette: widget.palette,
+              kicker: 'Profile',
+              title: 'Your style and progress',
+              subtitle:
+                  'Manage your profile, privacy, achievements, and app preferences.',
+              actions: [
+                Pill(icon: Icons.palette_rounded, label: widget.palette.name),
+                Pill(icon: Icons.verified_user_rounded, label: approvalLabel),
+              ],
             ),
-          ),
-        ),
-      ],
+            const SizedBox(height: 18),
+            GlassPanel(
+              palette: widget.palette,
+              child: Column(
+                children: [
+                  FloatingMascot(palette: widget.palette),
+                  const SizedBox(height: 14),
+                  Text(
+                    accountLabel,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    widget.actor?.ageCohort ??
+                        widget.onboardingState?.ageCohort ??
+                        '13_14',
+                    style: TextStyle(color: widget.palette.muted),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            if (badges.isNotEmpty)
+              GlassPanel(
+                palette: widget.palette,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SectionTitle(
+                      title: 'Earned badges',
+                      subtitle:
+                          'Finished learning paths stay on your profile so your progress feels visible and worth celebrating.',
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: badges
+                          .map(
+                            (badge) => _StudentBadgeCard(
+                              palette: widget.palette,
+                              badge: badge,
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ],
+                ),
+              ),
+            if (badges.isNotEmpty) const SizedBox(height: 14),
+            GlassPanel(
+              palette: widget.palette,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SectionTitle(
+                    title: 'Privacy snapshot',
+                    subtitle: 'Your current account and consent details.',
+                  ),
+                  _ProfileInfoRow(label: 'Consent band', value: privacyLabel),
+                  _ProfileInfoRow(
+                    label: 'Consent status',
+                    value:
+                        widget.onboardingState?.consentStatus ?? 'not_required',
+                  ),
+                  _ProfileInfoRow(
+                    label: 'Primary role',
+                    value:
+                        widget.actor?.primaryRole ??
+                        widget.onboardingState?.primaryRole ??
+                        'student',
+                  ),
+                  if ((linkingState?.studentCode ??
+                          widget.onboardingState?.studentCode ??
+                          '')
+                      .isNotEmpty)
+                    _ProfileInfoRow(
+                      label: 'Student ID',
+                      value:
+                          linkingState?.studentCode ??
+                          widget.onboardingState!.studentCode!,
+                    ),
+                  _ProfileInfoRow(
+                    label: 'Parent summary sharing',
+                    value: parentSummarySharingEnabled ? 'enabled' : 'disabled',
+                  ),
+                  if (linkingState != null)
+                    _ProfileInfoRow(
+                      label: 'Linked parents',
+                      value: '${linkingState.linkedGuardianCount}',
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            GlassPanel(
+              palette: widget.palette,
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SectionTitle(
+                    title: 'Parent linking',
+                    subtitle:
+                        'Use Settings to generate a one-time 6-digit pairing code whenever you want to link a parent or guardian.',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            ...roleActions.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: ActionCard(
+                  palette: widget.palette,
+                  item: item,
+                  onTap: () => widget.onActionTap(item),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            OutlinedButton.icon(
+              onPressed: widget.onClearIdentity,
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Log out and switch account'),
+            ),
+          ],
+        );
+      },
     );
+  }
+}
+
+class _StudentProfileSnapshot {
+  const _StudentProfileSnapshot({
+    required this.linkingState,
+    required this.modules,
+  });
+
+  final StudentLinkingState? linkingState;
+  final List<StudentModuleSummary> modules;
+}
+
+class _StudentBadgeCard extends StatelessWidget {
+  const _StudentBadgeCard({required this.palette, required this.badge});
+
+  final PrototypePalette palette;
+  final _StudentBadgeSummary badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 156,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            badge.color.withValues(alpha: palette.isDark ? .26 : .18),
+            palette.surface.withValues(alpha: palette.isDark ? .82 : .92),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: badge.color.withValues(alpha: .22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: badge.color.withValues(alpha: .16),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(Icons.workspace_premium_rounded, color: badge.color),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            badge.title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            badge.theme,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: badge.color),
+          ),
+          const SizedBox(height: 6),
+          Text(badge.subtitle, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+class _StudentBadgeSummary {
+  const _StudentBadgeSummary({
+    required this.theme,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+  });
+
+  final String theme;
+  final String title;
+  final String subtitle;
+  final Color color;
+}
+
+List<_StudentBadgeSummary> _earnedStudentBadges(
+  List<StudentModuleSummary> modules, {
+  required String? ageBand,
+}) {
+  if (modules.isEmpty) {
+    return const [];
+  }
+  final grouped = <String, List<StudentModuleSummary>>{};
+  for (final module in modules) {
+    grouped
+        .putIfAbsent(module.theme, () => <StudentModuleSummary>[])
+        .add(module);
+  }
+  final badges = <_StudentBadgeSummary>[];
+  grouped.forEach((theme, themeModules) {
+    final unlocked =
+        themeModules.isNotEmpty &&
+        themeModules.every((module) => module.completionPercent >= 100);
+    if (!unlocked) {
+      return;
+    }
+    badges.add(_studentBadgeSummaryForTheme(theme, ageBand: ageBand));
+  });
+  badges.sort((a, b) => a.theme.compareTo(b.theme));
+  return badges;
+}
+
+_StudentBadgeSummary _studentBadgeSummaryForTheme(
+  String theme, {
+  required String? ageBand,
+}) {
+  final normalizedAgeBand = ageBand ?? '13_14';
+  switch (theme.toLowerCase()) {
+    case 'sleep':
+      return _StudentBadgeSummary(
+        theme: 'Sleep',
+        title: normalizedAgeBand == '9_12'
+            ? 'Sleep Hero'
+            : normalizedAgeBand == '18_plus'
+            ? 'Recovery Builder'
+            : 'Sleep Reset Badge',
+        subtitle: 'You completed the full sleep learning path.',
+        color: const Color(0xFF4A7CF3),
+      );
+    case 'stress':
+      return _StudentBadgeSummary(
+        theme: 'Stress',
+        title: normalizedAgeBand == '9_12'
+            ? 'Calm Toolbox Builder'
+            : normalizedAgeBand == '18_plus'
+            ? 'Pressure Plan Badge'
+            : 'Stress Reset Badge',
+        subtitle: 'You finished the tools for pressure and regulation.',
+        color: const Color(0xFF239B72),
+      );
+    case 'bullying':
+      return _StudentBadgeSummary(
+        theme: 'Bullying',
+        title: normalizedAgeBand == '9_12'
+            ? 'Kindness Shield'
+            : normalizedAgeBand == '18_plus'
+            ? 'Boundary Strength Badge'
+            : 'Boundary Builder',
+        subtitle: 'You completed the safe-boundaries learning path.',
+        color: const Color(0xFFDB7C34),
+      );
+    case 'healthy gaming':
+      return const _StudentBadgeSummary(
+        theme: 'Healthy Gaming',
+        title: 'Digital Balance Badge',
+        subtitle: 'You completed the healthy gaming learning path.',
+        color: Color(0xFF7A5AF8),
+      );
+    case 'alcohol safety':
+      return _StudentBadgeSummary(
+        theme: 'Alcohol Safety',
+        title: normalizedAgeBand == '9_12'
+            ? 'Safe Choice Star'
+            : normalizedAgeBand == '18_plus'
+            ? 'Safe Decisions Badge'
+            : 'Safe Choice Badge',
+        subtitle: 'You completed the safer decisions learning path.',
+        color: const Color(0xFFD97706),
+      );
+    default:
+      return _StudentBadgeSummary(
+        theme: theme,
+        title: '$theme Badge',
+        subtitle: 'You completed this full learning path.',
+        color: const Color(0xFF239B72),
+      );
   }
 }
 
@@ -1599,7 +1864,7 @@ class _StudentInsightScreenState extends State<StudentInsightScreen> {
                         const SectionTitle(
                           title: 'Weekly pulse',
                           subtitle:
-                              'Rendered from real check-ins using the factors we actually track. Higher points mean a steadier week.',
+                              'Built from your check-ins. Higher points mean that area looked steadier over the week.',
                         ),
                         MiniLineChart(
                           palette: palette,
@@ -2522,8 +2787,7 @@ class StudentNotificationsScreen extends StatelessWidget {
               palette: palette,
               kicker: 'Notifications',
               title: 'Important updates, not noise',
-              subtitle:
-                  'A finished student notification center built from current app state and privacy rules.',
+              subtitle: 'Stay updated on the things that matter most.',
               actions: const [
                 Pill(
                   icon: Icons.notifications_active_rounded,
@@ -2561,7 +2825,15 @@ class StudentNotificationsScreen extends StatelessWidget {
                                   ?.copyWith(fontWeight: FontWeight.w800),
                             ),
                             const SizedBox(height: 6),
-                            Text(item.subtitle),
+                            Text(
+                              item.subtitle,
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
+                                    color: palette.text.withValues(
+                                      alpha: palette.isDark ? .92 : .88,
+                                    ),
+                                  ),
+                            ),
                           ],
                         ),
                       ),
@@ -2659,7 +2931,7 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
                     kicker: 'Calendar',
                     title: 'A gentle plan for this week',
                     subtitle:
-                        'This uses the real check-in templates and module catalog to shape a student-friendly plan.',
+                        'See your check-ins and learning steps in one place.',
                     actions: [
                       Pill(
                         icon: Icons.favorite_rounded,
@@ -2680,7 +2952,7 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
                         const SectionTitle(
                           title: 'Today',
                           subtitle:
-                              'A simple schedule from the current backend data.',
+                              'Your current check-ins and learning steps.',
                         ),
                         if (data.templates.isEmpty && data.modules.isEmpty)
                           Text('No student plan items are available yet.')
@@ -2707,8 +2979,7 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
                       children: [
                         const SectionTitle(
                           title: 'Upcoming',
-                          subtitle:
-                              'Backend-powered routines, shown in the reference layout.',
+                          subtitle: 'What is coming up next in your routine.',
                         ),
                         ...data.templates.map(
                           (template) => Padding(
@@ -2987,8 +3258,7 @@ class _StudentSettingsScreenState extends State<StudentSettingsScreen> {
               palette: palette,
               kicker: 'Settings',
               title: 'Privacy, account, and app controls',
-              subtitle:
-                  'This keeps the reference look while exposing the real student identity state.',
+              subtitle: 'Manage privacy, account details, and app preferences.',
               actions: [
                 const Pill(icon: Icons.settings_rounded, label: 'Student'),
                 Pill(
@@ -3171,9 +3441,16 @@ class _StudentSettingsScreenState extends State<StudentSettingsScreen> {
                                         relationshipBits.isEmpty
                                             ? 'Linked guardian'
                                             : relationshipBits.join(' • '),
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodyMedium,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              color: palette.text.withValues(
+                                                alpha: palette.isDark
+                                                    ? .92
+                                                    : .88,
+                                              ),
+                                            ),
                                       ),
                                     ],
                                   ),
@@ -3184,9 +3461,7 @@ class _StudentSettingsScreenState extends State<StudentSettingsScreen> {
                                       ? null
                                       : () => _confirmUnpairGuardian(guardian),
                                   icon: const Icon(Icons.link_off_rounded),
-                                  label: Text(
-                                    busy ? 'Removing...' : 'Unpair',
-                                  ),
+                                  label: Text(busy ? 'Removing...' : 'Unpair'),
                                 ),
                               ],
                             ),
@@ -3241,14 +3516,6 @@ class _StudentSettingsScreenState extends State<StudentSettingsScreen> {
                     }).toList(),
                   ),
                   const SizedBox(height: 14),
-                  _ProfileInfoRow(
-                    label: 'API URL',
-                    value: widget.environment.apiBaseUrl,
-                  ),
-                  _ProfileInfoRow(
-                    label: 'External ID',
-                    value: widget.identity.externalAuthId,
-                  ),
                 ],
               ),
             ),
@@ -3277,8 +3544,8 @@ class _StudentSettingsScreenState extends State<StudentSettingsScreen> {
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: widget.onClearIdentity,
-              icon: const Icon(Icons.switch_account_rounded),
-              label: const Text('Switch development identity'),
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Log out and switch account'),
             ),
           ],
         ),
@@ -3625,7 +3892,11 @@ List<UiCardItem> _recommendedLearnCards({
     );
   }
   final desiredThemes = <String>[
-    ..._recommendedThemeNames(points: points, summary: summary, profile: profile),
+    ..._recommendedThemeNames(
+      points: points,
+      summary: summary,
+      profile: profile,
+    ),
   ];
   final availableThemes = modules
       .map((module) => module.theme.toLowerCase())
@@ -3716,10 +3987,7 @@ List<UiCardItem> _recommendedChildLearnCards({
     ...desiredThemes.where(
       (theme) => availableThemes.contains(theme.toLowerCase()),
     ),
-    ..._curatedThemeFallback(
-      modules: modules,
-      excludedThemes: desiredThemes,
-    ),
+    ..._curatedThemeFallback(modules: modules, excludedThemes: desiredThemes),
   }.take(2);
 
   return orderedThemes.map((theme) {
@@ -3845,28 +4113,34 @@ List<String> _recommendedThemeNames({
     themes.add('Healthy Gaming');
   }
   final unique = themes.toSet().toList();
-  unique.sort((a, b) => _themeRecommendationPriority(a).compareTo(
-        _themeRecommendationPriority(b),
-      ));
+  unique.sort(
+    (a, b) => _themeRecommendationPriority(
+      a,
+    ).compareTo(_themeRecommendationPriority(b)),
+  );
   return unique;
 }
 
 List<String> _themesFromSummary(StudentWeeklySummary summary) {
   final payload = summary.summary;
-  final text = [
-    payload['headline'],
-    payload['week_story'],
-    payload['best_progress'],
-    payload['watch_area'],
-    payload['support_nudge'],
-    payload['sleep_trend'],
-    payload['stress_trend'],
-    payload['mood_trend'],
-    payload['connectedness_trend'],
-    ...(payload['risk_flags'] as List<dynamic>? ?? const []),
-    ...(payload['trend_labels'] as List<dynamic>? ?? const []),
-    ...(payload['profile_tags'] as List<dynamic>? ?? const []),
-  ].whereType<Object?>().map((value) => value.toString().toLowerCase()).join(' ');
+  final text =
+      [
+            payload['headline'],
+            payload['week_story'],
+            payload['best_progress'],
+            payload['watch_area'],
+            payload['support_nudge'],
+            payload['sleep_trend'],
+            payload['stress_trend'],
+            payload['mood_trend'],
+            payload['connectedness_trend'],
+            ...(payload['risk_flags'] as List<dynamic>? ?? const []),
+            ...(payload['trend_labels'] as List<dynamic>? ?? const []),
+            ...(payload['profile_tags'] as List<dynamic>? ?? const []),
+          ]
+          .whereType<Object?>()
+          .map((value) => value.toString().toLowerCase())
+          .join(' ');
 
   final themes = <String>[];
   if (text.contains('sleep')) {
@@ -3883,7 +4157,9 @@ List<String> _themesFromSummary(StudentWeeklySummary summary) {
       text.contains('bully')) {
     themes.add('Bullying');
   }
-  if (text.contains('screen') || text.contains('gaming') || text.contains('digital')) {
+  if (text.contains('screen') ||
+      text.contains('gaming') ||
+      text.contains('digital')) {
     themes.add('Healthy Gaming');
   }
   return themes;
@@ -3897,9 +4173,9 @@ List<String> _curatedThemeFallback({
   final excluded = excludedThemes.map((theme) => theme.toLowerCase()).toSet();
   final ordered = availableThemes.toList()
     ..sort(
-      (a, b) => _themeRecommendationPriority(a).compareTo(
-        _themeRecommendationPriority(b),
-      ),
+      (a, b) => _themeRecommendationPriority(
+        a,
+      ).compareTo(_themeRecommendationPriority(b)),
     );
   return ordered
       .where((theme) => !excluded.contains(theme.toLowerCase()))
@@ -4568,7 +4844,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'This is the first real student feature slice running on the BAHA backend.',
+                    'Here is a simple view of how your week is going so far.',
                     style: theme.bodyLarge,
                   ),
                   const SizedBox(height: 24),
@@ -4610,7 +4886,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Account and runtime', style: theme.titleLarge),
+                        Text('Account and privacy', style: theme.titleLarge),
                         const SizedBox(height: 12),
                         _InfoRow(
                           label: 'Age cohort',
@@ -4619,10 +4895,6 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                         _InfoRow(
                           label: 'Role',
                           value: actor?.primaryRole ?? 'student',
-                        ),
-                        _InfoRow(
-                          label: 'API URL',
-                          value: widget.environment.apiBaseUrl,
                         ),
                         _InfoRow(
                           label: 'Privacy tier',
@@ -4639,7 +4911,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                         Text('Need support?', style: theme.titleLarge),
                         const SizedBox(height: 12),
                         Text(
-                          'Reach BAHA support using the real help-request workflow and view the active support contacts for your app audience.',
+                          'Reach BAHA support and view the support contacts available for your account.',
                           style: theme.bodyLarge,
                         ),
                         const SizedBox(height: 16),
@@ -4677,7 +4949,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                   const SizedBox(height: 20),
                   OutlinedButton(
                     onPressed: widget.onClearIdentity,
-                    child: const Text('Switch development identity'),
+                    child: const Text('Log out and switch account'),
                   ),
                 ],
               );
@@ -4846,7 +5118,7 @@ class _StudentCheckinsScreenState extends State<StudentCheckinsScreen> {
                     title:
                         'Sleep, mood, stress, energy, physical symptoms, and support.',
                     subtitle:
-                        'Adaptive check-ins powered by the live backend template and your saved profile.',
+                        'A short daily check-in that adjusts to your saved profile.',
                     actions: [
                       const Pill(icon: Icons.favorite_rounded, label: '2 min'),
                       Pill(
@@ -4864,11 +5136,11 @@ class _StudentCheckinsScreenState extends State<StudentCheckinsScreen> {
                         const SectionTitle(
                           title: 'Available check-ins',
                           subtitle:
-                              'Live templates from the backend. Follow-up questions appear only when relevant.',
+                              'Follow-up questions appear only when they are relevant.',
                         ),
                         if (data.templates.isEmpty)
                           Text(
-                            'No check-in templates are available for this account yet. Pull to refresh after the backend template setup is complete.',
+                            'No check-ins are available right now. Pull to refresh and try again shortly.',
                           )
                         else
                           ...data.templates.map(
@@ -4899,7 +5171,7 @@ class _StudentCheckinsScreenState extends State<StudentCheckinsScreen> {
                       children: [
                         const SectionTitle(
                           title: 'Submitted history',
-                          subtitle: 'Your recent real check-ins.',
+                          subtitle: 'Your latest completed check-ins.',
                         ),
                         if (data.history.isEmpty)
                           Text('No check-ins submitted yet.')

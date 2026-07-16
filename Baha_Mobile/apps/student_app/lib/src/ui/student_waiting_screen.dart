@@ -103,7 +103,7 @@ class StudentWaitingScreen extends StatelessWidget {
             const SizedBox(height: 12),
             OutlinedButton(
               onPressed: onChangeIdentity,
-              child: const Text('Switch development identity'),
+              child: const Text('Log out and switch account'),
             ),
           ],
         ),
@@ -126,7 +126,7 @@ class StudentWaitingScreen extends StatelessWidget {
 
   String _detailForState(AuthOnboardingState? state) {
     return state?.detail ??
-        'The mobile app is respecting the server-side onboarding and consent rules. Once the backend returns `ready`, this flow will unlock automatically.';
+        'This account is still waiting for setup or approval. As soon as that is complete, the main app will unlock automatically.';
   }
 }
 

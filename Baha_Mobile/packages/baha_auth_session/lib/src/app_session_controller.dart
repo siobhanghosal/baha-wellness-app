@@ -80,7 +80,7 @@ class AppSessionController extends ChangeNotifier {
       );
       final validationMessage = registerMode
           ? _registrationMessageFor(onboardingState)
-          : _signInMessageFor(onboardingState);
+          : _signInMessageFor(identity, onboardingState);
       if (validationMessage != null) {
         return validationMessage;
       }
@@ -116,8 +116,23 @@ class AppSessionController extends ChangeNotifier {
       _onboardingState = await _apiClient.getOnboardingState(
         identity: identity,
       );
+      if (_onboardingState!.hasBahaUser &&
+          !_onboardingStateSupportsRequestedRole(identity, _onboardingState!)) {
+        _actor = null;
+        _errorMessage =
+            'This sign-in ID does not have a ${identity.requestedRole.label.toLowerCase()} account. Log out and sign back in with the correct role.';
+        _setStage(SessionStage.failure);
+        return;
+      }
       if (_onboardingState!.isReady) {
         _actor = await _apiClient.getMobileMe(identity: identity);
+        if (!_actorSupportsRequestedRole(identity, _actor!)) {
+          _actor = null;
+          _errorMessage =
+              'This sign-in ID does not have a ${identity.requestedRole.label.toLowerCase()} account. Log out and sign back in with the correct role.';
+          _setStage(SessionStage.failure);
+          return;
+        }
         _setStage(SessionStage.ready);
         return;
       }
@@ -178,9 +193,15 @@ class AppSessionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  String? _signInMessageFor(AuthOnboardingState state) {
+  String? _signInMessageFor(
+    DevelopmentIdentity identity,
+    AuthOnboardingState state,
+  ) {
     switch (state.identityMatchMode) {
       case 'external_auth_id':
+        if (!_onboardingStateSupportsRequestedRole(identity, state)) {
+          return 'No ${identity.requestedRole.label.toLowerCase()} account was found for this sign-in ID. Choose the correct role or use a different account.';
+        }
         return null;
       default:
         return 'We could not find an account for this sign-in ID. Check the details or create a new account.';
@@ -197,5 +218,27 @@ class AppSessionController extends ChangeNotifier {
       default:
         return null;
     }
+  }
+
+  bool _onboardingStateSupportsRequestedRole(
+    DevelopmentIdentity identity,
+    AuthOnboardingState state,
+  ) {
+    final requestedRole = identity.requestedRole.apiValue;
+    if (state.roles.contains(requestedRole)) {
+      return true;
+    }
+    return state.primaryRole == requestedRole;
+  }
+
+  bool _actorSupportsRequestedRole(
+    DevelopmentIdentity identity,
+    MobileActor actor,
+  ) {
+    final requestedRole = identity.requestedRole.apiValue;
+    if (actor.roles.contains(requestedRole)) {
+      return true;
+    }
+    return actor.primaryRole == requestedRole;
   }
 }
