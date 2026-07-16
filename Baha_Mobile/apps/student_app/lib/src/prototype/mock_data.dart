@@ -29,6 +29,14 @@ const studentPrimaryCards = [
 
 const activityCards = [
   UiCardItem(
+    title: 'Journal',
+    subtitle:
+        'Write freely, use a guided prompt, and keep private notes you can revisit later.',
+    tag: 'Reflect',
+    icon: Icons.menu_book_rounded,
+    color: Color(0xFF0F766E),
+  ),
+  UiCardItem(
     title: 'Comet Sequence',
     subtitle: 'Watch the pattern, remember it, and repeat it before it fades.',
     tag: 'Memory',
@@ -237,10 +245,11 @@ const roleActions = [
     color: Color(0xFFF59E0B),
   ),
   UiCardItem(
-    title: 'Calendar',
-    subtitle: 'Appointments, activities, and school events.',
-    tag: 'Today',
-    icon: Icons.calendar_month_rounded,
+    title: 'Your Week',
+    subtitle:
+        'See simple scores, trends, and next steps from recent check-ins.',
+    tag: 'Progress',
+    icon: Icons.insights_rounded,
     color: Color(0xFF3B82F6),
   ),
   UiCardItem(

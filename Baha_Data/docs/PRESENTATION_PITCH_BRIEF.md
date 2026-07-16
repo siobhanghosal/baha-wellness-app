@@ -699,7 +699,7 @@ Working Android-first prototype with student and parent flows implemented.
 
 If someone needs a short 30 to 45 second verbal pitch:
 
-**BAHA Wellness Companion is a privacy-first adolescent wellness platform built with BAHA to help young people check in on their wellbeing, understand their own patterns, learn through guided health content, and talk to a safe AI companion without turning the experience into surveillance or diagnosis. Our current Android-first prototype already supports student and parent journeys, including adaptive check-ins, trend dashboards, structured learning modules, a support chatbot, and privacy-safe parent summaries.**
+**BAHA Wellness Companion is a privacy-first adolescent wellness platform built with BAHA to help young people check in on their wellbeing, understand their own patterns, learn through guided health content, reflect in a private journal, and talk to a safe AI companion without turning the experience into surveillance or diagnosis. Our current Android-first prototype already supports student and parent journeys, including adaptive check-ins, a separate weekly progress view, structured learning modules, wellness activities, a support chatbot, and privacy-safe parent summaries.**
 
 ---
 

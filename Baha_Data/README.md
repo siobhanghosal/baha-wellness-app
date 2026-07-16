@@ -99,16 +99,11 @@ Buddy note:
 
 Current demo-facing mobile UX improvements:
 
-- the student home dashboard stays in a real empty state until live check-in data exists
-- once data exists, the dashboard adds narrative callouts:
-  - `What changed`
-  - `What improved`
-  - `What to watch`
-  - `What to try next`
-- the student dashboard now labels the combined chart as `Overall pulse`
-  - it uses real submission dates on the x-axis
-  - it explains that higher points mean higher combined strain across tracked factors
-  - it is powered only by actual check-ins, not placeholder graph lines
+- the student home dashboard is now intentionally simpler:
+  - `Recommended next` is the first section
+  - `SOS Help`, `BAHA Buddy`, and `Daily Check-in` are exposed as the main quick-support actions
+  - weekly scores and detailed pattern visuals were moved off the home screen into a dedicated `Your Week` surface
+- the floating action button now opens a `Quick support` launcher instead of jumping straight into daily check-in
 - the student wellbeing model is now framed in product language as:
   - sleep
   - energy
@@ -116,10 +111,17 @@ Current demo-facing mobile UX improvements:
   - stress
   - physical symptoms
   - support
+- the student app no longer uses `tracking` language in the visible UX; the wording now leans on `check-ins`, `signals`, `patterns`, and `support`
 - daily check-in wording is now age-adapted across `9_12`, `13_14`, `15_18`, and `18_plus`
 - the post-check-in result view now shows a short personalized takeaway based on today's factors versus recent averages
-- dashboard and insight surfaces now trim recent check-ins to the latest three entries instead of rendering a long history block
 - student discovery is now clearly separated into `Learning` and `Activities`
+- a new local-first student journal activity now exists in the unified app:
+  - free write mode
+  - guided prompts adapted by age band
+  - gratitude mode
+  - search and favorites
+  - local reminder toggle
+  - streak and entry counts
 - the student app now also includes a first real `9_12` learning-lane slice:
   - child-facing topic cards instead of only the older teen theme cards
   - topic-level progress rollup
@@ -132,10 +134,9 @@ Current demo-facing mobile UX improvements:
     - Healthy Gaming
     - Alcohol Safety
 - the parent weekly summary now includes a privacy-safe response layer with:
-  - `What changed`
-  - `Conversation starter`
-  - `What to watch next week`
-  - `Support action to try`
+  - shorter summary cards
+  - quantitative mini-stats for concern flags / positive shifts / watch points
+  - a shorter conversation starter and support step
 
 If a currently running local API returns `404` for the new Buddy stream route after pulling these changes, it usually means the old container/process is still running. Recreate the API container:
 

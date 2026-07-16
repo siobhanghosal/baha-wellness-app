@@ -860,7 +860,7 @@ class _GuardianHomeTab extends StatelessWidget {
                           _GuardianChecklistRow(
                             icon: Icons.insights_rounded,
                             title:
-                                '3. View summary trends, not private answers',
+                                '3. View weekly signals, not private answers',
                             subtitle:
                                 'BAHA only shows high-level patterns, alerts, and support nudges here.',
                           ),
@@ -877,7 +877,7 @@ class _GuardianHomeTab extends StatelessWidget {
                             const SectionTitle(
                               title: 'Family snapshot',
                               subtitle:
-                                  'A weekly summary to help you have calm, supportive conversations.',
+                                  'A short weekly view without exposing private answers.',
                             ),
                             ParentStudentPicker(
                               students: students,
@@ -888,48 +888,46 @@ class _GuardianHomeTab extends StatelessWidget {
                             ),
                             const SizedBox(height: 18),
                             Text(
-                              '${summary['headline'] ?? 'No summary available yet.'}',
+                              _compactSummaryText(
+                                summary['headline']?.toString() ??
+                                    'No summary available yet.',
+                              ),
                               style: Theme.of(context).textTheme.titleLarge
                                   ?.copyWith(fontWeight: FontWeight.w800),
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '${summary['week_story'] ?? 'A weekly summary will appear here once there is enough recent activity.'}',
-                              style: Theme.of(context).textTheme.bodyLarge,
-                            ),
                             const SizedBox(height: 16),
-                            _GuardianNarrativeCard(
-                              palette: palette,
-                              title: 'What improved',
-                              body:
-                                  '${summary['best_progress'] ?? 'No clear improvement has been highlighted yet.'}',
-                              icon: Icons.trending_up_rounded,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _GuardianMiniStatCard(
+                                    palette: palette,
+                                    title: 'Concern flags',
+                                    value: '${_guardianConcernCount(summary)}',
+                                    subtitle: 'Repeated signals',
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _GuardianMiniStatCard(
+                                    palette: palette,
+                                    title: 'Positive shifts',
+                                    value:
+                                        '${_guardianPositiveShiftCount(summary)}',
+                                    subtitle: 'Areas improving',
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _GuardianMiniStatCard(
+                                    palette: palette,
+                                    title: 'Watch points',
+                                    value:
+                                        '${_guardianWatchPointCount(summary)}',
+                                    subtitle: 'Worth checking in on',
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 12),
-                            _GuardianNarrativeCard(
-                              palette: palette,
-                              title: 'What to watch',
-                              body:
-                                  '${summary['watch_area'] ?? 'There are no watch areas right now.'}',
-                              icon: Icons.visibility_rounded,
-                            ),
-                            const SizedBox(height: 12),
-                            _GuardianNarrativeCard(
-                              palette: palette,
-                              title: 'Support action to try',
-                              body:
-                                  '${summary['support_nudge'] ?? 'Try a calm check-in conversation and notice whether any patterns repeat over time.'}',
-                              icon: Icons.favorite_outline_rounded,
-                            ),
-                            if ((summary['privacy_note'] as String?) !=
-                                null) ...[
-                              const SizedBox(height: 12),
-                              Text(
-                                '${summary['privacy_note']}',
-                                style: Theme.of(context).textTheme.bodyMedium
-                                    ?.copyWith(color: palette.muted),
-                              ),
-                            ],
                             const SizedBox(height: 16),
                             Wrap(
                               spacing: 10,
@@ -960,23 +958,28 @@ class _GuardianHomeTab extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const SectionTitle(
-                              title: 'Parent next steps',
-                              subtitle:
-                                  'Simple prompts you can use right away.',
+                              title: 'Support next',
+                              subtitle: 'Short prompts you can use right away.',
                             ),
                             _GuardianNarrativeCard(
                               palette: palette,
                               title: 'Conversation starter',
-                              body:
-                                  '${summary['safe_talking_point'] ?? summary['conversation_starter'] ?? 'Start small: ask what felt easiest this week and what felt heavier.'}',
+                              body: _compactSummaryText(
+                                summary['safe_talking_point']?.toString() ??
+                                    summary['conversation_starter']
+                                        ?.toString() ??
+                                    'Start small: ask what felt easiest this week and what felt heavier.',
+                              ),
                               icon: Icons.forum_rounded,
                             ),
                             const SizedBox(height: 12),
                             _GuardianNarrativeCard(
                               palette: palette,
                               title: 'One thing to watch next',
-                              body:
-                                  '${summary['watch_area'] ?? 'Watch for repeated shifts rather than reacting to one difficult day.'}',
+                              body: _compactSummaryText(
+                                summary['watch_area']?.toString() ??
+                                    'Watch for repeated shifts rather than reacting to one difficult day.',
+                              ),
                               icon: Icons.visibility_rounded,
                             ),
                           ],
@@ -2222,6 +2225,97 @@ class _GuardianLinkPanel extends StatelessWidget {
   }
 }
 
+class _GuardianMiniStatCard extends StatelessWidget {
+  const _GuardianMiniStatCard({
+    required this.palette,
+    required this.title,
+    required this.value,
+    required this.subtitle,
+  });
+
+  final PrototypePalette palette;
+  final String title;
+  final String value;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.primary.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: palette.primary.withValues(alpha: .12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+int _guardianConcernCount(Map<String, dynamic> summary) {
+  final flags = summary['risk_flags'] as List<dynamic>? ?? const [];
+  return flags.length;
+}
+
+int _guardianPositiveShiftCount(Map<String, dynamic> summary) {
+  final trends = (summary['trend_labels'] as List<dynamic>? ?? const [])
+      .map((value) => value.toString().toLowerCase())
+      .toList();
+  final positive = trends.where(
+    (trend) =>
+        trend.contains('improv') ||
+        trend.contains('recover') ||
+        trend.contains('steady') ||
+        trend.contains('stable'),
+  );
+  final bestProgress = (summary['best_progress']?.toString() ?? '').trim();
+  if (positive.isEmpty &&
+      bestProgress.isNotEmpty &&
+      !bestProgress.startsWith('No ')) {
+    return 1;
+  }
+  return positive.length;
+}
+
+int _guardianWatchPointCount(Map<String, dynamic> summary) {
+  final watchArea = (summary['watch_area']?.toString() ?? '').trim();
+  final flags = _guardianConcernCount(summary);
+  if (watchArea.isEmpty || watchArea.startsWith('No ')) {
+    return flags;
+  }
+  return flags == 0 ? 1 : flags;
+}
+
+String _compactSummaryText(String value) {
+  final cleaned = value.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (cleaned.isEmpty) {
+    return value;
+  }
+  final firstSentence = cleaned.split(RegExp(r'(?<=[.!?])\s+')).first.trim();
+  return firstSentence.length <= 140
+      ? firstSentence
+      : '${firstSentence.substring(0, 137).trimRight()}...';
+}
+
 class _GuardianChecklistRow extends StatelessWidget {
   const _GuardianChecklistRow({
     required this.icon,
@@ -2600,7 +2694,7 @@ class _GuardianStudentSummaryScreenState
                   kicker: 'Parent summary',
                   title: widget.student.studentName,
                   subtitle:
-                      'This view is intentionally high-level. It shows weekly trends and concern signals without exposing private daily answers.',
+                      'A short weekly view built to protect private daily answers.',
                   actions: [
                     if ((widget.student.ageCohort ?? '').isNotEmpty)
                       Pill(
@@ -2685,35 +2779,61 @@ class _GuardianStudentSummaryScreenState
                         const SectionTitle(
                           title: 'This week at a glance',
                           subtitle:
-                              'The main narrative, the strongest positive sign, and the main watch area.',
+                              'Short signals with numbers first and detail second.',
                         ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _GuardianMiniStatCard(
+                                palette: palette,
+                                title: 'Concern flags',
+                                value: '${flags.length}',
+                                subtitle: 'Repeated signals',
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _GuardianMiniStatCard(
+                                palette: palette,
+                                title: 'Trend labels',
+                                value: '${trends.length}',
+                                subtitle: 'Named patterns',
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _GuardianMiniStatCard(
+                                palette: palette,
+                                title: 'Visible tiers',
+                                value:
+                                    '${data.summary?.visibleTiers.length ?? 0}',
+                                subtitle: 'Summary access',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
                         _SummaryBlock(
                           title: 'Headline',
-                          value: '${summaryMap['headline'] ?? 'No headline'}',
+                          value: _compactSummaryText(
+                            summaryMap['headline']?.toString() ?? 'No headline',
+                          ),
                         ),
                         const SizedBox(height: 10),
                         _SummaryBlock(
-                          title: 'Week story',
-                          value:
-                              '${summaryMap['week_story'] ?? 'No weekly story yet.'}',
+                          title: 'Best shift',
+                          value: _compactSummaryText(
+                            summaryMap['best_progress']?.toString() ??
+                                'No clear improvement signal yet.',
+                          ),
                         ),
                         const SizedBox(height: 10),
                         _SummaryBlock(
-                          title: 'Best progress',
-                          value:
-                              '${summaryMap['best_progress'] ?? 'No clear improvement signal yet.'}',
-                        ),
-                        const SizedBox(height: 10),
-                        _SummaryBlock(
-                          title: 'Watch area',
-                          value:
-                              '${summaryMap['watch_area'] ?? 'No watch area detected this week.'}',
-                        ),
-                        const SizedBox(height: 10),
-                        _SummaryBlock(
-                          title: 'Support nudge',
-                          value:
-                              '${summaryMap['support_nudge'] ?? 'No support suggestion yet.'}',
+                          title: 'Watch next',
+                          value: _compactSummaryText(
+                            summaryMap['watch_area']?.toString() ??
+                                'No watch area detected this week.',
+                          ),
                         ),
                         const SizedBox(height: 14),
                         Wrap(
@@ -2746,26 +2866,26 @@ class _GuardianStudentSummaryScreenState
                         const SectionTitle(
                           title: 'How to respond this week',
                           subtitle:
-                              'A privacy-safe parent action layer built on the summary, not the child’s private entries.',
+                              'Short prompts for a calmer, more useful check-in.',
                         ),
                         _SummaryBlock(
                           title: 'What changed',
-                          value: whatChanged,
+                          value: _compactSummaryText(whatChanged),
                         ),
                         const SizedBox(height: 10),
                         _SummaryBlock(
                           title: 'Conversation starter',
-                          value: conversationStarter,
+                          value: _compactSummaryText(conversationStarter),
                         ),
                         const SizedBox(height: 10),
                         _SummaryBlock(
-                          title: 'What to watch next week',
-                          value: watchNextWeek,
+                          title: 'Watch next week',
+                          value: _compactSummaryText(watchNextWeek),
                         ),
                         const SizedBox(height: 10),
                         _SummaryBlock(
-                          title: 'Support action to try',
-                          value: supportAction,
+                          title: 'Support step',
+                          value: _compactSummaryText(supportAction),
                         ),
                       ],
                     ),
