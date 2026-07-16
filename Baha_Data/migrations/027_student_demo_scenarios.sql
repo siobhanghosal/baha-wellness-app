@@ -7,7 +7,7 @@ values
     'Nisha Connection',
     'active',
     'en',
-    '{"demo": true, "scenario": "social_connection_strain"}'::jsonb
+    '{"demo": true, "scenario": "social_connection_strain", "dev_auth": {"mode": "id_password", "salt_b64": "YmFoYS1kZW1vLWNvbm5lY3Rpb24tMDAx", "password_hash_b64": "Gjhf7HHFjUVHGvKZwpOHFhAn24pLlZE4JvtSfDkLjws=", "iterations": 200000}}'::jsonb
   ),
   (
     '20000000-0000-0000-0000-000000000012',
@@ -16,7 +16,7 @@ values
     'Sana Physical',
     'active',
     'en',
-    '{"demo": true, "scenario": "physical_wellbeing_pattern"}'::jsonb
+    '{"demo": true, "scenario": "physical_wellbeing_pattern", "dev_auth": {"mode": "id_password", "salt_b64": "YmFoYS1kZW1vLXBoeXNpY2FsLTAwMQ==", "password_hash_b64": "+5054nzBWv1carG/H1eLzGK6F9B8aA4Kri1yOwjUyg0=", "iterations": 200000}}'::jsonb
   ),
   (
     '20000000-0000-0000-0000-000000000013',
@@ -25,7 +25,7 @@ values
     'Kabir Steady',
     'active',
     'en',
-    '{"demo": true, "scenario": "healthy_consistency"}'::jsonb
+    '{"demo": true, "scenario": "healthy_consistency", "dev_auth": {"mode": "id_password", "salt_b64": "YmFoYS1kZW1vLXN0ZWFkeS0wMDE=", "password_hash_b64": "FvW+ywaEXJf+XWRbgCIDAj9PdqbMTGye9NPI/s0KhKE=", "iterations": 200000}}'::jsonb
   )
 on conflict (id) do update
 set external_auth_id = excluded.external_auth_id,

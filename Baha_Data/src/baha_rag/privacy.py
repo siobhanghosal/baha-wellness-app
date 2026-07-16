@@ -68,6 +68,27 @@ class PrivacyService:
                 None,
             )
 
+        student_pref_row = (
+            await self.session.execute(
+                text(
+                    """
+                    select coalesce((metadata ->> 'parent_summary_sharing_enabled')::boolean, false) as parent_summary_sharing_enabled
+                    from student_profiles
+                    where id = :student_profile_id
+                    limit 1
+                    """
+                ),
+                {"student_profile_id": student_profile_id},
+            )
+        ).mappings().first()
+        if student_pref_row is None or not student_pref_row["parent_summary_sharing_enabled"]:
+            return ParentSummaryAccessDecision(
+                False,
+                "student_disabled",
+                [],
+                "The student has not enabled parent summary sharing yet",
+            )
+
         consent_row = (
             await self.session.execute(
                 text(

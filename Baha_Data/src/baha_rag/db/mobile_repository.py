@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from secrets import randbelow
 from typing import Any
 from uuid import UUID
 
@@ -188,6 +189,189 @@ class MobileAppRepository:
                 """
             ),
             {"user_id": user_id, "external_auth_id": external_auth_id},
+        )
+        return result.rowcount > 0
+
+    async def get_student_linking_state(
+        self,
+        *,
+        student_profile_id: UUID,
+    ) -> dict[str, Any] | None:
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  sp.id as student_profile_id,
+                  sp.student_code,
+                  sp.legal_consent_band,
+                  sp.metadata,
+                  sp.updated_at,
+                  (
+                    select count(*)::int
+                    from student_guardian_links sgl
+                    where sgl.student_profile_id = sp.id
+                      and sgl.status = 'active'
+                  ) as linked_guardian_count
+                from student_profiles sp
+                where sp.id = :student_profile_id
+                limit 1
+                """
+            ),
+            {"student_profile_id": student_profile_id},
+        )
+        row = result.mappings().first()
+        if row is None:
+            return None
+        metadata = row["metadata"] or {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+        guardian_rows = await self.session.execute(
+            text(
+                """
+                select
+                  sgl.guardian_id,
+                  g.user_id as guardian_user_id,
+                  u.display_name,
+                  sgl.relationship_to_student,
+                  sgl.is_primary
+                from student_guardian_links sgl
+                join guardians g
+                  on g.id = sgl.guardian_id
+                join users u
+                  on u.id = g.user_id
+                where sgl.student_profile_id = :student_profile_id
+                  and sgl.status = 'active'
+                order by sgl.is_primary desc, u.display_name asc
+                """
+            ),
+            {"student_profile_id": student_profile_id},
+        )
+        return {
+            "student_profile_id": row["student_profile_id"],
+            "student_code": row["student_code"],
+            "legal_consent_band": row["legal_consent_band"],
+            "linked_guardian_count": row["linked_guardian_count"] or 0,
+            "linked_guardians": [
+                {
+                    "guardian_id": guardian_row["guardian_id"],
+                    "guardian_user_id": guardian_row["guardian_user_id"],
+                    "display_name": guardian_row["display_name"] or "Parent or guardian",
+                    "relationship_to_student": guardian_row["relationship_to_student"],
+                    "is_primary": bool(guardian_row["is_primary"]),
+                }
+                for guardian_row in guardian_rows.mappings().all()
+            ],
+            "guardian_link_verification_code": metadata.get("guardian_link_verification_code"),
+            "guardian_link_code_generated_at": metadata.get("guardian_link_code_generated_at"),
+            "guardian_link_code_expires_at": metadata.get("guardian_link_code_expires_at"),
+            "parent_summary_sharing_enabled": bool(
+                metadata.get("parent_summary_sharing_enabled", False)
+            ),
+            "updated_at": row["updated_at"],
+        }
+
+    async def issue_student_guardian_link_code(
+        self,
+        *,
+        student_profile_id: UUID,
+        ttl_minutes: int = 30,
+    ) -> dict[str, Any] | None:
+        code = f"{randbelow(1_000_000):06d}"
+        result = await self.session.execute(
+            text(
+                """
+                update student_profiles
+                set
+                  metadata = jsonb_set(
+                    jsonb_set(
+                      jsonb_set(
+                        coalesce(metadata, '{}'::jsonb),
+                        '{guardian_link_verification_code}',
+                        to_jsonb(cast(:code as text)),
+                        true
+                      ),
+                      '{guardian_link_code_generated_at}',
+                      to_jsonb(to_char(now() at time zone 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')),
+                      true
+                    ),
+                    '{guardian_link_code_expires_at}',
+                    to_jsonb(
+                      to_char(
+                        (now() + cast((cast(:ttl_minutes as text) || ' minutes') as interval)) at time zone 'utc',
+                        'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'
+                      )
+                    ),
+                    true
+                  ),
+                  updated_at = now()
+                where id = :student_profile_id
+                returning id
+                """
+            ),
+            {
+                "student_profile_id": student_profile_id,
+                "code": code,
+                "ttl_minutes": str(ttl_minutes),
+            },
+        )
+        if result.scalar_one_or_none() is None:
+            return None
+        return await self.get_student_linking_state(student_profile_id=student_profile_id)
+
+    async def set_student_parent_summary_sharing(
+        self,
+        *,
+        student_profile_id: UUID,
+        enabled: bool,
+    ) -> dict[str, Any] | None:
+        result = await self.session.execute(
+            text(
+                """
+                update student_profiles
+                set
+                  metadata = jsonb_set(
+                    coalesce(metadata, '{}'::jsonb),
+                    '{parent_summary_sharing_enabled}',
+                    to_jsonb(cast(:enabled as boolean)),
+                    true
+                  ),
+                  updated_at = now()
+                where id = :student_profile_id
+                returning id
+                """
+            ),
+            {
+                "student_profile_id": student_profile_id,
+                "enabled": enabled,
+            },
+        )
+        if result.scalar_one_or_none() is None:
+            return None
+        return await self.get_student_linking_state(student_profile_id=student_profile_id)
+
+    async def deactivate_student_guardian_link(
+        self,
+        *,
+        student_profile_id: UUID,
+        guardian_id: UUID,
+    ) -> bool:
+        result = await self.session.execute(
+            text(
+                """
+                update student_guardian_links
+                set
+                  status = 'inactive',
+                  is_primary = false,
+                  updated_at = now()
+                where student_profile_id = :student_profile_id
+                  and guardian_id = :guardian_id
+                  and status = 'active'
+                """
+            ),
+            {
+                "student_profile_id": student_profile_id,
+                "guardian_id": guardian_id,
+            },
         )
         return result.rowcount > 0
 

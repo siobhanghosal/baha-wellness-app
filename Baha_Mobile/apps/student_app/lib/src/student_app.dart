@@ -1,5 +1,6 @@
 import 'package:baha_api_client/baha_api_client.dart';
 import 'package:baha_auth_session/baha_auth_session.dart';
+import 'package:baha_shared_models/baha_shared_models.dart';
 import 'package:flutter/material.dart';
 
 import 'app_environment.dart';
@@ -54,7 +55,7 @@ class _StudentAppEntryPointState extends State<StudentAppEntryPoint> {
             case SessionStage.requiresIdentity:
               return StudentIdentityScreen(
                 defaultExternalAuthId: _environment.defaultExternalAuthId,
-                defaultAuthEmail: _environment.defaultAuthEmail,
+                defaultPassword: _environment.defaultPassword,
                 apiBaseUrl: _environment.apiBaseUrl,
                 onSubmit: (identity, mode) => _sessionController.attemptEntry(
                   identity,
@@ -69,8 +70,20 @@ class _StudentAppEntryPointState extends State<StudentAppEntryPoint> {
                 onChangeIdentity: _sessionController.clearIdentity,
               );
             case SessionStage.waiting:
+              final onboardingState = _sessionController.onboardingState;
+              final identity = _sessionController.identity!;
+              if (onboardingState?.nextStep == 'link_student' &&
+                  identity.requestedRole == AppRequestedRole.guardian) {
+                return GuardianLinkWaitingScreen(
+                  apiClient: _apiClient,
+                  identity: identity,
+                  onboardingState: onboardingState,
+                  onRefresh: _sessionController.refreshOnboarding,
+                  onChangeIdentity: _sessionController.clearIdentity,
+                );
+              }
               return StudentWaitingScreen(
-                onboardingState: _sessionController.onboardingState,
+                onboardingState: onboardingState,
                 onRefresh: _sessionController.refreshOnboarding,
                 onChangeIdentity: _sessionController.clearIdentity,
               );

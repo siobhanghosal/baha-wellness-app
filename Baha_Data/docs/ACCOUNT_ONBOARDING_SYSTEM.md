@@ -21,6 +21,11 @@ Local development fallback for onboarding-only routes:
 
 - `X-BAHA-External-Auth-Id`
 - `X-BAHA-Auth-Email` (optional)
+- `X-BAHA-Dev-Password`
+
+For seeded local diagnostics, read-only or admin-style testing can also use:
+
+- `X-BAHA-User-Id`
 
 If multiple BAHA users share the same email, automatic linking is rejected.
 
@@ -83,8 +88,10 @@ Current behavior:
 
 - adult students can become active immediately after bootstrap
 - minor students bootstrap into `users.status = 'pending'`
-- the backend auto-generates a six-digit `guardian_link_verification_code` for student accounts
-- minor students receive both `student_code` and `guardian_link_verification_code` in onboarding state so the app can show them on the waiting screen
+- every student keeps a persistent `student_code`
+- students can generate a short-lived six-digit guardian-link verification code on demand
+- verification codes currently expire after 30 minutes
+- under-18 students who are still waiting for parent linkage receive both `student_code` and `guardian_link_verification_code` in onboarding state so the unified app can show them on the waiting screen
 - a guardian with active consent authority can grant platform participation
 - once granted, the backend activates the student account
 
@@ -94,6 +101,7 @@ This gives server-side gating even before the Flutter client exists.
 
 Parent-safe weekly summary sharing is enforced through:
 
+- `student_profiles.metadata.parent_summary_sharing_enabled`
 - `consent_records` with `consent_type = 'parent_summary_sharing'`
 - `student_guardian_links.consent_authority`
 - `privacy_tier_settings`
@@ -101,9 +109,12 @@ Parent-safe weekly summary sharing is enforced through:
 
 Current behavior:
 
+- the student must first enable parent-summary sharing from student settings
 - a guardian with active consent authority can read the current parent-summary consent state
 - that guardian can grant, decline, or withdraw summary sharing for a linked student
+- if the student has not enabled sharing yet, the parent weekly-summary endpoint returns a clear blocked message instead of exposing data
 - the parent weekly-summary endpoint continues to enforce consent plus privacy-tier checks server-side
+- active safeguarding overrides can still expose the safeguarding-only summary layer even if the normal student sharing toggle is off
 
 This means Flutter can manage parent-summary sharing through explicit auth endpoints instead of relying on manual seed data.
 
@@ -120,12 +131,34 @@ Lookup supports:
 
 Current guardian-link rule:
 
-- for the under-18 flow, the guardian must provide the student code plus the student’s verification code
-- adult students are intentionally excluded from this guardian-linking path
+- any student can initiate guardian linking by sharing their student code plus a short-lived verification code
+- the guardian must provide the student code plus the student’s six-digit verification code
+- under-18 students still require guardian platform-participation approval before the student account is fully active
+- adult students can link a guardian for summary-sharing purposes without a platform-access approval step
 
 The active relationship is stored in:
 
 - `student_guardian_links`
+
+Student self-service linking utilities now available:
+
+- `GET /mobile/student/linking-state`
+- `POST /mobile/student/linking-code`
+- `POST /mobile/student/parent-summary-sharing`
+- `DELETE /mobile/student/guardians/{guardian_id}`
+
+These power the unified app settings flow for:
+
+- showing the student ID
+- generating or refreshing a six-digit pairing code
+- deciding whether parents can view summary charts
+- intentionally removing a linked parent or guardian after confirmation
+
+Guardian self-service link management now also includes:
+
+- `DELETE /mobile/parent/students/{student_profile_id}/link`
+
+This lets a parent or guardian remove their own link from the parent side without touching the student account itself.
 
 ## 6. Onboarding State Contract
 
@@ -149,6 +182,7 @@ This is the backend contract the Flutter developer should use to decide whether 
 - guardian consent pending
 - approval pending
 - ready/active app access
+- parent-summary sharing blocked by student preference
 
 For the current development-auth mobile flow, the client also uses
 `GET /auth/onboarding-state` as a preflight check before opening a session so it

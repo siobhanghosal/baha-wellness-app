@@ -19,7 +19,6 @@ import 'student_buddy_screen.dart';
 import 'student_help_request_screen.dart';
 import 'student_learn_screen.dart';
 import 'student_profile_setup_screen.dart';
-import 'student_story_world_screen.dart';
 import '../wellbeing/student_checkin_logic.dart';
 import '../wellbeing/student_profile_logic.dart';
 
@@ -111,7 +110,7 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
 
   Future<void> _openBuddy() async {
     await _pushRoute(
-      builder: (context) => StudentBuddyScreen(
+      builder: (context) => StudentBuddyDirectScreen(
         apiClient: widget.apiClient,
         identity: widget.identity,
       ),
@@ -123,16 +122,6 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
       builder: (context) => StudentHelpRequestScreen(
         apiClient: widget.apiClient,
         identity: widget.identity,
-      ),
-    );
-  }
-
-  Future<void> _openStoryWorld() async {
-    await _pushRoute(
-      builder: (context) => StudentStoryWorldScreen(
-        apiClient: widget.apiClient,
-        identity: widget.identity,
-        palette: _currentPalette,
       ),
     );
   }
@@ -179,6 +168,7 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
   Future<void> _openSettings() async {
     await _pushRoute(
       builder: (context) => StudentSettingsScreen(
+        apiClient: widget.apiClient,
         palette: _currentPalette,
         actor: widget.actor,
         identity: widget.identity,
@@ -298,7 +288,6 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
         request: AppBootstrapRequest(
           role: AppRequestedRole.student,
           displayName: actor.displayName,
-          email: widget.identity.authEmail,
           schoolId: actor.schoolId,
           schoolName: actor.schoolName,
           ageCohort: profile.ageBand,
@@ -331,9 +320,6 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
       case 'Focus Catch':
         unawaited(_openTool(item));
         return;
-      case 'Story World':
-        unawaited(_openStoryWorld());
-        return;
       case 'BAHA Buddy':
         setState(() => _currentIndex = 2);
         return;
@@ -357,33 +343,76 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
           ),
         );
         return;
-      case 'Digital Wellness':
+      case 'Sleep and Recharge':
         unawaited(
           _openLearn(
-            theme: 'Digital Wellness',
-            screenTitle: 'Digital Wellness',
+            theme: 'Sleep',
+            screenTitle: 'Sleep and Recharge',
             screenSubtitle:
-                'Screen boundaries, scroll resets, and healthier after-school habits.',
+                'A child-friendly sleep lane with short steps, practice, and steady progress.',
           ),
         );
         return;
-      case 'Peer Pressure':
+      case 'Sleep and Recovery':
         unawaited(
           _openLearn(
-            theme: 'Peer Pressure',
-            screenTitle: 'Peer Pressure',
+            theme: 'Sleep',
+            screenTitle: 'Sleep and Recovery',
             screenSubtitle:
-                'Boundary-setting, confidence scripts, and social choice practice.',
+                'Protect rest so focus, energy, and recovery stay more stable.',
           ),
         );
         return;
-      case 'Exam Stress':
+      case 'Calm Through Stress':
         unawaited(
           _openLearn(
-            theme: 'Exam Stress',
-            screenTitle: 'Exam Stress',
+            theme: 'Stress',
+            screenTitle: 'Calm Through Stress',
             screenSubtitle:
-                'Reset your thoughts, make a smaller plan, and recover focus.',
+                'Learn what stress feels like, what helps, and build your calm toolbox.',
+          ),
+        );
+        return;
+      case 'Stress Reset':
+      case 'Handling Stress':
+      case 'Stress Under Pressure':
+        unawaited(
+          _openLearn(
+            theme: 'Stress',
+            screenTitle: item.title,
+            screenSubtitle:
+                'Build a calmer plan for pressure, overload, and harder days.',
+          ),
+        );
+        return;
+      case 'Bullying and Kindness':
+      case 'Bullying and Boundaries':
+        unawaited(
+          _openLearn(
+            theme: 'Bullying',
+            screenTitle: item.title,
+            screenSubtitle:
+                'Know what repeated harm looks like, how to stay safe, and who to tell.',
+          ),
+        );
+        return;
+      case 'Healthy Gaming':
+        unawaited(
+          _openLearn(
+            theme: 'Healthy Gaming',
+            screenTitle: 'Healthy Gaming',
+            screenSubtitle:
+                'Keep games fun while protecting sleep, homework, and balance.',
+          ),
+        );
+        return;
+      case 'Alcohol Safety':
+        unawaited(
+          _openLearn(
+            theme: 'Alcohol Safety',
+            screenTitle: 'Alcohol Safety',
+            screenSubtitle:
+                'Practice safe choices, trusted-adult help, and confident ways to say no.',
           ),
         );
         return;
@@ -424,6 +453,7 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
             ),
             StudentReferenceExploreTab(
               palette: palette,
+              ageBand: _profile?.ageBand ?? widget.actor?.ageCohort,
               onCardTap: _handleCardAction,
             ),
             StudentReferenceBuddyTab(
@@ -552,10 +582,7 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
 
   Future<_StudentDashboardData> _load() async {
     final results = await Future.wait<Object>([
-      widget.apiClient.listStudentCheckins(
-        identity: widget.identity,
-        limit: 7,
-      ),
+      widget.apiClient.listStudentCheckins(identity: widget.identity, limit: 7),
       widget.apiClient.listStudentModules(identity: widget.identity),
     ]);
     final checkins = results[0] as List<StudentCheckinSummary>;
@@ -683,6 +710,7 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
             modules: data.modules,
             points: data.trendPoints,
             profile: widget.profile,
+            ageBand: widget.profile?.ageBand ?? widget.actor?.ageCohort,
           );
           final activityRecommendations = _recommendedActivityCards(
             points: data.trendPoints,
@@ -744,7 +772,7 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                             'Your trend cards and graphs will appear after you submit your first daily check-in.',
                       ),
                       Text(
-                        'Once you add a few entries, BAHA will start showing real patterns for sleep, mood, stress, energy, body, and connection.',
+                        'Once you add a few entries, BAHA will start showing real patterns for sleep, mood, stress, energy, physical symptoms, and support.',
                       ),
                     ],
                   ),
@@ -767,7 +795,7 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SectionTitle(
-                        title: 'Tracked factors',
+                        title: 'Overall pulse',
                         subtitle: dailyHeadline,
                       ),
                       MiniLineChart(
@@ -775,6 +803,11 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                         values: overallValues,
                         labels: labels,
                         lineColor: palette.primary,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _overallPulseExplainer(data.trendPoints),
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       if (flags.isNotEmpty) ...[
                         const SizedBox(height: 12),
@@ -823,7 +856,7 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                     ],
                     const SizedBox(height: 12),
                     Text(
-                      'Recent check-ins: ${data.checkins.length} • Privacy tier: ${data.summary.privacyTierApplied}',
+                      'Latest ${min(data.checkins.length, 3)} check-ins power this view • Privacy tier: ${data.summary.privacyTierApplied}',
                       style: Theme.of(
                         context,
                       ).textTheme.bodyMedium?.copyWith(color: palette.muted),
@@ -873,7 +906,8 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                 ],
               ),
               const SizedBox(height: 14),
-              if (learnRecommendations.isNotEmpty || activityRecommendations.isNotEmpty)
+              if (learnRecommendations.isNotEmpty ||
+                  activityRecommendations.isNotEmpty)
                 GlassPanel(
                   palette: palette,
                   child: Column(
@@ -891,16 +925,18 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                               ?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 10),
-                        ...learnRecommendations.take(2).map(
-                          (item) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: ActionCard(
-                              palette: palette,
-                              item: item,
-                              onTap: () => widget.onCardTap(item),
+                        ...learnRecommendations
+                            .take(2)
+                            .map(
+                              (item) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: ActionCard(
+                                  palette: palette,
+                                  item: item,
+                                  onTap: () => widget.onCardTap(item),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
                       ],
                       if (learnRecommendations.isNotEmpty &&
                           activityRecommendations.isNotEmpty)
@@ -912,21 +948,24 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                               ?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 10),
-                        ...activityRecommendations.take(2).map(
-                          (item) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: ActionCard(
-                              palette: palette,
-                              item: item,
-                              onTap: () => widget.onCardTap(item),
+                        ...activityRecommendations
+                            .take(2)
+                            .map(
+                              (item) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: ActionCard(
+                                  palette: palette,
+                                  item: item,
+                                  onTap: () => widget.onCardTap(item),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
                       ],
                     ],
                   ),
                 ),
-              if (learnRecommendations.isNotEmpty || activityRecommendations.isNotEmpty)
+              if (learnRecommendations.isNotEmpty ||
+                  activityRecommendations.isNotEmpty)
                 const SizedBox(height: 14),
               if (data.checkins.isNotEmpty)
                 GlassPanel(
@@ -967,11 +1006,13 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
 class StudentReferenceExploreTab extends StatelessWidget {
   const StudentReferenceExploreTab({
     required this.palette,
+    required this.ageBand,
     required this.onCardTap,
     super.key,
   });
 
   final PrototypePalette palette;
+  final String? ageBand;
   final ValueChanged<UiCardItem> onCardTap;
 
   @override
@@ -984,19 +1025,19 @@ class StudentReferenceExploreTab extends StatelessWidget {
           const SectionTitle(
             title: 'Learning',
             subtitle:
-                'Guided modules and quick guides for sleep, stress, confidence, and digital habits.',
+                'Guided modules for sleep, stress, safety, healthy gaming, and stronger daily habits.',
           ),
           _ExploreGrid(
             palette: palette,
             constraints: constraints,
-            items: learningCards,
+            items: learningCardsForAgeBand(ageBand),
             onCardTap: onCardTap,
           ),
           const SizedBox(height: 18),
           const SectionTitle(
             title: 'Activities',
             subtitle:
-                'Breathing resets, cognitive mini-games, check-ins, and Story World live here as practice spaces.',
+                'Breathing resets, cognitive mini-games, Buddy, and check-ins give you quick support between lessons.',
           ),
           _ExploreGrid(
             palette: palette,
@@ -1184,7 +1225,7 @@ class _StudentReferenceBuddyTabState extends State<StudentReferenceBuddyTab> {
               ),
               const SizedBox(height: 16),
               AnimatedPrimaryButton(
-                label: 'Open live Buddy',
+                label: 'Chat with Buddy',
                 icon: Icons.smart_toy_rounded,
                 onPressed: widget.onOpenBuddy,
               ),
@@ -1233,8 +1274,7 @@ class StudentReferenceProfileTab extends StatelessWidget {
           palette: palette,
           kicker: 'Profile',
           title: 'Your style and progress',
-          subtitle:
-              'Profile, privacy, and app preferences in the reference student style.',
+          subtitle: 'Manage your profile, privacy, and app preferences.',
           actions: [
             Pill(icon: Icons.palette_rounded, label: palette.name),
             Pill(icon: Icons.verified_user_rounded, label: approvalLabel),
@@ -1254,7 +1294,7 @@ class StudentReferenceProfileTab extends StatelessWidget {
                 ),
               ),
               Text(
-                '${actor?.ageCohort ?? onboardingState?.ageCohort ?? '13_14'} · ${environment.apiBaseUrl}',
+                actor?.ageCohort ?? onboardingState?.ageCohort ?? '13_14',
                 style: TextStyle(color: palette.muted),
                 textAlign: TextAlign.center,
               ),
@@ -1269,8 +1309,7 @@ class StudentReferenceProfileTab extends StatelessWidget {
             children: [
               const SectionTitle(
                 title: 'Privacy snapshot',
-                subtitle:
-                    'Real onboarding state rendered inside the reference UI.',
+                subtitle: 'Your current account and consent details.',
               ),
               _ProfileInfoRow(label: 'Consent band', value: privacyLabel),
               _ProfileInfoRow(
@@ -1283,6 +1322,34 @@ class StudentReferenceProfileTab extends StatelessWidget {
                     actor?.primaryRole ??
                     onboardingState?.primaryRole ??
                     'student',
+              ),
+              if ((onboardingState?.studentCode ?? '').isNotEmpty)
+                _ProfileInfoRow(
+                  label: 'Student ID',
+                  value: onboardingState!.studentCode!,
+                ),
+              _ProfileInfoRow(
+                label: 'Parent summary sharing',
+                value:
+                    (actor?.studentMetadata['parent_summary_sharing_enabled']
+                            as bool? ??
+                        false)
+                    ? 'enabled'
+                    : 'disabled',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        GlassPanel(
+          palette: palette,
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SectionTitle(
+                title: 'Parent linking',
+                subtitle:
+                    'Use Settings to generate a one-time 6-digit pairing code whenever you want to link a parent or guardian.',
               ),
             ],
           ),
@@ -1494,9 +1561,6 @@ class _StudentInsightScreenState extends State<StudentInsightScreen> {
                 data.trendPoints,
                 widget.profile,
               );
-              final moduleProgress = data.modules.isEmpty
-                  ? 'No modules started'
-                  : '${data.modules.where((module) => module.completionPercent > 0).length}/${data.modules.length} active modules';
               final chartValues = chartValuesForFactor(
                 data.trendPoints,
                 factorKey,
@@ -1534,7 +1598,7 @@ class _StudentInsightScreenState extends State<StudentInsightScreen> {
                         const SectionTitle(
                           title: 'Weekly pulse',
                           subtitle:
-                              'Rendered from real check-ins using the factors we actually track.',
+                              'Rendered from real check-ins using the factors we actually track. Higher points mean a steadier week.',
                         ),
                         MiniLineChart(
                           palette: palette,
@@ -1563,9 +1627,15 @@ class _StudentInsightScreenState extends State<StudentInsightScreen> {
                       Expanded(
                         child: _StudentStatTile(
                           palette: palette,
-                          title: 'Modules',
-                          value: '${data.modules.length}',
-                          subtitle: moduleProgress,
+                          title: 'Pattern',
+                          value: _insightStatusValue(
+                            factorKey,
+                            data.trendPoints,
+                          ),
+                          subtitle: _insightStatusSubtitle(
+                            factorKey,
+                            data.trendPoints,
+                          ),
                         ),
                       ),
                     ],
@@ -1584,7 +1654,7 @@ class _StudentInsightScreenState extends State<StudentInsightScreen> {
                           Text('No recent check-ins have been submitted yet.')
                         else
                           ...data.checkins
-                              .take(4)
+                              .take(3)
                               .map(
                                 (checkin) => Padding(
                                   padding: const EdgeInsets.only(bottom: 10),
@@ -2670,6 +2740,7 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
 
 class StudentSettingsScreen extends StatefulWidget {
   const StudentSettingsScreen({
+    required this.apiClient,
     required this.palette,
     required this.actor,
     required this.identity,
@@ -2684,6 +2755,7 @@ class StudentSettingsScreen extends StatefulWidget {
     super.key,
   });
 
+  final BahaApiClient apiClient;
   final PrototypePalette palette;
   final MobileActor? actor;
   final DevelopmentIdentity identity;
@@ -2702,14 +2774,194 @@ class StudentSettingsScreen extends StatefulWidget {
 
 class _StudentSettingsScreenState extends State<StudentSettingsScreen> {
   bool _refreshing = false;
+  bool _loadingLinkingState = true;
+  bool _updatingSharing = false;
+  bool _generatingCode = false;
+  final Set<String> _unpairingGuardianIds = <String>{};
+  String? _linkingError;
+  StudentLinkingState? _linkingState;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadLinkingState());
+  }
+
+  Future<void> _loadLinkingState() async {
+    setState(() {
+      _loadingLinkingState = true;
+      _linkingError = null;
+    });
+    try {
+      final state = await widget.apiClient.getStudentLinkingState(
+        identity: widget.identity,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() => _linkingState = state);
+    } on BahaApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _linkingError = error.message);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _linkingError = '$error');
+    } finally {
+      if (mounted) {
+        setState(() => _loadingLinkingState = false);
+      }
+    }
+  }
 
   Future<void> _refresh() async {
     setState(() => _refreshing = true);
     try {
       await widget.onRefreshOnboarding();
+      await _loadLinkingState();
     } finally {
       if (mounted) {
         setState(() => _refreshing = false);
+      }
+    }
+  }
+
+  Future<void> _toggleParentSummarySharing(bool enabled) async {
+    setState(() => _updatingSharing = true);
+    try {
+      final state = await widget.apiClient.updateStudentParentSummarySharing(
+        identity: widget.identity,
+        request: StudentParentSummarySharingRequest(enabled: enabled),
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() => _linkingState = state);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            enabled
+                ? 'Parent summary sharing is now on.'
+                : 'Parent summary sharing is now off.',
+          ),
+        ),
+      );
+      await widget.onRefreshOnboarding();
+    } on BahaApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) {
+        setState(() => _updatingSharing = false);
+      }
+    }
+  }
+
+  Future<void> _generatePairingCode() async {
+    setState(() => _generatingCode = true);
+    try {
+      final state = await widget.apiClient.generateStudentLinkingCode(
+        identity: widget.identity,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() => _linkingState = state);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('A new 6-digit pairing code is ready to share.'),
+        ),
+      );
+      await widget.onRefreshOnboarding();
+    } on BahaApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) {
+        setState(() => _generatingCode = false);
+      }
+    }
+  }
+
+  Future<void> _confirmUnpairGuardian(LinkedGuardianSummary guardian) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove linked parent?'),
+        content: Text(
+          'This will remove ${guardian.displayName} from your linked parent or guardian list. They will lose access to your summaries until you link them again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Remove link'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+    setState(() => _unpairingGuardianIds.add(guardian.guardianId));
+    try {
+      final state = await widget.apiClient.unpairStudentGuardian(
+        identity: widget.identity,
+        guardianId: guardian.guardianId,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() => _linkingState = state);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${guardian.displayName} was unpaired.')),
+      );
+      await widget.onRefreshOnboarding();
+    } on BahaApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) {
+        setState(() => _unpairingGuardianIds.remove(guardian.guardianId));
       }
     }
   }
@@ -2780,6 +3032,16 @@ class _StudentSettingsScreenState extends State<StudentSettingsScreen> {
                     label: 'Approval',
                     value: onboardingState?.approvalStatus ?? 'approved',
                   ),
+                  if (_linkingState != null) ...[
+                    _ProfileInfoRow(
+                      label: 'Student ID',
+                      value: _linkingState!.studentCode,
+                    ),
+                    _ProfileInfoRow(
+                      label: 'Linked parents',
+                      value: '${_linkingState!.linkedGuardianCount}',
+                    ),
+                  ],
                   if (widget.profile != null) ...[
                     _ProfileInfoRow(
                       label: 'Focus',
@@ -2789,6 +3051,148 @@ class _StudentSettingsScreenState extends State<StudentSettingsScreen> {
                       label: 'Support',
                       value: widget.profile!.supportPreferenceLabel,
                     ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            GlassPanel(
+              palette: palette,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SectionTitle(
+                    title: 'Parent linking and privacy',
+                    subtitle:
+                        'Keep your student ID visible, create a short-lived pairing code when needed, and decide whether parents can see summary charts.',
+                  ),
+                  if (_loadingLinkingState)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: CircularProgressIndicator(),
+                    )
+                  else if (_linkingError != null)
+                    Text(_linkingError!)
+                  else if (_linkingState != null) ...[
+                    _ProfileInfoRow(
+                      label: 'Student ID',
+                      value: _linkingState!.studentCode,
+                    ),
+                    _ProfileInfoRow(
+                      label: 'Pairing code',
+                      value:
+                          _linkingState!.guardianLinkVerificationCode ??
+                          'Not generated yet',
+                    ),
+                    _ProfileInfoRow(
+                      label: 'Code expires',
+                      value: _linkingState!.guardianLinkCodeExpiresAt == null
+                          ? 'Generate a code when you want to link a parent'
+                          : _formatDateTime(
+                              _linkingState!.guardianLinkCodeExpiresAt!,
+                            ),
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Let parents view summary charts'),
+                      subtitle: const Text(
+                        'Parents only see high-level trends and alerts, never your private answers.',
+                      ),
+                      value: _linkingState!.parentSummarySharingEnabled,
+                      onChanged: _updatingSharing
+                          ? null
+                          : _toggleParentSummarySharing,
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: _generatingCode ? null : _generatePairingCode,
+                      icon: const Icon(Icons.password_rounded),
+                      label: Text(
+                        _generatingCode
+                            ? 'Generating...'
+                            : _linkingState!.guardianLinkVerificationCode ==
+                                  null
+                            ? 'Generate 6-digit pairing code'
+                            : 'Refresh 6-digit pairing code',
+                      ),
+                    ),
+                    if (_linkingState!.linkedGuardians.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Linked parents and guardians',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 8),
+                      ..._linkingState!.linkedGuardians.map((guardian) {
+                        final busy = _unpairingGuardianIds.contains(
+                          guardian.guardianId,
+                        );
+                        final relationshipBits = <String>[
+                          if ((guardian.relationshipToStudent ?? '').isNotEmpty)
+                            guardian.relationshipToStudent!,
+                          if (guardian.isPrimary) 'Primary link',
+                        ];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: palette.surface.withValues(
+                                alpha: palette.isDark ? .72 : .84,
+                              ),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: palette.muted.withValues(alpha: .18),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        guardian.displayName,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        relationshipBits.isEmpty
+                                            ? 'Linked guardian'
+                                            : relationshipBits.join(' • '),
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodyMedium,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                OutlinedButton.icon(
+                                  onPressed: busy
+                                      ? null
+                                      : () => _confirmUnpairGuardian(guardian),
+                                  icon: const Icon(Icons.link_off_rounded),
+                                  label: Text(
+                                    busy ? 'Removing...' : 'Unpair',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
                   ],
                 ],
               ),
@@ -3074,34 +3478,32 @@ List<_DashboardCallout> _dashboardCallouts({
 }) {
   final payload = summary.summary;
   final callouts = <_DashboardCallout>[];
-  final weekStory = payload['week_story']?.toString().trim();
-  final bestProgress = payload['best_progress']?.toString().trim();
-  final watchArea = payload['watch_area']?.toString().trim();
-  final supportNudge = payload['support_nudge']?.toString().trim();
+  final weekStory = _cleanSummaryText(payload['week_story']?.toString());
+  final supportNudge = _cleanSummaryText(payload['support_nudge']?.toString());
 
-  if (weekStory != null && weekStory.isNotEmpty) {
+  final derivedStory = _derivedChangeStory(points);
+  if (derivedStory != null) {
+    callouts.add(_DashboardCallout(label: 'What changed', value: derivedStory));
+  } else if (weekStory != null && weekStory.isNotEmpty) {
     callouts.add(_DashboardCallout(label: 'What changed', value: weekStory));
   }
-  if (bestProgress != null && bestProgress.isNotEmpty) {
-    callouts.add(_DashboardCallout(label: 'What improved', value: bestProgress));
-  } else {
-    final derived = _derivedImprovement(points);
-    if (derived != null) {
-      callouts.add(_DashboardCallout(label: 'What improved', value: derived));
-    }
+  final improvement = _derivedImprovement(points);
+  if (improvement != null) {
+    callouts.add(_DashboardCallout(label: 'What improved', value: improvement));
   }
-  if (watchArea != null && watchArea.isNotEmpty) {
+  final watchArea = _derivedWatchArea(points, profile);
+  if (watchArea != null) {
     callouts.add(_DashboardCallout(label: 'What to watch', value: watchArea));
-  } else {
-    final derived = _derivedWatchArea(points, profile);
-    if (derived != null) {
-      callouts.add(_DashboardCallout(label: 'What to watch', value: derived));
-    }
   }
-  if (supportNudge != null && supportNudge.isNotEmpty) {
+  final linkedPattern = _derivedLinkedPattern(points);
+  if (linkedPattern != null) {
     callouts.add(
-      _DashboardCallout(label: 'What to try next', value: supportNudge),
+      _DashboardCallout(label: 'Pattern worth noticing', value: linkedPattern),
     );
+  }
+  final tryNext = _derivedRecommendation(points, profile) ?? supportNudge;
+  if (tryNext != null && tryNext.isNotEmpty) {
+    callouts.add(_DashboardCallout(label: 'What to try next', value: tryNext));
   }
   return callouts.take(4).toList();
 }
@@ -3147,7 +3549,7 @@ List<_DashboardCallout> _checkinTakeaways({
         _DashboardCallout(
           label: 'Compared with recent days',
           value:
-              'Today looks more ${_factorLabel(factorKey).toLowerCase()}-heavy than your recent average.',
+              'Today shows more strain around ${_factorLabel(factorKey).toLowerCase()} than your recent average.',
         ),
       );
       break;
@@ -3157,7 +3559,7 @@ List<_DashboardCallout> _checkinTakeaways({
         _DashboardCallout(
           label: 'Compared with recent days',
           value:
-              'Today looks lighter on ${_factorLabel(factorKey).toLowerCase()} than your recent average.',
+              '${_factorLabel(factorKey)} looks steadier than your recent average today.',
         ),
       );
       break;
@@ -3168,13 +3570,13 @@ List<_DashboardCallout> _checkinTakeaways({
   final energy = factors['energy'] ?? 0;
   final mood = factors['mood'] ?? 0;
   final stress = factors['stress'] ?? 0;
-  final connection = factors['connectedness'] ?? 0;
+  final support = factors['connectedness'] ?? 0;
   if (sleep >= 2 && energy >= 2) {
     takeaways.add(
       const _DashboardCallout(
         label: 'Linked pattern',
         value:
-            'Sleep and energy moved together today, so improving one may help the other.',
+            'Sleep and energy both looked strained today, so protecting rest is likely to help tomorrow too.',
       ),
     );
   } else if (stress >= 2 && mood >= 2) {
@@ -3182,27 +3584,22 @@ List<_DashboardCallout> _checkinTakeaways({
       const _DashboardCallout(
         label: 'Linked pattern',
         value:
-            'Stress and mood both looked elevated today, so a reset plus one small practical step would make sense next.',
+            'Stress and mood both looked strained today, so a quick reset plus one manageable next step would make sense.',
       ),
     );
-  } else if (connection >= 2) {
+  } else if (support >= 2) {
     takeaways.add(
       const _DashboardCallout(
-        label: 'Social signal',
+        label: 'Support signal',
         value:
-            'Connection looked strained today, so a low-pressure social support step may matter more than pushing productivity.',
+            'Support looked lower today, so reaching out to one safe person may help more than pushing through alone.',
       ),
     );
   }
 
-  if (detail.answers.length <= 6) {
-    takeaways.add(
-      const _DashboardCallout(
-        label: 'Why it stayed short',
-        value:
-            'BAHA kept this check-in short and only expanded where your answers suggested a follow-up was worth asking.',
-      ),
-    );
+  final nextStep = _checkinNextStep(factors);
+  if (nextStep != null) {
+    takeaways.add(_DashboardCallout(label: 'Best next step', value: nextStep));
   }
 
   return takeaways.take(3).toList();
@@ -3212,17 +3609,28 @@ List<UiCardItem> _recommendedLearnCards({
   required List<StudentModuleSummary> modules,
   required List<WellbeingTrendPoint> points,
   required StudentWellbeingProfile? profile,
+  required String? ageBand,
 }) {
   if (modules.isEmpty) {
     return const [];
   }
+  if (ageBand == '9_12') {
+    return _recommendedChildLearnCards(
+      modules: modules,
+      points: points,
+      profile: profile,
+    );
+  }
   final desiredThemes = <String>[
     ..._recommendedThemeNames(points: points, profile: profile),
   ];
-  final availableThemes = modules.map((module) => module.theme.toLowerCase()).toSet();
+  final availableThemes = modules
+      .map((module) => module.theme.toLowerCase())
+      .toSet();
   final matches = <String>[];
   for (final theme in desiredThemes) {
-    if (availableThemes.contains(theme.toLowerCase()) && !matches.contains(theme)) {
+    if (availableThemes.contains(theme.toLowerCase()) &&
+        !matches.contains(theme)) {
       matches.add(theme);
     }
   }
@@ -3232,10 +3640,7 @@ List<UiCardItem> _recommendedLearnCards({
       .toSet()
       .take(2)
       .toList();
-  return [
-    ...matches.take(2),
-    ...fallback,
-  ].take(2).map((theme) {
+  return [...matches.take(2), ...fallback].take(2).map((theme) {
     final started = modules.any(
       (module) =>
           module.theme.toLowerCase() == theme.toLowerCase() &&
@@ -3251,33 +3656,134 @@ List<UiCardItem> _recommendedLearnCards({
           icon: Icons.bedtime_rounded,
           color: const Color(0xFF6366F1),
         );
-      case 'digital wellness':
+      case 'stress':
         return UiCardItem(
-          title: 'Digital Wellness',
+          title: 'Handling Stress',
           subtitle:
-              'Because attention and routine may be drifting, ${started ? 'continue' : 'open'} this guide next.',
-          tag: started ? 'Continue' : 'Guide',
-          icon: Icons.phone_android_rounded,
-          color: const Color(0xFF0EA5E9),
+              'Because pressure looks active, ${started ? 'continue' : 'start'} this support lane next.',
+          tag: started ? 'Continue' : 'Try next',
+          icon: Icons.self_improvement_rounded,
+          color: const Color(0xFF14B8A6),
         );
-      case 'peer pressure':
+      case 'bullying':
         return UiCardItem(
-          title: 'Peer Pressure',
+          title: 'Bullying and Boundaries',
           subtitle:
-              'Because connection looks important this week, ${started ? 'continue' : 'try'} this social confidence lane next.',
-          tag: started ? 'Continue' : 'Story',
-          icon: Icons.groups_2_rounded,
+              'Because support and safety look important right now, ${started ? 'continue' : 'open'} this lane next.',
+          tag: started ? 'Continue' : 'Path',
+          icon: Icons.shield_rounded,
           color: const Color(0xFFEC4899),
         );
-      case 'exam stress':
+      case 'healthy gaming':
+        return UiCardItem(
+          title: 'Healthy Gaming',
+          subtitle:
+              'Because routine balance may be slipping, ${started ? 'continue' : 'open'} this lane next.',
+          tag: started ? 'Continue' : 'Path',
+          icon: Icons.sports_esports_rounded,
+          color: const Color(0xFF0EA5E9),
+        );
+      case 'alcohol safety':
       default:
         return UiCardItem(
-          title: 'Exam Stress',
+          title: 'Alcohol Safety',
           subtitle:
-              'Because stress and energy seem linked, ${started ? 'continue' : 'start'} this toolkit next.',
-          tag: started ? 'Continue' : 'Toolkit',
-          icon: Icons.edit_note_rounded,
+              'Because safe choices matter as independence grows, ${started ? 'continue' : 'open'} this lane next.',
+          tag: started ? 'Continue' : 'Safety',
+          icon: Icons.no_drinks_rounded,
           color: const Color(0xFFF97316),
+        );
+    }
+  }).toList();
+}
+
+List<UiCardItem> _recommendedChildLearnCards({
+  required List<StudentModuleSummary> modules,
+  required List<WellbeingTrendPoint> points,
+  required StudentWellbeingProfile? profile,
+}) {
+  final desiredThemes = <String>[];
+  if (points.isEmpty) {
+    desiredThemes.addAll(const ['Sleep', 'Stress']);
+  } else {
+    final latest = points.last.factorScores;
+    if ((latest['sleep'] ?? 0) >= 2) {
+      desiredThemes.add('Sleep');
+    }
+    if ((latest['stress'] ?? 0) >= 2 || (latest['mood'] ?? 0) >= 2) {
+      desiredThemes.add('Stress');
+    }
+    if ((latest['connectedness'] ?? 0) >= 2) {
+      desiredThemes.add('Bullying');
+    }
+    if (profile?.profileTags.contains('digital_overload') == true) {
+      desiredThemes.add('Healthy Gaming');
+    }
+  }
+  final availableThemes = modules
+      .map((module) => module.theme.toLowerCase())
+      .toSet();
+  final orderedThemes = <String>{
+    ...desiredThemes.where(
+      (theme) => availableThemes.contains(theme.toLowerCase()),
+    ),
+    ...modules
+        .map((module) => module.theme)
+        .where((theme) => !desiredThemes.contains(theme)),
+  }.take(2);
+
+  return orderedThemes.map((theme) {
+    final started = modules.any(
+      (module) =>
+          module.theme.toLowerCase() == theme.toLowerCase() &&
+          module.completionPercent > 0,
+    );
+    switch (theme.toLowerCase()) {
+      case 'sleep':
+        return UiCardItem(
+          title: 'Sleep and Recharge',
+          subtitle:
+              'Sleep looks important right now, so ${started ? 'continue' : 'start'} this short routine lane next.',
+          tag: started ? 'Continue' : 'Path',
+          icon: Icons.bedtime_rounded,
+          color: const Color(0xFF6366F1),
+        );
+      case 'bullying':
+        return UiCardItem(
+          title: 'Bullying and Kindness',
+          subtitle:
+              'Support and safety signals matter here, so ${started ? 'continue' : 'open'} this lane next.',
+          tag: started ? 'Continue' : 'Path',
+          icon: Icons.shield_rounded,
+          color: const Color(0xFFEC4899),
+        );
+      case 'healthy gaming':
+        return UiCardItem(
+          title: 'Healthy Gaming',
+          subtitle:
+              'Screen and routine balance may help, so ${started ? 'continue' : 'try'} this next.',
+          tag: started ? 'Continue' : 'Path',
+          icon: Icons.sports_esports_rounded,
+          color: const Color(0xFF0EA5E9),
+        );
+      case 'alcohol safety':
+        return UiCardItem(
+          title: 'Alcohol Safety',
+          subtitle:
+              'Learn safe choices, trusted-adult help, and what to do when something feels wrong.',
+          tag: started ? 'Continue' : 'Safety',
+          icon: Icons.no_drinks_rounded,
+          color: const Color(0xFFF97316),
+        );
+      case 'stress':
+      default:
+        return UiCardItem(
+          title: 'Calm Through Stress',
+          subtitle:
+              'Stress looks active, so ${started ? 'continue' : 'start'} this calm-toolbox lane next.',
+          tag: started ? 'Continue' : 'Path',
+          icon: Icons.self_improvement_rounded,
+          color: const Color(0xFF14B8A6),
         );
     }
   }).toList();
@@ -3288,7 +3794,7 @@ List<String> _recommendedThemeNames({
   required StudentWellbeingProfile? profile,
 }) {
   if (points.isEmpty) {
-    return const ['Sleep', 'Digital Wellness'];
+    return const ['Sleep', 'Stress'];
   }
   final latest = points.last.factorScores;
   final entries = latest.entries.toList()
@@ -3301,17 +3807,17 @@ List<String> _recommendedThemeNames({
         themes.add('Sleep');
       case 'stress':
       case 'energy':
-        themes.add('Exam Stress');
+        themes.add('Stress');
       case 'connectedness':
-        themes.add('Peer Pressure');
+        themes.add('Bullying');
       case 'mood':
-        themes.add('Peer Pressure');
+        themes.add('Bullying');
       case 'physical_wellbeing':
         themes.add('Sleep');
     }
   }
   if (profile?.profileTags.contains('digital_overload') == true) {
-    themes.add('Digital Wellness');
+    themes.add('Healthy Gaming');
   }
   return themes.toSet().toList();
 }
@@ -3337,7 +3843,8 @@ List<UiCardItem> _recommendedActivityCards({
     recommendations.add(
       const UiCardItem(
         title: 'Calm Breathing',
-        subtitle: 'Stress looks elevated, so a 60-second reset is the best first move.',
+        subtitle:
+            'Stress looks elevated, so a 60-second reset is the best first move.',
         tag: 'Reset',
         icon: Icons.air_rounded,
         color: Color(0xFF3B82F6),
@@ -3347,11 +3854,12 @@ List<UiCardItem> _recommendedActivityCards({
   if ((latest['connectedness'] ?? 0) >= 2) {
     recommendations.add(
       const UiCardItem(
-        title: 'Story World',
-        subtitle: 'Social confidence looks worth practicing, so this is a good narrative activity next.',
-        tag: 'Practice',
-        icon: Icons.explore_rounded,
-        color: Color(0xFF06B6D4),
+        title: 'Comet Sequence',
+        subtitle:
+            'Support looks low, so a light memory task can help you reset before you reach out or reflect.',
+        tag: 'Memory',
+        icon: Icons.auto_awesome_rounded,
+        color: Color(0xFF8B5CF6),
       ),
     );
   }
@@ -3359,7 +3867,8 @@ List<UiCardItem> _recommendedActivityCards({
     recommendations.add(
       const UiCardItem(
         title: 'Comet Sequence',
-        subtitle: 'This gives your attention something light and structured before a heavier task.',
+        subtitle:
+            'This gives your attention something light and structured before a heavier task.',
         tag: 'Memory',
         icon: Icons.auto_awesome_rounded,
         color: Color(0xFF8B5CF6),
@@ -3370,7 +3879,8 @@ List<UiCardItem> _recommendedActivityCards({
     recommendations.add(
       const UiCardItem(
         title: 'Focus Catch',
-        subtitle: 'A short coordination break keeps the app useful even on steadier days.',
+        subtitle:
+            'A short coordination break keeps the app useful even on steadier days.',
         tag: 'Reflex',
         icon: Icons.ads_click_rounded,
         color: Color(0xFFF97316),
@@ -3381,11 +3891,11 @@ List<UiCardItem> _recommendedActivityCards({
 }
 
 String? _derivedImprovement(List<WellbeingTrendPoint> points) {
-  if (points.length < 2) {
+  if (points.length < 3) {
     return null;
   }
-  final first = points.first;
-  final last = points.last;
+  final early = _recentWindow(points, 6).take(3).toList();
+  final late = _recentWindow(points, 3);
   String? bestFactor;
   double bestDelta = 0;
   for (final factorKey in const [
@@ -3396,8 +3906,8 @@ String? _derivedImprovement(List<WellbeingTrendPoint> points) {
     'physical_wellbeing',
     'connectedness',
   ]) {
-    final start = first.factorScores[factorKey];
-    final end = last.factorScores[factorKey];
+    final start = _averageFactor(early, factorKey);
+    final end = _averageFactor(late, factorKey);
     if (start == null || end == null) {
       continue;
     }
@@ -3410,7 +3920,7 @@ String? _derivedImprovement(List<WellbeingTrendPoint> points) {
   if (bestFactor == null || bestDelta < 0.5) {
     return null;
   }
-  return '${_factorLabel(bestFactor)} improved most across recent check-ins.';
+  return '${_factorLabel(bestFactor)} has improved the most across recent check-ins.';
 }
 
 String? _derivedWatchArea(
@@ -3420,43 +3930,294 @@ String? _derivedWatchArea(
   if (points.isEmpty) {
     return null;
   }
-  final latest = points.last;
-  MapEntry<String, double>? highest;
-  for (final entry in latest.factorScores.entries) {
-    if (highest == null || entry.value > highest.value) {
-      highest = entry;
-    }
-  }
+  final recent = _recentWindow(points, 4);
+  final highest = _highestAverageFactor(recent);
   if (highest == null) {
     return null;
   }
   if (highest.value < 2) {
     return 'No repeated high-strain pattern stands out right now.';
   }
-  final previousValue = points.length > 1
-      ? points[points.length - 2].factorScores[highest.key]
-      : null;
-  final delta = previousValue == null ? 0 : highest.value - previousValue;
+  final previousWindow = points.length > 4
+      ? points.sublist(max(points.length - 8, 0), points.length - 4)
+      : <WellbeingTrendPoint>[];
+  final previousAverage = _averageFactor(previousWindow, highest.key);
+  final delta = previousAverage == null ? 0 : highest.value - previousAverage;
   final severity = highest.value >= 3
       ? 'high'
-      : highest.value >= 2
+      : highest.value >= 2.2
       ? 'moderate'
-      : 'steady';
+      : 'mild';
   final direction = delta >= 0.35
-      ? 'worsening'
+      ? 'and rising'
       : delta <= -0.35
-      ? 'improving'
-      : 'steady';
+      ? 'but easing'
+      : 'and fairly steady';
   final label = _factorLabel(highest.key);
   if (highest.key == 'sleep' &&
       profile?.profileTags.contains('sleep_vulnerable') == true) {
-    return '$label looks $severity and $direction against this student\'s sleep-sensitive baseline.';
+    return '$label looks $severity $direction against this student\'s usual baseline.';
   }
   if (highest.key == 'stress' &&
       profile?.profileTags.contains('school_pressure_driven') == true) {
-    return '$label looks $severity, with school pressure likely to matter most.';
+    return '$label looks $severity, and school pressure may be feeding it.';
   }
-  return '$label looks $severity and $direction across recent check-ins.';
+  return '$label looks $severity $direction across recent check-ins.';
+}
+
+String? _derivedChangeStory(List<WellbeingTrendPoint> points) {
+  if (points.length < 3) {
+    return null;
+  }
+  final recent = _recentWindow(points, 3);
+  final prior = points.length > 3
+      ? points.sublist(max(points.length - 6, 0), points.length - 3)
+      : <WellbeingTrendPoint>[];
+  if (prior.isEmpty) {
+    return null;
+  }
+  final recentOverall = _averageOverall(recent);
+  final priorOverall = _averageOverall(prior);
+  if (recentOverall == null || priorOverall == null) {
+    return null;
+  }
+  final delta = recentOverall - priorOverall;
+  if (delta <= -0.45) {
+    return 'The last few check-ins look steadier than the days before them.';
+  }
+  if (delta >= 0.45) {
+    return 'The last few check-ins show more strain than the days before them.';
+  }
+  return 'Your recent check-ins look fairly steady overall, without a sharp swing either way.';
+}
+
+String? _derivedLinkedPattern(List<WellbeingTrendPoint> points) {
+  final recent = _recentWindow(points, 4);
+  if (recent.length < 2) {
+    return null;
+  }
+  final sleep = _averageFactor(recent, 'sleep') ?? 0;
+  final energy = _averageFactor(recent, 'energy') ?? 0;
+  final stress = _averageFactor(recent, 'stress') ?? 0;
+  final mood = _averageFactor(recent, 'mood') ?? 0;
+  final support = _averageFactor(recent, 'connectedness') ?? 0;
+  if (sleep >= 2.2 && energy >= 2.2) {
+    return 'Sleep and energy are moving together, so protecting sleep is likely to help daytime energy too.';
+  }
+  if (stress >= 2.2 && mood >= 2.2) {
+    return 'Stress and mood are moving together, so a reset works best when paired with one practical next step.';
+  }
+  if (support >= 2.2 && mood >= 2) {
+    return 'Lower support is showing up alongside mood, so reaching one safe person may matter more than pushing through alone.';
+  }
+  return null;
+}
+
+String? _derivedRecommendation(
+  List<WellbeingTrendPoint> points,
+  StudentWellbeingProfile? profile,
+) {
+  if (points.isEmpty) {
+    return 'Start with one short daily check-in so BAHA can build a real baseline for you.';
+  }
+  final highest = _highestAverageFactor(_recentWindow(points, 3));
+  if (highest == null) {
+    return null;
+  }
+  switch (highest.key) {
+    case 'sleep':
+      return 'Keep tonight simple: protect sleep timing, lower stimulation late, and use the Sleep lane if this repeats.';
+    case 'energy':
+      return 'Pick one recovery move first, like rest, food, water, or a lighter task, before expecting normal output.';
+    case 'mood':
+      return 'Go for one steadying step next: something familiar, low-pressure, and easy to finish.';
+    case 'stress':
+      return profile?.profileTags.contains('school_pressure_driven') == true
+          ? 'Stress looks school-linked, so break the next task into a smaller first step instead of tackling everything at once.'
+          : 'Try a short reset first, then choose one small next step you can actually finish.';
+    case 'physical_wellbeing':
+      return 'Physical symptoms are showing up, so slow down a little and track whether rest, food, hydration, or support changes the pattern.';
+    case 'connectedness':
+      return 'Support looks lower right now, so sending one message or checking in with one trusted person would be a strong next step.';
+    default:
+      return null;
+  }
+}
+
+String? _checkinNextStep(Map<String, double> factors) {
+  final highest = factors.entries.fold<MapEntry<String, double>?>(
+    null,
+    (best, current) =>
+        best == null || current.value > best.value ? current : best,
+  );
+  if (highest == null || highest.value < 2) {
+    return 'Things look fairly steady today. Keep the next step small and maintain what already helped.';
+  }
+  switch (highest.key) {
+    case 'sleep':
+      return 'A sleep reset is the strongest next move if this carries into tonight.';
+    case 'energy':
+      return 'Aim for recovery before productivity: one lighter task, then reassess.';
+    case 'mood':
+      return 'Choose one grounding activity next instead of stacking pressure on yourself.';
+    case 'stress':
+      return 'Do a quick calming reset, then pick the smallest useful next step.';
+    case 'physical_wellbeing':
+      return 'Notice whether food, water, rest, or a break changes how your body feels.';
+    case 'connectedness':
+      return 'One low-pressure check-in with a trusted person may help more than handling everything alone.';
+    default:
+      return null;
+  }
+}
+
+String _overallPulseExplainer(List<WellbeingTrendPoint> points) {
+  if (points.isEmpty) {
+    return 'Each point will show your combined overall picture from the most recent daily check-ins. Higher points mean steadier days.';
+  }
+  final recentAverage = _averageOverall(_recentWindow(points, 3)) ?? 0;
+  if (recentAverage >= 2.6) {
+    return 'Higher points mean a steadier overall picture across the factors you checked in on. The recent pattern still looks strained.';
+  }
+  if (recentAverage >= 1.8) {
+    return 'Higher points mean a steadier overall picture across the factors you checked in on. The recent pattern looks mixed.';
+  }
+  return 'Higher points mean a steadier overall picture across the factors you checked in on. The recent pattern looks fairly steady.';
+}
+
+String _insightStatusValue(String factorKey, List<WellbeingTrendPoint> points) {
+  final average = _averageFactor(_recentWindow(points, 3), factorKey) ?? 0;
+  if (average >= 3) {
+    return 'High';
+  }
+  if (average >= 2) {
+    return 'Watch';
+  }
+  return 'Steady';
+}
+
+String _insightStatusSubtitle(
+  String factorKey,
+  List<WellbeingTrendPoint> points,
+) {
+  final elevatedDays = _recentWindow(
+    points,
+    5,
+  ).where((point) => (point.factorScores[factorKey] ?? 0) >= 2).length;
+  if (elevatedDays == 0) {
+    return 'No elevated recent days';
+  }
+  return '$elevatedDays recent day${elevatedDays == 1 ? '' : 's'} showed strain';
+}
+
+String? _derivedMetricNarrative({
+  required String factorKey,
+  required List<WellbeingTrendPoint> points,
+  required StudentWellbeingProfile? profile,
+}) {
+  if (points.isEmpty) {
+    return null;
+  }
+  final recent = _recentWindow(points, 4);
+  final average = _averageFactor(recent, factorKey);
+  if (average == null) {
+    return null;
+  }
+  final previousWindow = points.length > 4
+      ? points.sublist(max(points.length - 8, 0), points.length - 4)
+      : <WellbeingTrendPoint>[];
+  final previousAverage = _averageFactor(previousWindow, factorKey);
+  final delta = previousAverage == null ? 0 : average - previousAverage;
+  final direction = delta >= 0.35
+      ? 'has been trending upward'
+      : delta <= -0.35
+      ? 'has been easing'
+      : 'has stayed fairly steady';
+  final intensity = average >= 3
+      ? 'high'
+      : average >= 2
+      ? 'mixed'
+      : 'steady';
+  if (factorKey == 'stress' &&
+      profile?.profileTags.contains('school_pressure_driven') == true &&
+      average >= 2) {
+    return 'Stress looks $intensity and $direction, with school pressure likely shaping part of the pattern.';
+  }
+  if (factorKey == 'sleep' &&
+      profile?.profileTags.contains('sleep_vulnerable') == true &&
+      average >= 2) {
+    return 'Sleep looks $intensity and $direction against your usual baseline.';
+  }
+  return '${_factorLabel(factorKey)} looks $intensity and $direction across recent check-ins.';
+}
+
+String? _cleanSummaryText(String? text) {
+  if (text == null || text.trim().isEmpty) {
+    return null;
+  }
+  return text
+      .trim()
+      .replaceAll('connectedness', 'support')
+      .replaceAll('Connectedness', 'Support')
+      .replaceAll('Connection', 'Support')
+      .replaceAll('connection', 'support')
+      .replaceAll('physical wellbeing', 'physical symptoms')
+      .replaceAll('Physical wellbeing', 'Physical symptoms')
+      .replaceAll('body', 'physical symptoms');
+}
+
+List<WellbeingTrendPoint> _recentWindow(
+  List<WellbeingTrendPoint> points,
+  int count,
+) {
+  if (points.length <= count) {
+    return points;
+  }
+  return points.sublist(points.length - count);
+}
+
+double? _averageFactor(List<WellbeingTrendPoint> points, String factorKey) {
+  final values = points
+      .map((point) => point.factorScores[factorKey])
+      .whereType<double>()
+      .toList();
+  if (values.isEmpty) {
+    return null;
+  }
+  return values.reduce((left, right) => left + right) / values.length;
+}
+
+double? _averageOverall(List<WellbeingTrendPoint> points) {
+  if (points.isEmpty) {
+    return null;
+  }
+  return points
+          .map((point) => point.overallScore)
+          .reduce((left, right) => left + right) /
+      points.length;
+}
+
+MapEntry<String, double>? _highestAverageFactor(
+  List<WellbeingTrendPoint> points,
+) {
+  MapEntry<String, double>? best;
+  for (final factorKey in const [
+    'sleep',
+    'energy',
+    'mood',
+    'stress',
+    'physical_wellbeing',
+    'connectedness',
+  ]) {
+    final average = _averageFactor(points, factorKey);
+    if (average == null) {
+      continue;
+    }
+    if (best == null || average > best.value) {
+      best = MapEntry(factorKey, average);
+    }
+  }
+  return best;
 }
 
 String _factorLabel(String factorKey) {
@@ -3470,9 +4231,9 @@ String _factorLabel(String factorKey) {
     case 'stress':
       return 'Stress';
     case 'physical_wellbeing':
-      return 'Body';
+      return 'Physical symptoms';
     case 'connectedness':
-      return 'Connection';
+      return 'Support';
     default:
       return 'Wellbeing';
   }
@@ -3484,44 +4245,54 @@ String _summaryForMetric(
   List<WellbeingTrendPoint> points,
   StudentWellbeingProfile? profile,
 ) {
+  final derived = _derivedMetricNarrative(
+    factorKey: factorKey,
+    points: points,
+    profile: profile,
+  );
+  if (derived != null) {
+    return derived;
+  }
   switch (factorKey) {
     case 'mood':
-      return summary.summary['mood_trend']?.toString() ??
+      return _cleanSummaryText(summary.summary['mood_trend']?.toString()) ??
           buildFactorMetrics(
             points: points,
             profile: profile,
           ).firstWhere((metric) => metric.factorKey == 'mood').detail;
     case 'sleep':
-      return summary.summary['sleep_trend']?.toString() ??
+      return _cleanSummaryText(summary.summary['sleep_trend']?.toString()) ??
           buildFactorMetrics(
             points: points,
             profile: profile,
           ).firstWhere((metric) => metric.factorKey == 'sleep').detail;
     case 'stress':
-      return summary.summary['stress_trend']?.toString() ??
+      return _cleanSummaryText(summary.summary['stress_trend']?.toString()) ??
           buildFactorMetrics(
             points: points,
             profile: profile,
           ).firstWhere((metric) => metric.factorKey == 'stress').detail;
     case 'energy':
-      return summary.summary['energy_trend']?.toString() ??
+      return _cleanSummaryText(summary.summary['energy_trend']?.toString()) ??
           buildFactorMetrics(
             points: points,
             profile: profile,
           ).firstWhere((metric) => metric.factorKey == 'energy').detail;
     case 'physical_wellbeing':
-      return summary.summary['physical_trend']?.toString() ??
+      return _cleanSummaryText(summary.summary['physical_trend']?.toString()) ??
           buildFactorMetrics(points: points, profile: profile)
               .firstWhere((metric) => metric.factorKey == 'physical_wellbeing')
               .detail;
     case 'connectedness':
-      return summary.summary['connectedness_trend']?.toString() ??
+      return _cleanSummaryText(
+            summary.summary['connectedness_trend']?.toString(),
+          ) ??
           buildFactorMetrics(
             points: points,
             profile: profile,
           ).firstWhere((metric) => metric.factorKey == 'connectedness').detail;
     default:
-      return summary.summary['headline']?.toString() ??
+      return _cleanSummaryText(summary.summary['headline']?.toString()) ??
           'Weekly insight available.';
   }
 }
@@ -3535,8 +4306,10 @@ String _factorKeyForMetricLabel(String label) {
     case 'stress':
       return 'stress';
     case 'body':
+    case 'physical symptoms':
       return 'physical_wellbeing';
     case 'connection':
+    case 'support':
       return 'connectedness';
     case 'mood':
     default:
@@ -3577,10 +4350,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
   Future<_StudentDashboardData> _load() async {
     final results = await Future.wait<Object>([
-      widget.apiClient.listStudentCheckins(
-        identity: widget.identity,
-        limit: 5,
-      ),
+      widget.apiClient.listStudentCheckins(identity: widget.identity, limit: 5),
       widget.apiClient.listStudentModules(identity: widget.identity),
     ]);
     final checkins = results[0] as List<StudentCheckinSummary>;
@@ -3792,12 +4562,14 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                             style: theme.bodyLarge,
                           )
                         else
-                          ...data.checkins.map(
-                            (checkin) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _CheckinSummaryTile(summary: checkin),
-                            ),
-                          ),
+                          ...data.checkins
+                              .take(3)
+                              .map(
+                                (checkin) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _CheckinSummaryTile(summary: checkin),
+                                ),
+                              ),
                       ],
                     ),
                   ),
@@ -3970,7 +4742,8 @@ class _StudentCheckinsScreenState extends State<StudentCheckinsScreen> {
                   HeroHeader(
                     palette: palette,
                     kicker: 'Daily Check-in',
-                    title: 'Sleep, mood, stress, energy, body, and connection.',
+                    title:
+                        'Sleep, mood, stress, energy, physical symptoms, and support.',
                     subtitle:
                         'Adaptive check-ins powered by the live backend template and your saved profile.',
                     actions: [
@@ -4776,11 +5549,11 @@ StudentWeeklySummary _buildEmptyWeeklySummary({
           ? 'No energy trend yet.'
           : 'Initial energy data is being collected.',
       'physical_trend': checkinCount == 0
-          ? 'No physical wellbeing trend yet.'
-          : 'Initial physical wellbeing data is being collected.',
+          ? 'No physical symptoms trend yet.'
+          : 'Initial physical symptoms data is being collected.',
       'connectedness_trend': checkinCount == 0
-          ? 'No connectedness trend yet.'
-          : 'Initial connectedness data is being collected.',
+          ? 'No support trend yet.'
+          : 'Initial support data is being collected.',
       'module_progress': checkinCount == 0
           ? 'Start with a daily check-in or a learning card.'
           : 'Keep going to build a clearer weekly picture.',

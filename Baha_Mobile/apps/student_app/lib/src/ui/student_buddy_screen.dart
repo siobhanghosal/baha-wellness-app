@@ -12,11 +12,42 @@ class StudentBuddyScreen extends StatefulWidget {
   const StudentBuddyScreen({
     required this.apiClient,
     required this.identity,
+    this.heroKicker = 'BAHA Buddy',
+    this.heroTitle = 'A calm place to talk things through.',
+    this.heroSubtitle =
+        'Ask questions, share how your day feels, or talk through something on your mind.',
+    this.startSectionTitle = 'Start a conversation',
+    this.startSectionSubtitle = 'Open a new chat whenever you want support.',
+    this.startButtonLabel = 'Start new chat',
+    this.sessionsSectionTitle = 'Recent sessions',
+    this.sessionsSectionSubtitle = 'Pick up where you left off.',
+    this.emptySessionsMessage =
+        'No chats yet. Start one above when you are ready.',
+    this.sessionType = 'general_support',
+    this.chatScreenTitle = 'Buddy',
+    this.chatInputHint = 'Message Buddy',
+    this.emptyConversationMessage =
+        'Your conversation will appear here.',
+    this.assistantName = 'Buddy',
     super.key,
   });
 
   final BahaApiClient apiClient;
   final DevelopmentIdentity identity;
+  final String heroKicker;
+  final String heroTitle;
+  final String heroSubtitle;
+  final String startSectionTitle;
+  final String startSectionSubtitle;
+  final String startButtonLabel;
+  final String sessionsSectionTitle;
+  final String sessionsSectionSubtitle;
+  final String emptySessionsMessage;
+  final String sessionType;
+  final String chatScreenTitle;
+  final String chatInputHint;
+  final String emptyConversationMessage;
+  final String assistantName;
 
   @override
   State<StudentBuddyScreen> createState() => _StudentBuddyScreenState();
@@ -46,6 +77,7 @@ class _StudentBuddyScreenState extends State<StudentBuddyScreen> {
     try {
       final session = await widget.apiClient.createChatSession(
         identity: widget.identity,
+        request: ChatSessionCreateRequest(sessionType: widget.sessionType),
       );
       if (!mounted) {
         return;
@@ -55,6 +87,10 @@ class _StudentBuddyScreenState extends State<StudentBuddyScreen> {
           apiClient: widget.apiClient,
           identity: widget.identity,
           session: session,
+          screenTitle: widget.chatScreenTitle,
+          inputHint: widget.chatInputHint,
+          emptyConversationMessage: widget.emptyConversationMessage,
+          assistantName: widget.assistantName,
         ),
       );
       await _refresh();
@@ -74,31 +110,38 @@ class _StudentBuddyScreenState extends State<StudentBuddyScreen> {
         apiClient: widget.apiClient,
         identity: widget.identity,
         session: session,
+        screenTitle: widget.chatScreenTitle,
+        inputHint: widget.chatInputHint,
+        emptyConversationMessage: widget.emptyConversationMessage,
+        assistantName: widget.assistantName,
       ),
     );
     await _refresh();
   }
 
   Future<void> _pushThemedRoute({required WidgetBuilder builder}) async {
-    final controller = ThemeScope.of(context);
+    final controller = ThemeScope.maybeOf(context);
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (context) => ThemeScope(
-          controller: controller,
-          child: AnimatedBuilder(
-            animation: controller,
-            builder: (context, _) => builder(context),
-          ),
-        ),
+        builder: (context) => controller == null
+            ? builder(context)
+            : ThemeScope(
+                controller: controller,
+                child: AnimatedBuilder(
+                  animation: controller,
+                  builder: (context, _) => builder(context),
+                ),
+              ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final themeController = ThemeScope.maybeOf(context);
     final palette = appPaletteForTheme(
-      ThemeScope.of(context).colorTheme,
-      isDark: ThemeScope.of(context).isDark,
+      themeController?.colorTheme ?? AppColorTheme.growth,
+      isDark: themeController?.isDark ?? false,
     );
     return Theme(
       data: buildTheme(palette),
@@ -163,10 +206,9 @@ class _StudentBuddyScreenState extends State<StudentBuddyScreen> {
                   ),
                   HeroHeader(
                     palette: palette,
-                    kicker: 'BAHA Buddy',
-                    title: 'A companion, not a clinician.',
-                    subtitle:
-                        'Start a private support conversation backed by the live BAHA backend chat runtime.',
+                    kicker: widget.heroKicker,
+                    title: widget.heroTitle,
+                    subtitle: widget.heroSubtitle,
                     actions: [
                       const Pill(
                         icon: Icons.verified_rounded,
@@ -185,12 +227,12 @@ class _StudentBuddyScreenState extends State<StudentBuddyScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SectionTitle(
-                          title: 'Start chatting',
-                          subtitle: 'Create a new real Buddy conversation.',
+                        SectionTitle(
+                          title: widget.startSectionTitle,
+                          subtitle: widget.startSectionSubtitle,
                         ),
                         AnimatedPrimaryButton(
-                          label: 'Start new Buddy chat',
+                          label: widget.startButtonLabel,
                           icon: Icons.chat_rounded,
                           onPressed: _startSession,
                         ),
@@ -203,13 +245,13 @@ class _StudentBuddyScreenState extends State<StudentBuddyScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SectionTitle(
-                          title: 'Recent sessions',
-                          subtitle: 'Live session list from the API.',
+                        SectionTitle(
+                          title: widget.sessionsSectionTitle,
+                          subtitle: widget.sessionsSectionSubtitle,
                         ),
                         if (sessions.isEmpty)
                           Text(
-                            'No Buddy sessions yet. Start the first one above.',
+                            widget.emptySessionsMessage,
                             style: Theme.of(context).textTheme.bodyLarge,
                           )
                         else
@@ -293,17 +335,194 @@ class _StudentBuddyScreenState extends State<StudentBuddyScreen> {
   }
 }
 
+class StudentBuddyDirectScreen extends StatefulWidget {
+  const StudentBuddyDirectScreen({
+    required this.apiClient,
+    required this.identity,
+    this.sessionType = 'general_support',
+    this.screenTitle = 'Buddy',
+    this.inputHint = 'Message Buddy',
+    this.emptyConversationMessage = 'Your conversation will appear here.',
+    this.assistantName = 'Buddy',
+    super.key,
+  });
+
+  final BahaApiClient apiClient;
+  final DevelopmentIdentity identity;
+  final String sessionType;
+  final String screenTitle;
+  final String inputHint;
+  final String emptyConversationMessage;
+  final String assistantName;
+
+  @override
+  State<StudentBuddyDirectScreen> createState() =>
+      _StudentBuddyDirectScreenState();
+}
+
+class _StudentBuddyDirectScreenState extends State<StudentBuddyDirectScreen> {
+  bool _launching = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_openLatestOrCreate());
+    });
+  }
+
+  Future<void> _openLatestOrCreate() async {
+    try {
+      final sessions = await widget.apiClient.listChatSessions(
+        identity: widget.identity,
+      );
+      ChatSessionSummary session;
+      if (sessions.isNotEmpty) {
+        final sorted = [...sessions]..sort((a, b) {
+          final aDate = a.lastMessageAt ?? a.startedAt;
+          final bDate = b.lastMessageAt ?? b.startedAt;
+          return bDate.compareTo(aDate);
+        });
+        session = sorted.first;
+      } else {
+        session = await widget.apiClient.createChatSession(
+          identity: widget.identity,
+          request: ChatSessionCreateRequest(sessionType: widget.sessionType),
+        );
+      }
+      if (!mounted) {
+        return;
+      }
+      final controller = ThemeScope.maybeOf(context);
+      final route = MaterialPageRoute<void>(
+        builder: (context) => controller == null
+            ? StudentBuddyChatScreen(
+                apiClient: widget.apiClient,
+                identity: widget.identity,
+                session: session,
+                screenTitle: widget.screenTitle,
+                inputHint: widget.inputHint,
+                emptyConversationMessage: widget.emptyConversationMessage,
+                assistantName: widget.assistantName,
+              )
+            : ThemeScope(
+                controller: controller,
+                child: AnimatedBuilder(
+                  animation: controller,
+                  builder: (context, _) => StudentBuddyChatScreen(
+                    apiClient: widget.apiClient,
+                    identity: widget.identity,
+                    session: session,
+                    screenTitle: widget.screenTitle,
+                    inputHint: widget.inputHint,
+                    emptyConversationMessage: widget.emptyConversationMessage,
+                    assistantName: widget.assistantName,
+                  ),
+                ),
+              ),
+      );
+      await Navigator.of(context).pushReplacement(route);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _launching = false;
+        _errorMessage = '$error';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final themeController = ThemeScope.maybeOf(context);
+    final palette = appPaletteForTheme(
+      themeController?.colorTheme ?? AppColorTheme.growth,
+      isDark: themeController?.isDark ?? false,
+    );
+    return Theme(
+      data: buildTheme(palette),
+      child: AnimatedGradientScaffold(
+        palette: palette,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: GlassPanel(
+              palette: palette,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_launching) ...[
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Opening Buddy...',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Getting your conversation ready.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  ] else ...[
+                    Text(
+                      'Buddy could not open right now',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _errorMessage ?? 'Please try again.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _launching = true;
+                          _errorMessage = null;
+                        });
+                        unawaited(_openLatestOrCreate());
+                      },
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Try again'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class StudentBuddyChatScreen extends StatefulWidget {
   const StudentBuddyChatScreen({
     required this.apiClient,
     required this.identity,
     required this.session,
+    this.screenTitle = 'Buddy Chat',
+    this.inputHint = 'Talk to BAHA Buddy',
+    this.emptyConversationMessage =
+        'No messages yet. Start the conversation with BAHA Buddy.',
+    this.assistantName = 'Buddy',
     super.key,
   });
 
   final BahaApiClient apiClient;
   final DevelopmentIdentity identity;
   final ChatSessionSummary session;
+  final String screenTitle;
+  final String inputHint;
+  final String emptyConversationMessage;
+  final String assistantName;
 
   @override
   State<StudentBuddyChatScreen> createState() => _StudentBuddyChatScreenState();
@@ -550,9 +769,10 @@ class _StudentBuddyChatScreenState extends State<StudentBuddyChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeController = ThemeScope.maybeOf(context);
     final palette = appPaletteForTheme(
-      ThemeScope.of(context).colorTheme,
-      isDark: ThemeScope.of(context).isDark,
+      themeController?.colorTheme ?? AppColorTheme.growth,
+      isDark: themeController?.isDark ?? false,
     );
     return Theme(
       data: buildTheme(palette),
@@ -570,7 +790,7 @@ class _StudentBuddyChatScreenState extends State<StudentBuddyChatScreen> {
                   ),
                   Expanded(
                     child: Text(
-                      'Buddy Chat',
+                      widget.screenTitle,
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w900,
@@ -593,6 +813,9 @@ class _StudentBuddyChatScreenState extends State<StudentBuddyChatScreen> {
                         palette: palette,
                         controller: _scrollController,
                         loadingFrame: _loadingFrame,
+                        emptyConversationMessage:
+                            widget.emptyConversationMessage,
+                        assistantName: widget.assistantName,
                       );
                     }
                     if (snapshot.connectionState != ConnectionState.done) {
@@ -637,6 +860,9 @@ class _StudentBuddyChatScreenState extends State<StudentBuddyChatScreen> {
                       palette: palette,
                       controller: _scrollController,
                       loadingFrame: _loadingFrame,
+                      emptyConversationMessage:
+                          widget.emptyConversationMessage,
+                      assistantName: widget.assistantName,
                     );
                   },
                 ),
@@ -657,8 +883,8 @@ class _StudentBuddyChatScreenState extends State<StudentBuddyChatScreen> {
                           controller: _messageController,
                           minLines: 1,
                           maxLines: 4,
-                          decoration: const InputDecoration(
-                            hintText: 'Talk to BAHA Buddy',
+                          decoration: InputDecoration(
+                            hintText: widget.inputHint,
                           ),
                         ),
                       ),
@@ -688,12 +914,16 @@ class _ChatMessageList extends StatelessWidget {
     required this.palette,
     required this.controller,
     required this.loadingFrame,
+    required this.emptyConversationMessage,
+    required this.assistantName,
   });
 
   final List<MobileChatMessage> messages;
   final PrototypePalette palette;
   final ScrollController controller;
   final int loadingFrame;
+  final String emptyConversationMessage;
+  final String assistantName;
 
   @override
   Widget build(BuildContext context) {
@@ -703,9 +933,7 @@ class _ChatMessageList extends StatelessWidget {
         children: [
           GlassPanel(
             palette: palette,
-            child: const Text(
-              'No messages yet. Start the conversation with BAHA Buddy.',
-            ),
+            child: Text(emptyConversationMessage),
           ),
         ],
       );
@@ -723,7 +951,7 @@ class _ChatMessageList extends StatelessWidget {
             message.messageType == 'assistant_pending';
         final displayedBody = isPendingAssistant
             ? (message.body.isEmpty
-                  ? 'Buddy is thinking${'.' * (loadingFrame + 1)}'
+                  ? '$assistantName is thinking${'.' * (loadingFrame + 1)}'
                   : '${message.body}  ')
             : message.body;
         return Align(
@@ -738,7 +966,7 @@ class _ChatMessageList extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isUser ? 'You' : 'Buddy',
+                    isUser ? 'You' : assistantName,
                     style: theme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),

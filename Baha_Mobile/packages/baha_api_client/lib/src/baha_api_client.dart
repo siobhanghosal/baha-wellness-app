@@ -67,11 +67,12 @@ class BahaApiClient {
 
   Future<AuthOnboardingState> getOnboardingState({
     required DevelopmentIdentity identity,
+    String entryMode = 'session',
   }) async {
-    final response = await _httpClient.get(
-      Uri.parse('$_baseUrl/auth/onboarding-state'),
-      headers: _headers(identity),
-    );
+    final uri = Uri.parse(
+      '$_baseUrl/auth/onboarding-state',
+    ).replace(queryParameters: <String, String>{'entry_mode': entryMode});
+    final response = await _httpClient.get(uri, headers: _headers(identity));
     final payload = _decodeMap(response);
     _ensureSuccess(response.statusCode, payload);
     return AuthOnboardingState.fromJson(payload);
@@ -108,6 +109,57 @@ class BahaApiClient {
     final payload = _decodeMap(response);
     _ensureSuccess(response.statusCode, payload);
     return MobileActor.fromJson(payload);
+  }
+
+  Future<StudentLinkingState> getStudentLinkingState({
+    required DevelopmentIdentity identity,
+  }) async {
+    final response = await _httpClient.get(
+      Uri.parse('$_baseUrl/mobile/student/linking-state'),
+      headers: _headers(identity),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
+    return StudentLinkingState.fromJson(payload);
+  }
+
+  Future<StudentLinkingState> generateStudentLinkingCode({
+    required DevelopmentIdentity identity,
+  }) async {
+    final response = await _httpClient.post(
+      Uri.parse('$_baseUrl/mobile/student/linking-code'),
+      headers: _headers(identity),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
+    return StudentLinkingState.fromJson(payload);
+  }
+
+  Future<StudentLinkingState> updateStudentParentSummarySharing({
+    required DevelopmentIdentity identity,
+    required StudentParentSummarySharingRequest request,
+  }) async {
+    final response = await _httpClient.post(
+      Uri.parse('$_baseUrl/mobile/student/parent-summary-sharing'),
+      headers: _headers(identity),
+      body: jsonEncode(request.toJson()),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
+    return StudentLinkingState.fromJson(payload);
+  }
+
+  Future<StudentLinkingState> unpairStudentGuardian({
+    required DevelopmentIdentity identity,
+    required String guardianId,
+  }) async {
+    final response = await _httpClient.delete(
+      Uri.parse('$_baseUrl/mobile/student/guardians/$guardianId'),
+      headers: _headers(identity),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
+    return StudentLinkingState.fromJson(payload);
   }
 
   Future<StudentWeeklySummary> getStudentWeeklySummary({
@@ -408,7 +460,9 @@ class BahaApiClient {
     }
 
     await for (final line
-        in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
+        in response.stream
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())) {
       final trimmed = line.trim();
       if (trimmed.isEmpty) {
         continue;
@@ -450,6 +504,18 @@ class BahaApiClient {
     final payload = _decodeMap(response);
     _ensureSuccess(response.statusCode, payload);
     return AuthOnboardingState.fromJson(payload);
+  }
+
+  Future<void> unpairGuardianStudent({
+    required DevelopmentIdentity identity,
+    required String studentProfileId,
+  }) async {
+    final response = await _httpClient.delete(
+      Uri.parse('$_baseUrl/mobile/parent/students/$studentProfileId/link'),
+      headers: _headers(identity),
+    );
+    final payload = _decodeMap(response);
+    _ensureSuccess(response.statusCode, payload);
   }
 
   Future<ParentWeeklySummary> getParentWeeklySummary({

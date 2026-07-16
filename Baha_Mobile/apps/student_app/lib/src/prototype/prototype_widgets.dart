@@ -648,9 +648,13 @@ class MiniLineChart extends StatelessWidget {
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: labels.isNotEmpty,
+                interval: 1,
                 reservedSize: 28,
                 getTitlesWidget: (value, meta) {
                   final index = value.toInt();
+                  if ((value - index).abs() > 0.001) {
+                    return const SizedBox.shrink();
+                  }
                   if (index < 0 || index >= labels.length) {
                     return const SizedBox.shrink();
                   }

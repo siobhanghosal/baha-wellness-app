@@ -4,7 +4,7 @@ import importlib
 import json
 import shutil
 import tempfile
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -13,7 +13,14 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from baha_rag.auth import ActorContext, TokenIdentity, get_actor_context, get_provisioning_identity
+from baha_rag.auth import (
+    ActorContext,
+    TokenIdentity,
+    build_dev_password_metadata,
+    get_actor_context,
+    get_provisioning_identity,
+    verify_dev_password,
+)
 from baha_rag.config import Settings, get_settings
 from baha_rag.dashboard.metrics import DashboardService
 from baha_rag.db.auth_repository import AuthRepository
@@ -56,6 +63,7 @@ from baha_rag.schemas import (
     HelpRequestResponse,
     IngestResponse,
     IngestUrlRequest,
+    LinkRemovalResponse,
     MobileChatExchangeResponse,
     MobileChatMessage,
     MobileChatMessageCreateRequest,
@@ -81,6 +89,9 @@ from baha_rag.schemas import (
     ReviewDecisionRequest,
     StudentCheckinDetail,
     StudentCheckinSummary,
+    LinkedGuardianSummary,
+    StudentLinkingStateResponse,
+    StudentParentSummarySharingRequest,
     StudentWeeklySummaryResponse,
     TeacherClassStudentSummary,
     TeacherClassSummary,
@@ -218,6 +229,19 @@ def _derive_legal_consent_band(request: AuthBootstrapRequest) -> str:
     return "minor"
 
 
+def _dev_identity_password_is_valid(
+    *,
+    identity: TokenIdentity,
+    account: dict | None,
+) -> bool:
+    if not identity.is_dev_identity or account is None:
+        return True
+    metadata = account.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+    return verify_dev_password(identity.password, metadata)
+
+
 def _derive_student_age_cohort(request: AuthBootstrapRequest) -> str:
     if request.age_cohort:
         return request.age_cohort
@@ -268,9 +292,19 @@ async def _build_onboarding_state(
         linked_student_count = await repository.count_active_linked_students_for_guardian(guardian_id=account["guardian_id"])
     if primary_role == "student" and account["student_profile_id"] is not None:
         linked_guardian_count = await repository.count_active_guardian_links_for_student(student_profile_id=account["student_profile_id"])
-        guardian_link_verification_code = await repository.ensure_student_guardian_link_code(
-            student_profile_id=account["student_profile_id"]
-        )
+        if account["legal_consent_band"] == "minor" and linked_guardian_count == 0:
+            guardian_link_verification_code = await repository.ensure_student_guardian_link_code(
+                student_profile_id=account["student_profile_id"]
+            )
+        else:
+            code_state = await repository.get_student_guardian_link_code_state(
+                student_profile_id=account["student_profile_id"]
+            )
+            guardian_link_verification_code = (
+                code_state.get("guardian_link_verification_code")
+                if code_state
+                else None
+            )
 
     if primary_role in {"teacher", "counselor", "administrator"}:
         approval_row = await repository.get_latest_approval_request(
@@ -525,6 +559,11 @@ async def auth_bootstrap(
     repository = AuthRepository(session)
     existing = await repository.get_account_context_by_external_auth_id(identity.subject)
     identity_match_mode = "external_auth_id"
+    if existing is not None and not _dev_identity_password_is_valid(
+        identity=identity,
+        account=existing,
+    ):
+        raise HTTPException(status_code=401, detail="Incorrect sign-in ID or password")
     if existing is None and identity.email:
         email_count = await repository.count_users_by_email(identity.email)
         if email_count > 1:
@@ -567,6 +606,8 @@ async def auth_bootstrap(
         "bootstrap_source": "auth_bootstrap",
         **request.metadata,
     }
+    if identity.is_dev_identity and identity.password:
+        metadata.update(build_dev_password_metadata(identity.password))
     user_id = await repository.upsert_user(
         user_id=existing["user_id"] if existing else None,
         external_auth_id=identity.subject,
@@ -627,10 +668,16 @@ async def auth_bootstrap(
 async def auth_onboarding_state(
     identity: TokenIdentity = Depends(get_provisioning_identity),
     session: AsyncSession = Depends(get_session),
+    entry_mode: str = "session",
 ) -> AuthOnboardingStateResponse:
     repository = AuthRepository(session)
     account = await repository.get_account_context_by_external_auth_id(identity.subject)
     if account is not None:
+        if entry_mode != "register" and not _dev_identity_password_is_valid(
+            identity=identity,
+            account=account,
+        ):
+            raise HTTPException(status_code=401, detail="Incorrect sign-in ID or password")
         return await _build_onboarding_state(
             repository,
             identity_match_mode="external_auth_id",
@@ -692,20 +739,24 @@ async def auth_guardian_link_student(
     )
     if student is None:
         raise HTTPException(status_code=404, detail="Student not found")
-    if student["legal_consent_band"] != "minor":
-        raise HTTPException(
-            status_code=400,
-            detail="Only under-18 student accounts require parent linking in this flow",
-        )
+    metadata = student.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        metadata = {}
     expected_code = _normalize_verification_code(
-        (student.get("metadata") or {}).get("guardian_link_verification_code")
-        if isinstance(student.get("metadata"), dict)
-        else None
+        metadata.get("guardian_link_verification_code")
     )
+    expires_at_raw = str(metadata.get("guardian_link_code_expires_at") or "").strip()
     provided_code = _normalize_verification_code(request.verification_code)
-    if not expected_code:
-        expected_code = await repository.ensure_student_guardian_link_code(
-            student_profile_id=student["student_profile_id"]
+    expires_at = None
+    if expires_at_raw:
+        try:
+            expires_at = datetime.fromisoformat(expires_at_raw.replace("Z", "+00:00"))
+        except ValueError:
+            expires_at = None
+    if not expected_code or expires_at is None or expires_at <= datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=403,
+            detail="Verification code is missing or expired. Ask the student to generate a new code.",
         )
     if provided_code != expected_code:
         raise HTTPException(
@@ -752,6 +803,18 @@ async def auth_guardian_platform_participation_consent_status(
     )
     if link is None or not link["consent_authority"]:
         raise HTTPException(status_code=403, detail="Guardian does not have active consent authority for this student")
+    if student["legal_consent_band"] != "minor":
+        return AuthPlatformParticipationConsentResponse(
+            consent_version_id=None,
+            student_profile_id=student["student_profile_id"],
+            guardian_id=actor.guardian_id,
+            status="granted",
+            scope="platform_access",
+            actor_relationship=link["relationship_to_student"],
+            granted_at=None,
+            withdrawn_at=None,
+            created_at=None,
+        )
     consent_row = await repository.get_latest_platform_participation_consent(
         student_user_id=student["student_user_id"]
     )
@@ -795,6 +858,11 @@ async def auth_guardian_platform_participation_consent(
     )
     if student is None:
         raise HTTPException(status_code=404, detail="Student not found")
+    if student["legal_consent_band"] != "minor":
+        raise HTTPException(
+            status_code=400,
+            detail="Platform participation approval is only required for under-18 students",
+        )
     link = await repository.get_active_guardian_link(
         student_profile_id=student["student_profile_id"],
         guardian_id=actor.guardian_id,
@@ -997,6 +1065,104 @@ async def mobile_me(actor: ActorContext = Depends(get_actor_context)) -> MobileA
         school_name=actor.school_name,
         user_metadata=actor.user_metadata,
         student_metadata=actor.student_metadata,
+    )
+
+
+@router.get("/mobile/student/linking-state", response_model=StudentLinkingStateResponse)
+async def mobile_student_linking_state(
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> StudentLinkingStateResponse:
+    _require_student(actor)
+    row = await MobileAppRepository(session).get_student_linking_state(
+        student_profile_id=actor.student_profile_id
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Student linking state not found")
+    return StudentLinkingStateResponse.model_validate(row)
+
+
+@router.post("/mobile/student/linking-code", response_model=StudentLinkingStateResponse)
+async def mobile_student_linking_code(
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> StudentLinkingStateResponse:
+    _require_student(actor)
+    row = await MobileAppRepository(session).issue_student_guardian_link_code(
+        student_profile_id=actor.student_profile_id
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Student linking state not found")
+    await session.commit()
+    return StudentLinkingStateResponse.model_validate(row)
+
+
+@router.post("/mobile/student/parent-summary-sharing", response_model=StudentLinkingStateResponse)
+async def mobile_student_parent_summary_sharing(
+    request: StudentParentSummarySharingRequest,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> StudentLinkingStateResponse:
+    _require_student(actor)
+    row = await MobileAppRepository(session).set_student_parent_summary_sharing(
+        student_profile_id=actor.student_profile_id,
+        enabled=request.enabled,
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Student linking state not found")
+    await session.commit()
+    return StudentLinkingStateResponse.model_validate(row)
+
+
+@router.delete(
+    "/mobile/student/guardians/{guardian_id}",
+    response_model=StudentLinkingStateResponse,
+)
+async def mobile_student_unpair_guardian(
+    guardian_id: UUID,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> StudentLinkingStateResponse:
+    _require_student(actor)
+    repository = MobileAppRepository(session)
+    removed = await repository.deactivate_student_guardian_link(
+        student_profile_id=actor.student_profile_id,
+        guardian_id=guardian_id,
+    )
+    if not removed:
+        raise HTTPException(status_code=404, detail="Active guardian link not found")
+    await session.commit()
+    row = await repository.get_student_linking_state(
+        student_profile_id=actor.student_profile_id
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Student linking state not found")
+    return StudentLinkingStateResponse.model_validate(row)
+
+
+@router.delete(
+    "/mobile/parent/students/{student_profile_id}/link",
+    response_model=LinkRemovalResponse,
+)
+async def mobile_parent_unpair_student(
+    student_profile_id: UUID,
+    actor: ActorContext = Depends(get_actor_context),
+    session: AsyncSession = Depends(get_session),
+) -> LinkRemovalResponse:
+    _require_guardian(actor)
+    repository = MobileAppRepository(session)
+    removed = await repository.deactivate_student_guardian_link(
+        student_profile_id=student_profile_id,
+        guardian_id=actor.guardian_id,
+    )
+    if not removed:
+        raise HTTPException(status_code=404, detail="Active student link not found")
+    await session.commit()
+    return LinkRemovalResponse(
+        student_profile_id=student_profile_id,
+        guardian_id=actor.guardian_id,
+        removed=True,
+        message="Parent and student link removed",
     )
 
 
@@ -1424,6 +1590,7 @@ async def mobile_create_chat_message(
                 if actor.app_audience == "student"
                 else actor.app_audience
             ),
+            age_cohort=actor.age_cohort,
             filters=request.filters,
         ),
         retriever=retriever,
@@ -1556,6 +1723,7 @@ async def mobile_create_chat_message_stream(
             if actor.app_audience == "student"
             else actor.app_audience
         ),
+        age_cohort=actor.age_cohort,
         filters=request.filters,
     )
     history = [

@@ -7,25 +7,28 @@ import 'package:student_app/src/ui/student_identity_screen.dart';
 import 'package:student_app/src/ui/student_ready_screen.dart';
 
 void main() {
-  testWidgets('shows unified role-first identity prompt when no session exists', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: StudentIdentityScreen(
-          defaultExternalAuthId: '',
-          defaultAuthEmail: '',
-          apiBaseUrl: 'http://10.0.2.2:8000',
-          onSubmit: _noop,
+  testWidgets(
+    'shows unified role-first identity prompt when no session exists',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StudentIdentityScreen(
+            defaultExternalAuthId: '',
+            defaultPassword: '',
+            apiBaseUrl: 'http://10.0.2.2:8000',
+            onSubmit: _noop,
+          ),
         ),
-      ),
-    );
+      );
 
-    expect(find.text('One app, role-based experience'), findsOneWidget);
-    expect(find.text('Continue to sign in'), findsOneWidget);
+      expect(find.text('One app, role-based experience'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Sign in'), findsOneWidget);
 
-    await tester.pump(const Duration(seconds: 2));
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpAndSettle();
-  });
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets('breathing tool starts immediately and shows active controls', (
     tester,

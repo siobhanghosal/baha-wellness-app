@@ -2,14 +2,14 @@
 
 ## Purpose
 
-This directory now contains the real Flutter monorepo for the BAHA mobile suite.
+This directory now contains the real Flutter monorepo for the BAHA mobile prototype.
 
-It follows the PRD requirement that BAHA ships as four separate apps on a shared codebase:
+The current product implementation is a single unified Flutter app with role-based experiences for:
 
-- Student App
-- Parent App
-- Teacher App
-- BAHA/Counselor App
+- Student
+- Parent or guardian
+- Teacher
+- BAHA/Counselor
 
 Primary backend and flow references:
 
@@ -24,9 +24,6 @@ Primary backend and flow references:
 Baha_Mobile/
   apps/
     student_app/
-    parent_app/
-    teacher_app/
-    counselor_app/
   packages/
     baha_design_system/
     baha_api_client/
@@ -77,15 +74,21 @@ Implemented now:
   - deeper student flows now use retryable screen-specific error states instead of raw fallback failures
   - the Learn experience now organizes backend content into continue/recommended/recent/quick-guide sections with richer content-block rendering
   - the Explore learning cards are now meant to open focused theme lanes instead of one generic Learn list
-- parent app feature slice 1:
+- unified role experiences inside the same app:
   - guardian dev identity bootstrap
+  - guardian-to-student linking with student ID + verification code
+  - parent-style Home shell after linking instead of a single admin-style page
+  - parent-shell live theme persistence
   - linked-student list
   - parent-safe weekly summary
+  - parent starter learning lanes with local mini-module progress
+  - student practice checklists with capped custom user-entered items
+  - parent Buddy sessions with parent-guidance defaults
   - parent resources feed and resource detail
   - guardian summary-sharing consent status and updates
   - platform participation consent action
-  - support contacts in settings
-- teacher and counselor placeholder shells
+  - support contacts in profile/settings
+  - teacher and counselor role placeholders inside the unified shell
 
 Student vertical slice 1 currently supports:
 
@@ -114,8 +117,8 @@ Student feature slice 2 currently supports:
    - energy
    - mood
    - stress
-   - physical wellbeing
-   - connectedness
+   - physical symptoms
+   - support
 
 Student feature slice 3 currently supports:
 
@@ -123,6 +126,10 @@ Student feature slice 3 currently supports:
 2. `GET /mobile/content/{content_item_id}`
 3. `GET /mobile/student/modules`
 4. `POST /mobile/student/modules/{module_id}/progress`
+5. `GET /mobile/student/linking-state`
+6. `POST /mobile/student/linking-code`
+7. `POST /mobile/student/parent-summary-sharing`
+8. `DELETE /mobile/student/guardians/{guardian_id}`
 
 Student feature slice 4 currently supports:
 
@@ -173,22 +180,41 @@ Student corrective UI rewrite currently supports:
    - recently opened lane
    - quick guides and prompts lane
    - richer backend block rendering for module/content detail
-   - theme-focused Learn entry points for Sleep, Digital Wellness, Peer Pressure, and Exam Stress
+   - theme-focused Learn entry points for Sleep, Stress, Bullying, Healthy Gaming, and Alcohol Safety
+   - minimum three modules per topic across every student age cohort
+   - quick support cards across every topic for every student age cohort
+8. student settings/privacy controls for:
+   - visible student ID
+   - short-lived six-digit parent/guardian pairing code generation
+   - student-controlled parent summary sharing toggle
 
-Parent feature slice 1 currently supports:
+Unified guardian role slice currently supports:
 
 1. splash and session restore
 2. development identity capture using `X-BAHA-External-Auth-Id`
 3. `GET /auth/onboarding-state`
 4. `GET /mobile/me`
-5. `GET /mobile/parent/students`
-6. `GET /mobile/parent/students/{student_profile_id}/weekly-summary/latest`
-7. `GET /mobile/content/feed`
-8. `GET /mobile/content/{content_item_id}`
-9. `GET /auth/guardian/consent/parent-summary-sharing/{student_profile_id}`
-10. `POST /auth/guardian/consent/parent-summary-sharing`
-11. `POST /auth/guardian/consent/platform-participation`
-12. `GET /mobile/support-contacts`
+5. `POST /auth/guardian/link-student`
+6. `GET /mobile/parent/students`
+7. `GET /mobile/parent/students/{student_profile_id}/weekly-summary/latest`
+8. `GET /mobile/content/feed`
+9. `GET /mobile/content/{content_item_id}`
+10. `GET /auth/guardian/consent/parent-summary-sharing/{student_profile_id}`
+11. `POST /auth/guardian/consent/parent-summary-sharing`
+12. `GET /auth/guardian/consent/platform-participation/{student_profile_id}`
+13. `POST /auth/guardian/consent/platform-participation`
+14. `GET /mobile/support-contacts`
+15. blocked-state UX for:
+   - student not linked yet
+   - student has not enabled summary sharing
+   - guardian summary consent still pending
+16. explicit unpair actions from both sides with confirmation:
+   - parent can remove the current child link from the parent home
+   - student can remove linked parents/guardians from student settings
+17. mirrored parent learning experience with:
+   - the same five headline topics
+   - multi-module parent-facing guidance tracks
+   - quick support cards per topic
 
 ## Package Responsibilities
 
@@ -216,21 +242,14 @@ cd Baha_Mobile/apps/student_app
 flutter pub get
 ```
 
-Install parent app dependencies:
-
-```bash
-cd Baha_Mobile/apps/parent_app
-flutter pub get
-```
-
-Run student app against local backend from Android emulator:
+Run the unified app against local backend from Android emulator:
 
 ```bash
 flutter run \
   --dart-define=BAHA_API_BASE_URL=http://10.0.2.2:8000
 ```
 
-Run student app against local backend from a physical Android device on the same network:
+Run the unified app against local backend from a physical Android device on the same network:
 
 ```bash
 flutter run \
@@ -243,23 +262,14 @@ Optional demo identity hints:
 flutter run \
   --dart-define=BAHA_API_BASE_URL=http://10.0.2.2:8000 \
   --dart-define=BAHA_DEV_EXTERNAL_AUTH_ID=supabase-student-demo \
-  --dart-define=BAHA_DEV_AUTH_EMAIL=student.demo@baha.local
-```
-
-Run parent app against local backend from Android emulator:
-
-```bash
-flutter run \
-  --dart-define=BAHA_API_BASE_URL=http://10.0.2.2:8000 \
-  --dart-define=BAHA_DEV_EXTERNAL_AUTH_ID=supabase-guardian-demo \
-  --dart-define=BAHA_DEV_AUTH_EMAIL=guardian.demo@baha.local
+  --dart-define=BAHA_DEV_PASSWORD=BahaDemo123!
 ```
 
 ## Verified Baseline
 
 Verified in this workspace:
 
-- all packages and apps resolve dependencies
+- the unified app and shared packages resolve dependencies
 - all packages and apps pass analysis
 - Dart unit tests pass
 - Flutter widget tests pass
@@ -290,6 +300,6 @@ Verified in this workspace:
 
 Build next in this order:
 
-1. teacher app first real slice
-2. counselor app first real slice
-3. polish or tighten any remaining student micro-interactions discovered during device testing
+1. teacher role first real slice inside the unified app
+2. counselor role first real slice inside the unified app
+3. polish or tighten any remaining student and guardian micro-interactions discovered during device testing

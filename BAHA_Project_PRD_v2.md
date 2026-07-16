@@ -11,6 +11,8 @@
 **Prepared By:** Siobhan Kumar Ghosal, Sudharshan Srinivasan, Solomon Karuppiah  
 **Mentors:** Prof. Ruby Dinakar, Prof. Deepa S
 
+**Implementation Note (July 15, 2026):** The live demo prototype now uses one unified Flutter app with role-based student, parent/guardian, teacher, and counselor experiences inside a single mobile shell. References below to separate apps reflect the earlier product structuring model and should be interpreted as separate role surfaces within that unified app unless and until this PRD is fully revised.
+
 ---
 
 # 1. Executive Summary

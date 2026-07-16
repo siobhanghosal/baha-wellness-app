@@ -169,4 +169,93 @@ void main() {
     expect(riskFlags(points: points, profile: null), isEmpty);
     expect(dailyStateHeadline(points), 'No check-in entries yet.');
   });
+
+  test('chart labels use actual check-in dates instead of weekdays only', () {
+    final detail = StudentCheckinDetail.fromJson(const {
+      'id': 'resp-2',
+      'template_id': 'tmpl-1',
+      'template_key': 'daily_student_pulse_v2_15_18',
+      'title': 'Daily Wellbeing Pulse',
+      'status': 'submitted',
+      'source_mode': 'daily_optional',
+      'visibility_scope': 'private',
+      'submitted_at': '2026-07-14T12:00:00Z',
+      'answers': [
+        {
+          'question_id': 'q1',
+          'question_key': 'sleep_last_night',
+          'prompt': 'How did you sleep last night?',
+          'dimension': 'sleep',
+          'question_type': 'choice',
+          'numeric_value': 2,
+          'selected_options': ['okay'],
+          'normalized_value': {
+            'score': 2,
+            'label': 'Okay',
+            'dimension': 'sleep',
+            'is_core': true,
+          },
+        },
+      ],
+    });
+
+    final points = buildTrendPointsFromDetails([detail]);
+    expect(chartLabels(points), ['14 Jul']);
+  });
+
+  test('personalized prompts adapt to age band and factor phrasing', () {
+    final question = MobileCheckinQuestion.fromJson(const {
+      'id': 'support-q',
+      'question_key': 'connected_today',
+      'dimension': 'connectedness',
+      'question_type': 'choice',
+      'prompt': 'How connected do you feel today?',
+      'response_config': {'choices': []},
+      'is_required': true,
+      'ordinal': 1,
+      'metadata': {},
+    });
+
+    const childProfile = StudentWellbeingProfile(
+      ageBand: '9_12',
+      genderIdentity: 'male',
+      trustedSupportPerson: 'parent_guardian',
+      schoolDaySleepQuality: 'okay',
+      usualEnergy: 'okay',
+      weeklyStressFrequency: 'sometimes',
+      mainPressure: 'school',
+      mainPhysicalIssue: 'none',
+      experiencesPeriods: 'no',
+      copingStyle: 'talk_to_someone',
+      helpSeekingEase: 'mixed',
+      socialConnectedness: 'mostly_connected',
+      supportPreference: 'quick_tips',
+      checkinFocus: 'no_preference',
+    );
+    const olderProfile = StudentWellbeingProfile(
+      ageBand: '18_plus',
+      genderIdentity: 'female',
+      trustedSupportPerson: 'friend',
+      schoolDaySleepQuality: 'okay',
+      usualEnergy: 'okay',
+      weeklyStressFrequency: 'sometimes',
+      mainPressure: 'school',
+      mainPhysicalIssue: 'none',
+      experiencesPeriods: 'yes',
+      copingStyle: 'talk_to_someone',
+      helpSeekingEase: 'mixed',
+      socialConnectedness: 'mostly_connected',
+      supportPreference: 'quick_tips',
+      checkinFocus: 'no_preference',
+    );
+
+    expect(
+      personalizedPromptForQuestion(question, childProfile),
+      'How supported did you feel by people around you today?',
+    );
+    expect(
+      personalizedPromptForQuestion(question, olderProfile),
+      'How supported, included, or understood did you feel today?',
+    );
+  });
 }

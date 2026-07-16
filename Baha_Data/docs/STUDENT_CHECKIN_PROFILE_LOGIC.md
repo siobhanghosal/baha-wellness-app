@@ -68,7 +68,7 @@ Baseline wellbeing:
 
 Social and help context:
 
-- usual connectedness to friends or classmates
+- usual support / connectedness with friends or classmates
 - ease of asking for help
 
 Physical context:
@@ -127,10 +127,15 @@ The current daily pulse is built around six stable factors:
 2. energy
 3. mood
 4. stress
-5. physical wellbeing
-6. connectedness
+5. physical symptoms
+6. support
 
 This is the part that should remain broadly comparable over time.
+
+These labels are intentionally more clinically meaningful than the older `body` and `connection` wording:
+
+- `physical symptoms` captures headaches, stomach issues, pain, fatigue spillover, or other body-based discomfort
+- `support` captures whether the student felt supported, included, or understood by people around them
 
 ### 6.1 Core Daily Questions
 
@@ -172,8 +177,9 @@ The app now personalizes question wording by age band.
 
 Examples:
 
-- older adolescents see wording like "How much stress or worry are you carrying today?"
-- younger users keep slightly simpler phrasing like "How stressed or worried do you feel today?"
+- ages `9_12` see simple wording like "How are your feelings today?"
+- ages `13_14` keep plain wording like "How stressed or worried do you feel today?"
+- ages `15_18` and `18_plus` get more nuanced wording like "How much stress, pressure, or worry are you carrying today?"
 
 The important constraint is:
 
@@ -197,18 +203,22 @@ From repeated check-ins, the app can infer:
 - sleep strain patterns
 - stress persistence
 - mood dips over multiple days
-- low connectedness trends
-- physical discomfort patterns when the onboarding context suggests they matter more
+- lower-support trends across repeated entries
+- physical symptom patterns when the onboarding context suggests they matter more
+- linked patterns such as:
+  - sleep plus energy
+  - stress plus mood
+  - support plus mood
 
 ### 8.2 Example Product Flags
 
 Current demo-facing flags include:
 
-- `Sleep strain repeating`
-- `Stress elevated across days`
-- `Mood dip needs attention`
-- `Connection feels low`
-- `Physical discomfort pattern visible`
+- `Sleep strain has repeated`
+- `Stress has stayed elevated`
+- `Mood has been lower more than once`
+- `Support has felt low on recent days`
+- `Physical symptoms kept showing up`
 
 These are support signals only.
 
@@ -226,8 +236,8 @@ The student graphs should reflect the actual six tracked factors:
 - energy
 - mood
 - stress
-- physical wellbeing
-- connectedness
+- physical symptoms
+- support
 
 The graphs should not show placeholder categories that are not actually being collected.
 
@@ -236,6 +246,8 @@ Current UI behavior:
 - if no real check-ins have been submitted yet, the student dashboard should stay in an explicit empty state
 - trend cards and graphs should only appear once actual entries exist
 - first-use weekly summary placeholders are acceptable, but fake chart lines are not
+- the dashboard overview should explain that the `Overall pulse` graph is a combined strain pattern, not a clinical score
+- recent dashboard review should stay trimmed to the latest few real check-ins instead of overwhelming the student
 
 ## 10. Backend Contract Used By This Logic
 
@@ -258,6 +270,8 @@ For this product, this is the right balance:
 - keep onboarding concise but meaningful
 - keep the daily pulse to six stable factors
 - allow only a few targeted follow-ups
+- keep the factor names product-friendly, but specific enough to mean something real
+- let tone vary by age band while keeping factor scoring stable underneath
 - keep all interpretation non-clinical
 - intervene based on repeated patterns, not one isolated bad day
 

@@ -53,7 +53,7 @@ That means the current prototype can be reused as a design system and screen ref
 
 - real onboarding and consent gating
 - real account approval flow
-- counselor app surface
+- counselor role surface
 - role-safe published content feeds for parent, teacher, and BAHA
 - pilot analytics and command-center metrics
 - student trend summary endpoint for the dashboard
@@ -70,12 +70,16 @@ These do not need backend ownership yet:
 
 ## 4. Recommended Frontend Architecture
 
-Use one shared Flutter workspace, but build it as four app targets:
+Use one shared Flutter workspace with one production app target:
 
-- `student_app`
-- `parent_app`
-- `teacher_app`
-- `counselor_app`
+- `student_app` as the unified BAHA app shell
+
+Inside that app, keep role-based experiences for:
+
+- student
+- parent or guardian
+- teacher
+- counselor
 
 Shared packages should contain:
 
@@ -86,11 +90,11 @@ Shared packages should contain:
 - auth/session plumbing
 - shared content rendering blocks
 
-Do not share:
+Do not flatten:
 
-- navigation shells across all apps
 - stakeholder-specific task flows
-- student interaction language with parent, teacher, or counselor surfaces
+- student interaction language into parent, teacher, or counselor surfaces
+- privacy boundaries between role experiences just because they now live inside one app
 
 The existing `Solomon_UI_Version1` branch is best treated as:
 
@@ -100,29 +104,24 @@ The existing `Solomon_UI_Version1` branch is best treated as:
 
 It should not be treated as the final navigation, auth, or backend integration structure.
 
-## 4.1 Story World Branch Audit
+## 4.1 Archived Story World Branch Audit
 
-The teammate branch adds one substantial game-like feature called `Story World`.
+The teammate branch added a game-like feature called `Story World`.
 
-Useful parts:
+For the current unified demo prototype, Story World should be treated as
+archived reference material rather than active product scope.
 
-- world-based student game framing
-- typed free-text interaction
-- persistent location progression
-- strong student-facing visual/game shell ideas
+What remains useful from that branch:
 
-Unsafe parts to merge directly:
+- visual/game-shell inspiration
+- pacing ideas for future guided activities
+- examples of a more narrative student interaction surface
 
-- OpenAI-dependent story generation
-- detached `X-Story-Player-Key` identity
-- separate game-player storage not linked to current student auth
-- a backend/auth direction that conflicts with the current branch
+What should not be treated as active implementation:
 
-Decision:
-
-- keep `Story World` as a reference feature concept
-- do not merge its backend/runtime directly
-- rebuild it on top of the current BAHA identity, consent, and student game schema
+- Story World backend/runtime assumptions
+- Story World identity model
+- Story World API surfaces
 
 ## 5. Screen Mapping By App
 
@@ -161,7 +160,7 @@ Decision:
   - `POST /mobile/chat/sessions`
   - `GET /mobile/chat/sessions/{session_id}/messages`
   - `POST /mobile/chat/sessions/{session_id}/messages`
-  - backend generation is now retrieval-grounded and can use local `Ollama` + `qwen3:4b` without changing the Flutter Buddy UI
+  - backend generation is now OpenAI-backed, with retrieval used only when grounding is helpful, without changing the Flutter Buddy UI
 - help pathway:
   - `POST /mobile/student/help-requests`
   - `GET /mobile/support-contacts`
@@ -181,10 +180,11 @@ Decision:
 - badge and level visuals
 - theme switching
 
-Planned next game slice:
+Current activity scope:
 
-- `Story World` is now the first backend-aware student game after being reworked to fit the current backend and local-LLM roadmap documented in
-  [STORY_WORLD_AND_GAMES_PLAN.md](./STORY_WORLD_AND_GAMES_PLAN.md)
+- Comet Sequence
+- Calm Breathing
+- Focus Catch
 
 #### Implemented so far in the real Flutter workspace
 
@@ -205,9 +205,10 @@ Planned next game slice:
 - the student reference Learn cards should now be treated as theme entries, not
   generic links:
   - Sleep Reset -> `theme=Sleep`
-  - Digital Wellness -> `theme=Digital Wellness`
-  - Peer Pressure -> `theme=Peer Pressure`
-  - Exam Stress -> `theme=Exam Stress`
+  - Stress Reset -> `theme=Stress`
+  - Bullying and Boundaries -> `theme=Bullying`
+  - Healthy Gaming -> `theme=Healthy Gaming`
+  - Alcohol Safety -> `theme=Alcohol Safety`
 - student module and content detail rendering now supports richer block-driven presentation from the backend:
   - headings
   - bullet lists
@@ -241,7 +242,7 @@ Planned next game slice:
 Important constraint for the game slice:
 
 - the first game runtime should extend the current `game_sessions` and student identity model
-- it should not introduce a parallel player-key identity or an external OpenAI dependency
+- it should not introduce a parallel player-key identity
 
 Content strategy note:
 
@@ -276,8 +277,11 @@ Content strategy note:
 #### Implemented so far in the real Flutter workspace
 
 - development identity bootstrap
+- guardian Home / Learn / Buddy / Profile shell inside the unified app
 - guardian linked-student picker
 - parent-safe weekly summary view
+- parent starter learning lanes with local mini-module progress
+- parent Buddy sessions using the live backend chat runtime with parent-guidance defaults
 - parent resource list and detail view
 - summary-sharing consent read and update flow
 - platform participation consent action

@@ -437,6 +437,7 @@ class BuddyChatService:
         history: list[dict[str, str]],
         grounded: bool,
     ) -> BuddyDraftAnswer | None:
+        conversation_mode = self._conversation_mode(request.message)
         payload = {
             "model": self.settings.buddy_openai_model,
             "instructions": (
@@ -458,7 +459,10 @@ class BuddyChatService:
                     "schema": self._openai_output_schema(),
                 }
             },
-            "max_output_tokens": 240,
+            "max_output_tokens": self._max_output_tokens_for_mode(
+                conversation_mode,
+                grounded=grounded,
+            ),
             "reasoning": {"effort": "minimal"},
         }
         if self._http_client is not None:
@@ -507,6 +511,7 @@ class BuddyChatService:
         history: list[dict[str, str]],
         grounded: bool,
     ) -> AsyncIterator[str]:
+        conversation_mode = self._conversation_mode(request.message)
         payload = {
             "model": self.settings.buddy_openai_model,
             "instructions": (
@@ -522,7 +527,10 @@ class BuddyChatService:
                 grounded=grounded,
             ),
             "stream": True,
-            "max_output_tokens": 240,
+            "max_output_tokens": self._max_output_tokens_for_mode(
+                conversation_mode,
+                grounded=grounded,
+            ),
             "reasoning": {"effort": "minimal"},
             "text": {
                 "format": {"type": "text"},
@@ -833,6 +841,11 @@ class BuddyChatService:
             "Use remembered session context so the conversation feels continuous and attentive. "
             "If the user asks what they said earlier, answer from the remembered context and visible history directly. "
             "Keep the tone concise, natural, and human, not robotic. "
+            "Do not keep repeating the same validating opener. Vary how you begin, and often skip explicit validation entirely. "
+            "Do not default to phrases like 'I'm really glad you told me' unless the user disclosed something genuinely vulnerable, risky, or painful. "
+            "If the user only says hello or thanks, reply very briefly like a real chat companion would. "
+            "For a simple hello, a one-line warm reply is enough. "
+            "If the user is venting, respond like a good listener first, then offer at most one gentle next step or one short question. "
             "Return only valid JSON with the exact keys: "
             "answerable_from_corpus, what_it_is, how_to_identify_it, what_to_do, when_to_seek_help. "
             "Set answerable_from_corpus to true for this conversational mode. "
@@ -846,7 +859,8 @@ class BuddyChatService:
             "Do not diagnose or invent facts. "
             "Use remembered session context so the reply stays continuous across turns. "
             "If the evidence is limited, say that simply and stay conservative. "
-            "Write 3 to 6 short sentences total, as a normal chat reply."
+            "Avoid repetitive empathy phrases and sound like a real person, not a script. "
+            "Write 2 to 5 short sentences total, as a normal chat reply."
         )
 
     def _openai_conversational_text_system_prompt(self) -> str:
@@ -856,7 +870,58 @@ class BuddyChatService:
             "You can have light conversation, acknowledge feelings, and offer gentle wellbeing-oriented next steps. "
             "Use remembered session context so the user feels heard across multiple turns. "
             "If the question is outside your main wellbeing role, answer briefly and redirect kindly. "
+            "Do not start every reply with a heavy validation phrase. Vary the opening and keep greetings very short. "
+            "Do not keep opening with 'I'm really glad you told me' unless the user shared something genuinely painful, scary, or high-stakes. "
+            "If the user just says hello, answer naturally in one short line and stop there unless they ask for more. "
+            "If the user is just venting, reflect briefly and ask one simple follow-up or offer one next step. "
             "Keep the reply concise, human, and no more than 4 short sentences."
+        )
+
+    def _audience_support_instruction(self, audience: str) -> str:
+        if audience == "parent":
+            return (
+                "Speak to the user as a parent or guardian supporting a child. "
+                "Prefer calm parenting guidance, conversation starters, routine support, and practical next steps. "
+                "Do not speak as if the parent is the child."
+            )
+        if audience == "teacher":
+            return (
+                "Speak to the user as a teacher or school adult supporting a student. "
+                "Prefer observable, supportive, non-diagnostic guidance and school-safe next steps."
+            )
+        if audience == "counselor":
+            return (
+                "Speak to the user as a support professional using calm, bounded, operational guidance."
+            )
+        return (
+            "Speak to the user as a young person seeking support, using simple, warm, direct language."
+        )
+
+    def _age_style_instruction(self, audience: str, age_cohort: str | None) -> str:
+        if audience != "adolescent":
+            return "Use clear, calm, production-quality language."
+        if age_cohort == "9_12":
+            return (
+                "Use short sentences, simple words, and one idea at a time. "
+                "Sound warm and reassuring, not clinical or abstract."
+            )
+        if age_cohort == "13_14":
+            return (
+                "Use plain, age-appropriate language. "
+                "Keep the tone supportive and easy to follow without sounding childish."
+            )
+        if age_cohort == "15_18":
+            return (
+                "Use natural teen-friendly language. "
+                "You can be a little more nuanced, but keep it concise and emotionally clear."
+            )
+        if age_cohort == "18_plus":
+            return (
+                "Use calm, natural, more mature language. "
+                "You can be slightly more nuanced while staying concise."
+            )
+        return (
+            "Use warm, direct language that is easy to understand and not overly clinical."
         )
 
     def _openai_input_block(
@@ -868,6 +933,7 @@ class BuddyChatService:
         history: list[dict[str, str]],
         grounded: bool,
     ) -> str:
+        conversation_mode = self._conversation_mode(request.message)
         evidence_block = (
             "Use only the following approved evidence snippets:\n\n"
             f"{self._openai_evidence_block(evidence)}"
@@ -876,6 +942,7 @@ class BuddyChatService:
         )
         return (
             f"Audience: {request.audience}\n"
+            f"Age cohort: {request.age_cohort or 'unknown'}\n"
             f"Detected topic: {condition}\n"
             f"User question: {request.message}\n"
             "Remembered session context:\n"
@@ -885,12 +952,43 @@ class BuddyChatService:
             "Response style:\n"
             "- sound calm, warm, and human\n"
             "- keep it concise\n"
-            "- prefer 2 to 4 sentences total worth of content per field, not essays\n"
+            "- prefer 1 to 4 sentences total worth of content per field, not essays\n"
+            f"- conversation mode: {conversation_mode}\n"
+            "- do not use the same opening phrase every turn\n"
             "- no diagnosis\n"
             f"- {'no invented facts beyond the evidence' if grounded else 'no diagnosis and no pretending to know private details'}\n"
             f"- {'if the evidence is weak, set answerable_from_corpus to false' if grounded else 'keep the support general and emotionally intelligent'}\n\n"
+            "Audience-specific guidance:\n"
+            f"- {self._audience_support_instruction(request.audience)}\n"
+            f"- {self._age_style_instruction(request.audience, request.age_cohort)}\n\n"
+            "Turn-specific guidance:\n"
+            f"- {self._conversation_mode_instruction(conversation_mode)}\n\n"
             f"{evidence_block}"
         )
+
+    def _conversation_mode_instruction(self, mode: str) -> str:
+        if mode == "social":
+            return (
+                "Reply in 1 or 2 short sentences. A simple greeting, thanks, or check-in is enough. "
+                "Do not jump into a long advice message."
+            )
+        if mode == "supportive":
+            return (
+                "Respond like a steady listener first. Reflect briefly, avoid sounding scripted, "
+                "and end with at most one short question or one manageable next step."
+            )
+        return (
+            "If the user is asking for help or guidance, answer directly and clearly without sounding lecture-like."
+        )
+
+    def _max_output_tokens_for_mode(self, mode: str, *, grounded: bool) -> int:
+        if mode == "social":
+            return 48
+        if grounded:
+            return 160
+        if mode == "supportive":
+            return 120
+        return 140
 
     def _history_block(self, history: list[dict[str, str]]) -> str:
         sanitized = self._sanitize_history(

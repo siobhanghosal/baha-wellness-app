@@ -292,7 +292,7 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
               palette: palette,
               title: 'Physical context',
               subtitle:
-                  'Only asked because it changes how physical wellbeing answers get interpreted later.',
+                  'Only asked because it changes how physical symptom answers get interpreted later.',
               children: [
                 if (_shouldAskPeriodsQuestion) ...[
                   _ChoiceField(

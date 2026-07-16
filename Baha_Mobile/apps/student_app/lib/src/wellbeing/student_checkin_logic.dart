@@ -205,42 +205,47 @@ List<double> chartValuesForFactor(
 ) {
   return points
       .map((point) => point.factorScores[factorKey] ?? point.overallScore)
+      .map(_displayChartValue)
       .map((value) => double.parse(value.toStringAsFixed(2)))
       .toList();
 }
 
 List<double> overallChartValues(List<WellbeingTrendPoint> points) {
   return points
-      .map((point) => double.parse(point.overallScore.toStringAsFixed(2)))
+      .map((point) => _displayChartValue(point.overallScore))
+      .map((value) => double.parse(value.toStringAsFixed(2)))
       .toList();
 }
 
 List<String> chartLabels(List<WellbeingTrendPoint> points) {
-  return points.map((point) => _weekdayLabel(point.date.weekday)).toList();
+  return points.map((point) => _shortDateLabel(point.date)).toList();
 }
+
+double _displayChartValue(double rawScore) => (4 - rawScore).clamp(0, 4);
 
 List<String> riskFlags({
   required List<WellbeingTrendPoint> points,
   required StudentWellbeingProfile? profile,
 }) {
-  final source = points;
+  final source = points.length > 5 ? points.sublist(points.length - 5) : points;
   final flags = <String>[];
-  if (_countAtOrAbove(source, 'sleep', 3) >= 3) {
-    flags.add('Sleep strain repeating');
+  if (_countAtOrAbove(source, 'sleep', 3) >= 2) {
+    flags.add('Sleep strain has repeated');
   }
-  if (_consecutiveAtOrAbove(source, 'stress', 3, 2)) {
-    flags.add('Stress elevated across days');
+  if (_averageAtOrAbove(source, 'stress', 2.6) ||
+      _consecutiveAtOrAbove(source, 'stress', 3, 2)) {
+    flags.add('Stress has stayed elevated');
   }
-  if (_consecutiveAtOrAbove(source, 'mood', 3, 2)) {
-    flags.add('Mood dip needs attention');
+  if (_averageAtOrAbove(source, 'mood', 2.6)) {
+    flags.add('Mood has been lower more than once');
   }
-  if (_consecutiveAtOrAbove(source, 'connectedness', 3, 2)) {
-    flags.add('Connection feels low');
+  if (_averageAtOrAbove(source, 'connectedness', 2.6)) {
+    flags.add('Support has felt low on recent days');
   }
   if (profile != null &&
       profile.profileTags.contains('somatic_signal_prone') &&
       _countAtOrAbove(source, 'physical_wellbeing', 3) >= 2) {
-    flags.add('Physical discomfort pattern visible');
+    flags.add('Physical symptoms kept showing up');
   }
   return flags.take(3).toList();
 }
@@ -302,7 +307,7 @@ String dailyStateHeadline(List<WellbeingTrendPoint> points) {
   }
   final descriptor = _factorDescriptor(highest.key);
   if (highest.value >= 3) {
-    return '${descriptor.label} is the biggest strain signal today.';
+    return '${descriptor.label} is the strongest strain signal today.';
   }
   if (latest.overallScore < 1.4) {
     return 'Today looks fairly steady overall.';
@@ -327,57 +332,97 @@ String personalizedPromptForQuestion(
   StudentWellbeingProfile profile,
 ) {
   final ageBand = profile.ageBand;
-  final older = ageBand == '15_18' || ageBand == '18_plus';
+  final younger = ageBand == '9_12';
+  final middle = ageBand == '13_14';
   switch (question.questionKey) {
     case 'sleep_last_night':
-      return older
-          ? 'How was your sleep last night?'
-          : 'How did you sleep last night?';
-    case 'energy_today':
-      return older
-          ? 'How is your energy level today?'
-          : 'How is your energy today?';
-    case 'mood_today':
-      return older
-          ? 'How has your mood felt today?'
-          : 'How is your mood today?';
-    case 'stress_today':
-      return older
-          ? 'How much stress or worry are you carrying today?'
-          : 'How stressed or worried do you feel today?';
-    case 'body_today':
-      return older
-          ? 'How is your body feeling today overall?'
-          : 'How does your body feel today?';
-    case 'connected_today':
-      return older
-          ? 'How connected or supported do you feel today?'
-          : 'How supported or connected do you feel today?';
-    case 'sleep_reason':
-      return older
-          ? 'What was the main reason sleep felt off?'
-          : 'What was the biggest reason your sleep felt bad?';
-    case 'energy_reason':
-      return older
-          ? 'What seems to explain the low energy most?'
-          : 'What best explains the low energy?';
-    case 'hardest_today':
-      return older
-          ? 'What felt heaviest or hardest today?'
-          : 'What felt hardest today?';
-    case 'body_reason':
-      if (profile.experiencesPeriods == 'yes') {
-        return older
-            ? 'What physical issue stood out most today?'
-            : 'What bothered you most physically today?';
+      if (younger) {
+        return 'How did you sleep last night?';
       }
-      return older
-          ? 'What physical issue stood out most today?'
-          : 'What bothered you most physically?';
+      if (middle) {
+        return 'How was your sleep last night?';
+      }
+      return 'How rested did you feel after your sleep last night?';
+    case 'energy_today':
+      if (younger) {
+        return 'How much energy do you have today?';
+      }
+      if (middle) {
+        return 'How is your energy today?';
+      }
+      return 'How is your energy level today?';
+    case 'mood_today':
+      if (younger) {
+        return 'How are your feelings today?';
+      }
+      if (middle) {
+        return 'How has your mood felt today?';
+      }
+      return 'How has your mood felt for most of today?';
+    case 'stress_today':
+      if (younger) {
+        return 'How worried or stressed do you feel today?';
+      }
+      if (middle) {
+        return 'How stressed or worried do you feel today?';
+      }
+      return 'How much stress, pressure, or worry are you carrying today?';
+    case 'body_today':
+      if (younger) {
+        return 'How is your body feeling today?';
+      }
+      if (middle) {
+        return 'How is your body feeling today overall?';
+      }
+      return 'How much are physical symptoms or body discomfort bothering you today?';
+    case 'connected_today':
+      if (younger) {
+        return 'How supported did you feel by people around you today?';
+      }
+      if (middle) {
+        return 'How supported or connected did you feel today?';
+      }
+      return 'How supported, included, or understood did you feel today?';
+    case 'sleep_reason':
+      if (younger) {
+        return 'What was the biggest reason your sleep felt off?';
+      }
+      if (middle) {
+        return 'What was the main reason sleep felt off?';
+      }
+      return 'What seems most likely to have disrupted your sleep?';
+    case 'energy_reason':
+      if (younger) {
+        return 'What best explains the low energy?';
+      }
+      if (middle) {
+        return 'What seems to explain the low energy most?';
+      }
+      return 'What seems most likely to explain the lower energy today?';
+    case 'hardest_today':
+      if (younger) {
+        return 'What felt hardest today?';
+      }
+      if (middle) {
+        return 'What felt hardest today?';
+      }
+      return 'What felt heaviest or hardest to handle today?';
+    case 'body_reason':
+      if (younger) {
+        return 'What bothered your body the most today?';
+      }
+      if (middle) {
+        return 'What physical issue stood out most today?';
+      }
+      return 'Which physical symptom or discomfort stood out most today?';
     case 'support_today':
-      return older
-          ? 'Would any support be useful right now?'
-          : 'Would you like support today?';
+      if (younger) {
+        return 'Would support from someone help today?';
+      }
+      if (middle) {
+        return 'Would any support be useful right now?';
+      }
+      return 'Would any support or a check-in from someone help right now?';
     default:
       return question.prompt;
   }
@@ -411,13 +456,13 @@ _FactorDescriptor _factorDescriptor(String factorKey) {
       );
     case 'physical_wellbeing':
       return const _FactorDescriptor(
-        label: 'Body',
+        label: 'Physical symptoms',
         color: Color(0xFF0EA5E9),
         icon: Icons.favorite_rounded,
       );
     case 'connectedness':
       return const _FactorDescriptor(
-        label: 'Connection',
+        label: 'Support',
         color: Color(0xFFEC4899),
         icon: Icons.groups_2_rounded,
       );
@@ -528,24 +573,24 @@ String _trendSummary({
   final descriptor = _factorDescriptor(factorKey);
   final delta = previousValue == null ? 0 : value - previousValue;
   final severity = value >= 3
-      ? 'high'
+      ? 'elevated'
       : value >= 2
-      ? 'moderate'
+      ? 'mixed'
       : 'steady';
   final direction = delta >= 0.35
-      ? 'worsening'
+      ? 'rising'
       : delta <= -0.35
-      ? 'improving'
-      : 'steady';
+      ? 'easing'
+      : 'holding steady';
   if (factorKey == 'sleep' &&
       profile?.profileTags.contains('sleep_vulnerable') == true) {
-    return '${descriptor.label} looks $severity and $direction against this student’s sleep-sensitive baseline.';
+    return '${descriptor.label} looks $severity and is $direction against this student\'s usual sleep baseline.';
   }
   if (factorKey == 'stress' &&
       profile?.profileTags.contains('school_pressure_driven') == true) {
-    return '${descriptor.label} looks $severity, with school pressure likely to matter most.';
+    return '${descriptor.label} looks $severity, and school pressure may be a main driver.';
   }
-  return '${descriptor.label} looks $severity and $direction across recent check-ins.';
+  return '${descriptor.label} looks $severity and is $direction across recent check-ins.';
 }
 
 int _countAtOrAbove(
@@ -578,22 +623,53 @@ bool _consecutiveAtOrAbove(
   return false;
 }
 
-String _weekdayLabel(int weekday) {
-  switch (weekday) {
-    case DateTime.monday:
-      return 'Mon';
-    case DateTime.tuesday:
-      return 'Tue';
-    case DateTime.wednesday:
-      return 'Wed';
-    case DateTime.thursday:
-      return 'Thu';
-    case DateTime.friday:
-      return 'Fri';
-    case DateTime.saturday:
-      return 'Sat';
-    case DateTime.sunday:
-      return 'Sun';
+bool _averageAtOrAbove(
+  List<WellbeingTrendPoint> points,
+  String factorKey,
+  double threshold,
+) {
+  final values = points
+      .map((point) => point.factorScores[factorKey])
+      .whereType<double>()
+      .toList();
+  if (values.isEmpty) {
+    return false;
+  }
+  final average = values.reduce((left, right) => left + right) / values.length;
+  return average >= threshold;
+}
+
+String _shortDateLabel(DateTime date) {
+  final local = date.toLocal();
+  return '${local.day} ${_monthLabel(local.month)}';
+}
+
+String _monthLabel(int month) {
+  switch (month) {
+    case 1:
+      return 'Jan';
+    case 2:
+      return 'Feb';
+    case 3:
+      return 'Mar';
+    case 4:
+      return 'Apr';
+    case 5:
+      return 'May';
+    case 6:
+      return 'Jun';
+    case 7:
+      return 'Jul';
+    case 8:
+      return 'Aug';
+    case 9:
+      return 'Sep';
+    case 10:
+      return 'Oct';
+    case 11:
+      return 'Nov';
+    case 12:
+      return 'Dec';
     default:
       return '';
   }

@@ -17,6 +17,11 @@ The goal is to transform the corpus into:
 
 All of that should stay evidence-linked, age-appropriate, and easy to review.
 
+For the concrete `9-12` lesson-packaging blueprint based on the current sample
+content, see:
+
+- [AGE_9_12_CONTENT_DELIVERY_BLUEPRINT.md](./AGE_9_12_CONTENT_DELIVERY_BLUEPRINT.md)
+
 ## 2. Current Reality
 
 The repo currently has two very different content layers:
@@ -37,40 +42,42 @@ That distinction is correct and should remain.
 
 The app should never try to function by reading raw corpus files directly.
 
-## 3. What The Corpus Is Strong At
+## 3. Current Product Theme Set
 
-The current corpus is already strong enough to support richer student learning
-in some areas:
+The active student learning model in the unified app now uses the same five
+topics across cohorts:
 
-- `digital wellness`
-  - especially from Common Sense Media and Internet Matters
-- `communication skills`
-- `decision making`
-- `emotional intelligence`
-- `problem solving`
-- broader SEL and school-support content
+- `Sleep`
+- `Stress`
+- `Bullying`
+- `Healthy Gaming`
+- `Alcohol Safety`
 
-These are the best themes to lean on for deeper and more confident course
-experiences early.
+That five-topic set is now the source of truth for product-facing student
+learning.
 
-## 4. What The Corpus Is Still Weak At
+The larger raw corpus is still useful in adjacent areas such as digital
+wellness, communication, emotional intelligence, and decision making, but those
+ideas should now be absorbed into the five active topics instead of surfacing
+as separate theme labels in the app.
 
-The inventory and campaign reports still flag important gaps for student-facing
-themes:
+## 4. What That Means For Content Packaging
 
-- `peer pressure`
-- `exam stress`
-- `friendship issues`
-- `self awareness`
-- `performance anxiety`
-- `sleep`
+The practical consequence is:
 
-That does not mean these app themes should be removed. It means they should be
-treated more carefully:
+- `Healthy Gaming`
+  becomes the place where digital-balance and screen-habit material lives
+- `Stress`
+  absorbs school pressure, performance strain, and self-management material
+- `Bullying`
+  becomes the main home for friendship harm, exclusion, and social safety
+- `Sleep`
+  remains a foundational regulation lane
+- `Alcohol Safety`
+  stays a governed safety-and-boundaries lane
 
-- start with curated and reviewed manual content
-- keep the learning slices shorter
-- expand them later as direct source coverage improves
+Where the raw corpus is thin for a topic, we should keep using reviewed,
+product-written starter content and expand the lane over time.
 
 ## 5. Recommended Product Structure
 
@@ -87,9 +94,10 @@ In practical BAHA terms:
 
 - `Theme`
   - Sleep
-  - Digital Wellness
-  - Peer Pressure
-  - Exam Stress
+  - Stress
+  - Bullying
+  - Healthy Gaming
+  - Alcohol Safety
 - `Learning lane`
   - the filtered in-app experience for one theme
 - `Module`
@@ -147,6 +155,14 @@ Not:
 - open long text
 - scroll
 - leave
+
+For `9-12` specifically, this should be implemented as:
+
+- one topic hub
+- one learning lane per topic
+- `3 to 5` micro-modules
+- one practice interaction
+- topic-level completion and a soft reward
 
 ## 8. Recommended Preprocessing Workflow
 
@@ -207,12 +223,13 @@ It should not replace the curated product-content layer.
 
 ## 10. Current Student Theme Strategy
 
-| Theme | Current corpus posture | Recommended product approach |
+| Theme | Current product posture | Recommended product approach |
 | --- | --- | --- |
-| Sleep | Useful but still underdeveloped | foundational module + checklist |
-| Digital Wellness | Strongest coverage area | deeper lane with more cards and variations |
-| Peer Pressure | Direct evidence coverage still thin | short reviewed manual starter + later expansion |
-| Exam Stress | Gap area | short reviewed manual starter + later expansion |
+| Sleep | Foundational regulation lane | deeper multi-module lane + routines + reflection |
+| Stress | Broadest daily-life relevance | strongest narrative lane across age bands |
+| Bullying | High safeguarding relevance | clear boundaries, help-seeking, and bystander content |
+| Healthy Gaming | Strong evidence-adjacent coverage | practical balance tools and routines |
+| Alcohol Safety | Safety-critical starter lane | concise, reviewed, age-sensitive scenario guidance |
 
 ## 11. Changes Implemented In This Repo
 
@@ -230,23 +247,49 @@ This repo now moves closer to the right structure:
   - `current_step_ordinal`
   - `total_sections`
   - `total_steps`
-- new curated student seed content now exists for:
-  - Peer Pressure
-  - Exam Stress
 - richer text rendering is now tuned for reading comfort on device
+- the first `9_12` learning-lane implementation now exists in the repo:
+  - Sleep
+  - Stress
+  - Bullying
+  - Healthy Gaming
+  - Alcohol Safety
+- the same five-topic structure is now also seeded for:
+  - `13_14`
+  - `15_18`
+  - `18_plus`
+- those lanes currently include:
+  - three backend-published modules per topic
+  - one backend-published quick support item per topic
+  - child-facing lane titles
+  - topic-level progress presentation in the Flutter UI
+  - a small saved-practice interaction in the Flutter UI
+
+Important current limitation:
+
+- this first `9_12` implementation now reaches the lower bound of the intended
+  lane depth, but it is still not the final polished curriculum
+- the biggest remaining need is richer variation within modules:
+  - more scenario content
+  - more age-tuned interactivity
+  - less dependence on repeated explanation patterns across topics
 
 ## 12. What Should Happen Next
 
 The next content-focused steps should be:
 
-1. expand `Digital Wellness` into the deepest student lane first
-2. expand `Sleep` next
-3. keep `Peer Pressure` and `Exam Stress` as concise reviewed starter lanes
-4. later add:
+1. deepen `Sleep` and `Stress` first because they connect most clearly to daily check-in trends
+2. expand `Bullying`, `Healthy Gaming`, and `Alcohol Safety` with more scenario variation
+3. later add:
    - section read endpoints
    - richer scenario content
    - citation surfaces for counselor/admin review
    - stronger age-band adaptation
+4. package the new `9-12` content sample into guided topic lanes rather than
+   long lessons
+5. roll module progress up into topic completion so the student sees real
+   momentum
+6. add gentle topic-completion rewards instead of heavy gamification
 
 ## 13. External Pattern References
 

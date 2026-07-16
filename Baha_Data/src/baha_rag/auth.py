@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from base64 import b64decode, b64encode
 from dataclasses import dataclass
+import hashlib
+import hmac
+import secrets
 from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException
@@ -16,6 +20,11 @@ from baha_rag.identity import ActorContext
 class TokenIdentity:
     subject: str
     email: str | None = None
+    password: str | None = None
+    is_dev_identity: bool = False
+
+
+_DEV_PASSWORD_ITERATIONS = 200_000
 
 
 def _parse_user_id(raw_user_id: str) -> UUID:
@@ -31,6 +40,7 @@ async def get_actor_context(
     authorization: str | None = Header(default=None),
     x_baha_user_id: str | None = Header(default=None),
     x_baha_external_auth_id: str | None = Header(default=None),
+    x_baha_dev_password: str | None = Header(default=None),
 ) -> ActorContext:
     token_identity = await _identity_from_authorization(authorization, settings)
 
@@ -46,6 +56,10 @@ async def get_actor_context(
         actor = await repository.get_actor_context_by_user_id(_parse_user_id(x_baha_user_id))
     elif x_baha_external_auth_id:
         actor = await repository.get_actor_context_by_external_auth_id(x_baha_external_auth_id)
+        _require_dev_password_for_actor(
+            actor=actor,
+            password=x_baha_dev_password,
+        )
     elif token_identity:
         actor = await repository.get_actor_context_by_external_auth_id(token_identity.subject)
         if actor is None and token_identity.email:
@@ -78,12 +92,23 @@ async def get_provisioning_identity(
     authorization: str | None = Header(default=None),
     x_baha_external_auth_id: str | None = Header(default=None),
     x_baha_auth_email: str | None = Header(default=None),
+    x_baha_dev_password: str | None = Header(default=None),
 ) -> TokenIdentity:
     token_identity = await _identity_from_authorization(authorization, settings)
     if token_identity is not None:
         return token_identity
     if settings.allow_dev_identity_headers and x_baha_external_auth_id:
-        return TokenIdentity(subject=x_baha_external_auth_id, email=x_baha_auth_email)
+        if not x_baha_dev_password or not x_baha_dev_password.strip():
+            raise HTTPException(
+                status_code=401,
+                detail="Password is required for development identity sign-in",
+            )
+        return TokenIdentity(
+            subject=x_baha_external_auth_id,
+            email=x_baha_auth_email,
+            password=x_baha_dev_password,
+            is_dev_identity=True,
+        )
     raise HTTPException(
         status_code=401,
         detail="Provide a valid bearer token or a development external auth identity for auth bootstrap routes",
@@ -135,3 +160,59 @@ async def _identity_from_authorization(
         raise HTTPException(status_code=401, detail="Bearer token is missing a subject claim")
     email = payload.get("email")
     return TokenIdentity(subject=str(subject), email=str(email) if email else None)
+
+
+def build_dev_password_metadata(password: str) -> dict[str, object]:
+    salt = secrets.token_bytes(16)
+    password_hash = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt,
+        _DEV_PASSWORD_ITERATIONS,
+    )
+    return {
+        "dev_auth": {
+            "mode": "id_password",
+            "salt_b64": b64encode(salt).decode("ascii"),
+            "password_hash_b64": b64encode(password_hash).decode("ascii"),
+            "iterations": _DEV_PASSWORD_ITERATIONS,
+        }
+    }
+
+
+def verify_dev_password(password: str | None, user_metadata: dict | None) -> bool:
+    if password is None or not password.strip():
+        return False
+    metadata = user_metadata or {}
+    dev_auth = metadata.get("dev_auth")
+    if not isinstance(dev_auth, dict):
+        return False
+    salt_b64 = dev_auth.get("salt_b64")
+    password_hash_b64 = dev_auth.get("password_hash_b64")
+    iterations = dev_auth.get("iterations", _DEV_PASSWORD_ITERATIONS)
+    if not isinstance(salt_b64, str) or not isinstance(password_hash_b64, str):
+        return False
+    try:
+        salt = b64decode(salt_b64)
+        expected = b64decode(password_hash_b64)
+        rounds = int(iterations)
+    except Exception:
+        return False
+    candidate = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt,
+        rounds,
+    )
+    return hmac.compare_digest(candidate, expected)
+
+
+def _require_dev_password_for_actor(
+    *,
+    actor: ActorContext | None,
+    password: str | None,
+) -> None:
+    if actor is None:
+        return
+    if not verify_dev_password(password, actor.user_metadata):
+        raise HTTPException(status_code=401, detail="Incorrect sign-in ID or password")

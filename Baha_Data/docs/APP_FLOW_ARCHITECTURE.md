@@ -204,17 +204,14 @@ Frontend rule:
 
 ### 4.8 Student Games Flow
 
-Release-1 student games should be treated as two different categories:
-
-- lightweight local wellness tools
-- backend-aware progressive games
+Release-1 student activities should be treated as lightweight supportive tools
+inside the student experience.
 
 Initial game set:
 
 - Comet Sequence
 - Calm Breathing
 - Focus Catch
-- Story World
 
 Flow for local tools:
 
@@ -231,24 +228,6 @@ Current local-tool intent:
   paced reset routine with timed inhale/hold/exhale guidance
 - `Focus Catch`
   visual tracking and hand-eye coordination through a moving tap target
-
-Flow for Story World:
-
-1. open Story World from the student game/discovery area
-2. backend resolves the authenticated `student_profile_id`
-3. fetch or create the current Story World state
-4. open the current location, scene, and progress
-5. submit a free-text turn
-6. backend stores the turn and returns the next safe grounded scene
-7. backend records any non-diagnostic gameplay signals server-side
-
-Architecture rules:
-
-- Story World must use the current student auth model
-- Story World must not use a detached player-key identity
-- Story World must not depend on external OpenAI APIs
-- age-band differences should be implemented through content packs and presentation variants
-- gameplay signals are for insight/support workflows only and must never be shown as child-facing scores
 
 ### 4.9 Student Help Flow
 

@@ -44,21 +44,25 @@ void main() {
     final controller = AppSessionController(apiClient: client);
 
     await controller.saveIdentity(
-      const DevelopmentIdentity(externalAuthId: 'student-ext-id'),
+      const DevelopmentIdentity(
+        externalAuthId: 'student-ext-id',
+        password: 'BahaDemo123!',
+      ),
     );
 
     expect(controller.stage, SessionStage.ready);
     expect(controller.actor?.displayName, 'Student Demo');
   });
 
-  test('attemptEntry blocks registration when email already exists', () async {
+  test('attemptEntry blocks registration when sign-in ID already exists', () async {
     SharedPreferences.setMockInitialValues(const {});
     final client = BahaApiClient(
       baseUrl: 'http://localhost:8000',
       httpClient: MockClient((request) async {
         expect(request.url.path, '/auth/onboarding-state');
+        expect(request.url.queryParameters['entry_mode'], 'register');
         return http.Response(
-          '{"has_baha_user":true,"identity_match_mode":"email","external_auth_id":"new-sign-in-id","roles":["student"],"approval_status":"not_required","consent_status":"granted","guardian_link_status":"linked","linked_student_count":0,"linked_guardian_count":1,"next_step":"ready"}',
+          '{"has_baha_user":true,"identity_match_mode":"external_auth_id","external_auth_id":"new-sign-in-id","roles":["student"],"approval_status":"not_required","consent_status":"granted","guardian_link_status":"linked","linked_student_count":0,"linked_guardian_count":1,"next_step":"ready"}',
           200,
         );
       }),
@@ -68,14 +72,14 @@ void main() {
     final message = await controller.attemptEntry(
       const DevelopmentIdentity(
         externalAuthId: 'new-sign-in-id',
-        authEmail: 'student.demo@baha.local',
+        password: 'BahaDemo123!',
       ),
       registerMode: true,
     );
 
     expect(
       message,
-      'This email is already linked to an existing BAHA account. Sign in instead or use a different email.',
+      'This sign-in ID is already in use. Sign in instead or choose a different sign-in ID.',
     );
     expect(controller.identity, isNull);
     expect(controller.stage, SessionStage.splash);
@@ -87,6 +91,7 @@ void main() {
       baseUrl: 'http://localhost:8000',
       httpClient: MockClient((request) async {
         expect(request.url.path, '/auth/onboarding-state');
+        expect(request.url.queryParameters['entry_mode'], 'sign_in');
         return http.Response(
           '{"has_baha_user":false,"identity_match_mode":"none","external_auth_id":"missing-id","approval_status":"not_required","consent_status":"not_required","guardian_link_status":"not_required","linked_student_count":0,"linked_guardian_count":0,"next_step":"bootstrap"}',
           200,
@@ -96,7 +101,10 @@ void main() {
     final controller = AppSessionController(apiClient: client);
 
     final message = await controller.attemptEntry(
-      const DevelopmentIdentity(externalAuthId: 'missing-id'),
+      const DevelopmentIdentity(
+        externalAuthId: 'missing-id',
+        password: 'WrongPassword1!',
+      ),
       registerMode: false,
     );
 

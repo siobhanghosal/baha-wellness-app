@@ -13,6 +13,14 @@ It explains:
 - what demo data is already seeded
 - what assumptions the client app can safely make
 
+Current mobile-shell note:
+
+- the active demo client is now one unified Flutter app at `Baha_Mobile/apps/student_app`
+- student, guardian, teacher, and counselor experiences are role-routed inside that app
+- any references below to parent, teacher, or counselor screens describe role surfaces inside the unified app, not separate deployed mobile binaries
+- the guardian role now has its own in-app shell with Home, Learn, Buddy, and Profile tabs
+- parent Learn is currently backed by frontend-local starter modules while final BAHA parent content is still pending
+
 ## 2. Current Backend Shape
 
 The backend is:
@@ -86,16 +94,23 @@ Bootstrap and onboarding endpoints now available:
 - `GET /auth/onboarding-state`
 - `GET /auth/me`
 - `POST /auth/guardian/link-student`
+- `GET /auth/guardian/consent/platform-participation/{student_profile_id}`
 - `POST /auth/guardian/consent/platform-participation`
 - `GET /auth/guardian/consent/parent-summary-sharing/{student_profile_id}`
 - `POST /auth/guardian/consent/parent-summary-sharing`
 - `GET /auth/approval-requests`
 - `POST /auth/approval-requests/{request_id}/decision`
 
+Student self-service settings endpoints now available:
+
+- `GET /mobile/student/linking-state`
+- `POST /mobile/student/linking-code`
+- `POST /mobile/student/parent-summary-sharing`
+
 For local development, `POST /auth/bootstrap` and `GET /auth/onboarding-state` can also use:
 
 - `X-BAHA-External-Auth-Id`
-- `X-BAHA-Auth-Email` (optional)
+- `X-BAHA-Dev-Password`
 
 when bearer-token verification is not configured and dev identity headers remain enabled.
 
@@ -106,18 +121,15 @@ The backend includes demo seed data through SQL migrations.
 Demo external auth IDs:
 
 - `supabase-student-demo`
+- `supabase-student-analytics-demo`
 - `supabase-guardian-demo`
 - `supabase-teacher-demo`
 - `supabase-counselor-demo`
 - `supabase-admin-demo`
 
-Demo user emails:
+Demo password:
 
-- `student.demo@baha.local`
-- `guardian.demo@baha.local`
-- `teacher.demo@baha.local`
-- `counselor.demo@baha.local`
-- `admin.demo@baha.local`
+- `BahaDemo123!`
 
 ## 6. Seeded Demo Domain Data
 
@@ -269,7 +281,7 @@ The Flutter workspace now exists under:
 
 Implemented mobile status right now:
 
-- the monorepo has four real Flutter apps plus shared packages
+- the monorepo now centers on one unified Flutter app plus shared packages
 - the student app already implements the startup, check-in, learn, support, and Buddy/chat slices against this backend
 - the student app uses:
   - development identity capture
@@ -281,9 +293,10 @@ Implemented mobile status right now:
   - `GET /mobile/content/{content_item_id}`
   - theme-focused Learn routing for:
     - Sleep
-    - Digital Wellness
-    - Peer Pressure
-    - Exam Stress
+    - Stress
+    - Bullying
+    - Healthy Gaming
+    - Alcohol Safety
   - richer block-rendered student learning content
   - structure-aware module progress display
   - a discovery split between `Learning` and `Activities`
@@ -302,9 +315,22 @@ Current content strategy reference:
   - `GET /mobile/chat/sessions/{session_id}/messages`
   - `POST /mobile/chat/sessions/{session_id}/messages`
 - the parent app now implements the first real guardian slice:
+- a student can now manage the guardian-link and summary-sharing prerequisites from inside the unified app:
+  - visible student ID
+  - short-lived six-digit pairing code generation
+  - student-controlled parent-summary sharing toggle
+- guardian linking is now shared across minor and adult students:
+  - both use `student_code` + six-digit verification code
+  - only under-18 students require guardian platform-participation approval before student access opens
+- the parent experience now surfaces blocked states clearly:
+  - not linked
+  - student sharing still off
+  - guardian summary consent still pending
+- the parent app now implements the first real guardian slice:
   - development identity capture
   - `GET /auth/onboarding-state`
   - `GET /mobile/me`
+  - `POST /auth/guardian/link-student`
   - `GET /mobile/parent/students`
   - `GET /mobile/parent/students/{student_profile_id}/weekly-summary/latest`
   - `GET /mobile/content/feed`
@@ -331,6 +357,8 @@ Current content strategy reference:
   - `POST /mobile/chat/sessions/{session_id}/messages`
   - `POST /mobile/chat/sessions/{session_id}/messages/stream`
   - short remembered session context injected server-side for better within-session continuity
+- the student learning slice now has at least three modules per core topic for every student age cohort, plus a quick-support card per topic
+- the parent learning slice now mirrors the same five headline topics with multi-module, parent-facing support tracks plus quick-support cards
 
 Latest verified mobile/backend handshake:
 

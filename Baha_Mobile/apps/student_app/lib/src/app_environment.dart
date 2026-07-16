@@ -2,12 +2,12 @@ class StudentAppEnvironment {
   const StudentAppEnvironment({
     required this.apiBaseUrl,
     required this.defaultExternalAuthId,
-    required this.defaultAuthEmail,
+    required this.defaultPassword,
   });
 
   final String apiBaseUrl;
   final String defaultExternalAuthId;
-  final String defaultAuthEmail;
+  final String defaultPassword;
 
   factory StudentAppEnvironment.fromDefines() {
     return const StudentAppEnvironment(
@@ -19,8 +19,8 @@ class StudentAppEnvironment {
         'BAHA_DEV_EXTERNAL_AUTH_ID',
         defaultValue: '',
       ),
-      defaultAuthEmail: String.fromEnvironment(
-        'BAHA_DEV_AUTH_EMAIL',
+      defaultPassword: String.fromEnvironment(
+        'BAHA_DEV_PASSWORD',
         defaultValue: '',
       ),
     );

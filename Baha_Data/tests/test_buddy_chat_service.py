@@ -136,6 +136,24 @@ def test_buddy_chat_service_uses_openai_for_greeting() -> None:
     asyncio.run(run())
 
 
+def test_openai_input_block_adapts_language_for_younger_students() -> None:
+    service = BuddyChatService(Settings(buddy_generation_backend="openai"))
+    prompt = service._openai_input_block(  # noqa: SLF001 - direct prompt contract check
+        request=ChatRequest(
+            message="I feel stressed about school.",
+            audience="adolescent",
+            age_cohort="9_12",
+        ),
+        condition="Stress",
+        evidence=[],
+        history=[],
+        grounded=False,
+    )
+
+    assert "Age cohort: 9_12" in prompt
+    assert "Use short sentences, simple words" in prompt
+
+
 def test_buddy_chat_service_uses_openai_for_supportive_venting() -> None:
     async def run() -> None:
         transport = httpx.MockTransport(

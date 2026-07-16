@@ -29,7 +29,6 @@ class _StudentBootstrapScreenState extends State<StudentBootstrapScreen> {
   final _schoolNameController = TextEditingController(
     text: 'BAHA Pilot School',
   );
-  late final TextEditingController _emailController;
   final _staffCodeController = TextEditingController();
 
   String _ageCohort = '13_14';
@@ -44,16 +43,12 @@ class _StudentBootstrapScreenState extends State<StudentBootstrapScreen> {
   @override
   void initState() {
     super.initState();
-    _emailController = TextEditingController(
-      text: widget.identity.authEmail ?? '',
-    );
   }
 
   @override
   void dispose() {
     _displayNameController.dispose();
     _schoolNameController.dispose();
-    _emailController.dispose();
     _staffCodeController.dispose();
     super.dispose();
   }
@@ -87,7 +82,6 @@ class _StudentBootstrapScreenState extends State<StudentBootstrapScreen> {
   Future<void> _submit() async {
     final displayName = _displayNameController.text.trim();
     final schoolName = _schoolNameController.text.trim();
-    final email = _emailController.text.trim();
     final staffCode = _staffCodeController.text.trim();
 
     if (displayName.length < 2) {
@@ -118,7 +112,6 @@ class _StudentBootstrapScreenState extends State<StudentBootstrapScreen> {
         AppBootstrapRequest(
           role: _role,
           displayName: displayName,
-          email: email.isEmpty ? null : email,
           schoolName: _requiresSchool ? schoolName : null,
           ageCohort: _role == AppRequestedRole.student ? _ageCohort : null,
           legalConsentBand: _role == AppRequestedRole.student
@@ -218,21 +211,13 @@ class _StudentBootstrapScreenState extends State<StudentBootstrapScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Text(
-                    'Development identity: ${widget.identity.externalAuthId}',
-                  ),
+                  Text('Sign-in ID: ${widget.identity.externalAuthId}'),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _displayNameController,
                     decoration: const InputDecoration(
                       labelText: 'Display name',
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Email'),
                   ),
                   if (_requiresSchool) ...[
                     const SizedBox(height: 12),

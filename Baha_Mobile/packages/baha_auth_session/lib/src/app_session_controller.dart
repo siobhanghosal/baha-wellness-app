@@ -11,7 +11,7 @@ class AppSessionController extends ChangeNotifier {
     : _apiClient = apiClient;
 
   static const _externalAuthIdKey = 'baha.dev.external_auth_id';
-  static const _authEmailKey = 'baha.dev.auth_email';
+  static const _authPasswordKey = 'baha.dev.password';
   static const _requestedRoleKey = 'baha.dev.requested_role';
 
   final BahaApiClient _apiClient;
@@ -32,7 +32,7 @@ class AppSessionController extends ChangeNotifier {
     _setStage(SessionStage.splash);
     final preferences = await SharedPreferences.getInstance();
     final externalAuthId = preferences.getString(_externalAuthIdKey)?.trim();
-    final authEmail = preferences.getString(_authEmailKey)?.trim();
+    final password = preferences.getString(_authPasswordKey)?.trim();
     final requestedRole = AppRequestedRole.fromApiValue(
       preferences.getString(_requestedRoleKey),
     );
@@ -46,7 +46,7 @@ class AppSessionController extends ChangeNotifier {
     }
     _identity = DevelopmentIdentity(
       externalAuthId: externalAuthId,
-      authEmail: authEmail == null || authEmail.isEmpty ? null : authEmail,
+      password: password == null || password.isEmpty ? null : password,
       requestedRole: requestedRole,
     );
     await refreshOnboarding();
@@ -55,11 +55,11 @@ class AppSessionController extends ChangeNotifier {
   Future<void> saveIdentity(DevelopmentIdentity identity) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_externalAuthIdKey, identity.externalAuthId);
-    final email = identity.authEmail?.trim();
-    if (email != null && email.isNotEmpty) {
-      await preferences.setString(_authEmailKey, email);
+    final password = identity.password?.trim();
+    if (password != null && password.isNotEmpty) {
+      await preferences.setString(_authPasswordKey, password);
     } else {
-      await preferences.remove(_authEmailKey);
+      await preferences.remove(_authPasswordKey);
     }
     await preferences.setString(
       _requestedRoleKey,
@@ -76,6 +76,7 @@ class AppSessionController extends ChangeNotifier {
     try {
       final onboardingState = await _apiClient.getOnboardingState(
         identity: identity,
+        entryMode: registerMode ? 'register' : 'sign_in',
       );
       final validationMessage = registerMode
           ? _registrationMessageFor(onboardingState)
@@ -95,7 +96,7 @@ class AppSessionController extends ChangeNotifier {
   Future<void> clearIdentity() async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_externalAuthIdKey);
-    await preferences.remove(_authEmailKey);
+    await preferences.remove(_authPasswordKey);
     await preferences.remove(_requestedRoleKey);
     _identity = null;
     _onboardingState = null;
@@ -181,10 +182,6 @@ class AppSessionController extends ChangeNotifier {
     switch (state.identityMatchMode) {
       case 'external_auth_id':
         return null;
-      case 'email':
-        return 'This email already belongs to a BAHA account, but this sign-in ID does not match it. Use the original sign-in ID or register with a different email.';
-      case 'duplicate_email':
-        return 'Multiple BAHA accounts are using this email. Sign in with the original sign-in ID instead.';
       default:
         return 'We could not find an account for this sign-in ID. Check the details or create a new account.';
     }
@@ -197,9 +194,6 @@ class AppSessionController extends ChangeNotifier {
           return 'This sign-in ID is already tied to an unfinished BAHA account. Continue with that account or use a different sign-in ID.';
         }
         return 'This sign-in ID is already in use. Sign in instead or choose a different sign-in ID.';
-      case 'email':
-      case 'duplicate_email':
-        return 'This email is already linked to an existing BAHA account. Sign in instead or use a different email.';
       default:
         return null;
     }

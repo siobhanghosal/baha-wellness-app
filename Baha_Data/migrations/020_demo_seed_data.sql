@@ -10,12 +10,59 @@ on conflict (id) do nothing;
 
 insert into users (id, external_auth_id, email, display_name, status, preferred_language, metadata)
 values
-  ('20000000-0000-0000-0000-000000000001', 'supabase-student-demo', 'student.demo@baha.local', 'Aarav Student', 'active', 'en', '{"demo": true}'::jsonb),
-  ('20000000-0000-0000-0000-000000000002', 'supabase-guardian-demo', 'guardian.demo@baha.local', 'Meera Guardian', 'active', 'en', '{"demo": true}'::jsonb),
-  ('20000000-0000-0000-0000-000000000003', 'supabase-teacher-demo', 'teacher.demo@baha.local', 'Riya Teacher', 'active', 'en', '{"demo": true}'::jsonb),
-  ('20000000-0000-0000-0000-000000000004', 'supabase-counselor-demo', 'counselor.demo@baha.local', 'Anita Counselor', 'active', 'en', '{"demo": true}'::jsonb),
-  ('20000000-0000-0000-0000-000000000005', 'supabase-admin-demo', 'admin.demo@baha.local', 'BAHA Admin', 'active', 'en', '{"demo": true}'::jsonb)
-on conflict (id) do nothing;
+  (
+    '20000000-0000-0000-0000-000000000001',
+    'supabase-student-demo',
+    'student.demo@baha.local',
+    'Aarav Student',
+    'active',
+    'en',
+    '{"demo": true, "dev_auth": {"mode": "id_password", "salt_b64": "YmFoYS1kZW1vLXN0dWRlbnQtMDAx", "password_hash_b64": "4EyIOU6AEtSRBB0wdSKBgzDpS6Xg0570JAZyEuidTlk=", "iterations": 200000}}'::jsonb
+  ),
+  (
+    '20000000-0000-0000-0000-000000000002',
+    'supabase-guardian-demo',
+    'guardian.demo@baha.local',
+    'Meera Guardian',
+    'active',
+    'en',
+    '{"demo": true, "dev_auth": {"mode": "id_password", "salt_b64": "YmFoYS1kZW1vLXN0dWRlbnQtMDAx", "password_hash_b64": "4EyIOU6AEtSRBB0wdSKBgzDpS6Xg0570JAZyEuidTlk=", "iterations": 200000}}'::jsonb
+  ),
+  (
+    '20000000-0000-0000-0000-000000000003',
+    'supabase-teacher-demo',
+    'teacher.demo@baha.local',
+    'Riya Teacher',
+    'active',
+    'en',
+    '{"demo": true, "dev_auth": {"mode": "id_password", "salt_b64": "YmFoYS1kZW1vLXN0dWRlbnQtMDAx", "password_hash_b64": "4EyIOU6AEtSRBB0wdSKBgzDpS6Xg0570JAZyEuidTlk=", "iterations": 200000}}'::jsonb
+  ),
+  (
+    '20000000-0000-0000-0000-000000000004',
+    'supabase-counselor-demo',
+    'counselor.demo@baha.local',
+    'Anita Counselor',
+    'active',
+    'en',
+    '{"demo": true, "dev_auth": {"mode": "id_password", "salt_b64": "YmFoYS1kZW1vLXN0dWRlbnQtMDAx", "password_hash_b64": "4EyIOU6AEtSRBB0wdSKBgzDpS6Xg0570JAZyEuidTlk=", "iterations": 200000}}'::jsonb
+  ),
+  (
+    '20000000-0000-0000-0000-000000000005',
+    'supabase-admin-demo',
+    'admin.demo@baha.local',
+    'BAHA Admin',
+    'active',
+    'en',
+    '{"demo": true, "dev_auth": {"mode": "id_password", "salt_b64": "YmFoYS1kZW1vLXN0dWRlbnQtMDAx", "password_hash_b64": "4EyIOU6AEtSRBB0wdSKBgzDpS6Xg0570JAZyEuidTlk=", "iterations": 200000}}'::jsonb
+  )
+on conflict (id) do update
+set external_auth_id = excluded.external_auth_id,
+    email = excluded.email,
+    display_name = excluded.display_name,
+    status = excluded.status,
+    preferred_language = excluded.preferred_language,
+    metadata = excluded.metadata,
+    updated_at = now();
 
 insert into user_roles (user_id, role_id, status, metadata)
 select v.user_id, r.id, 'active', '{"demo": true}'::jsonb

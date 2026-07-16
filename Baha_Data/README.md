@@ -63,6 +63,12 @@ docker compose -f docker-compose.yml up -d --build --force-recreate api
 For Android emulator testing, use `http://10.0.2.2:8000` as the API base URL.
 For a physical device on the same network, use your machine's LAN IP instead of `localhost`.
 
+Current mobile prototype note:
+
+- the live Flutter demo is now one unified app at `Baha_Mobile/apps/student_app`
+- role-specific student, guardian, teacher, and counselor experiences are routed inside that single app
+- separate Flutter app shells are no longer part of the active demo architecture
+
 For local syntax checks without installing dependencies:
 
 ```bash
@@ -79,6 +85,10 @@ Buddy note:
 - Buddy now uses two OpenAI-backed reply modes under one server-side safety layer:
   - conversational OpenAI replies for greetings, venting, and general supportive conversation
   - retrieval-grounded OpenAI replies for advice-style wellbeing questions where approved BAHA evidence is useful
+- Buddy now adapts reply style by student age cohort:
+  - `9_12` gets shorter, simpler, less abstract replies
+  - `13_14` gets plain, easy-to-follow language
+  - `15_18` and `18_plus` get slightly more nuance while staying concise
 - the hard scope gate is now softened:
   - weak or missing retrieval falls back to conversational OpenAI instead of a cold refusal
   - only emergency handling stays strictly server-controlled
@@ -95,8 +105,32 @@ Current demo-facing mobile UX improvements:
   - `What improved`
   - `What to watch`
   - `What to try next`
+- the student dashboard now labels the combined chart as `Overall pulse`
+  - it uses real submission dates on the x-axis
+  - it explains that higher points mean higher combined strain across tracked factors
+  - it is powered only by actual check-ins, not placeholder graph lines
+- the student wellbeing model is now framed in product language as:
+  - sleep
+  - energy
+  - mood
+  - stress
+  - physical symptoms
+  - support
+- daily check-in wording is now age-adapted across `9_12`, `13_14`, `15_18`, and `18_plus`
 - the post-check-in result view now shows a short personalized takeaway based on today's factors versus recent averages
+- dashboard and insight surfaces now trim recent check-ins to the latest three entries instead of rendering a long history block
 - student discovery is now clearly separated into `Learning` and `Activities`
+- the student app now also includes a first real `9_12` learning-lane slice:
+  - child-facing topic cards instead of only the older teen theme cards
+  - topic-level progress rollup
+  - saved practice tools inside the lane
+  - soft badge/reward states instead of heavy gamification
+  - `3` ordered modules per `9_12` topic across:
+    - Sleep
+    - Stress
+    - Bullying
+    - Healthy Gaming
+    - Alcohol Safety
 - the parent weekly summary now includes a privacy-safe response layer with:
   - `What changed`
   - `Conversation starter`
@@ -114,6 +148,17 @@ Optional branch artifact note:
 - the `Solomon_RAG_Vector_DB` branch includes an LFS-tracked Postgres dump at `backups/baha_rag_20260714-183725.dump`
 - that dump is useful as a restore/import source for retrieval experiments, but it is not required by the current backend runtime and was not made a boot-time dependency
 - the current local workflow for using that donor corpus is documented in [docs/BUDDY_DEMO_RAG_SETUP.md](/Users/sudharshan/Desktop/PES/RF%20Internship/Baha_Data/docs/BUDDY_DEMO_RAG_SETUP.md)
+
+Local database note:
+
+- if you already have an existing local Postgres volume, newly added SQL seed or migration files may not appear automatically just from rebuilding containers
+- in that case, either reinitialize the local database volume or apply the new SQL manually against the running local database
+- this mattered for the newer learning and onboarding seed slices such as:
+  - `028_age_9_12_learning_lanes.sql`
+  - `029_multi_cohort_learning_refresh.sql`
+  - `030_dashboard_showcase_seed.sql`
+  - `031_student_linking_and_learning_depth.sql`
+  - `032_fix_guardian_demo_password.sql`
 
 ## Safety Contract
 
@@ -144,6 +189,8 @@ See [docs/ACCOUNT_ONBOARDING_SYSTEM.md](/Users/sudharshan/Desktop/PES/RF Interns
 See [docs/STUDENT_CHECKIN_PROFILE_LOGIC.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/STUDENT_CHECKIN_PROFILE_LOGIC.md) for the current student onboarding baseline, adaptive daily check-in logic, scoring model, and trend/risk interpretation rules.
 
 See [docs/STUDENT_DEMO_SCENARIOS.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/STUDENT_DEMO_SCENARIOS.md) for the seeded student demo accounts, sign-in identities, and the narrative each one is intended to demonstrate on the dashboard.
+
+See [docs/AGE_9_12_CONTENT_DELIVERY_BLUEPRINT.md](/Users/sudharshan/Desktop/PES/RF%20Internship/Baha_Data/docs/AGE_9_12_CONTENT_DELIVERY_BLUEPRINT.md) for the concrete plan for turning the new `9-12` content sample into topic lanes, micro-modules, practice interactions, and soft reward loops.
 
 See [docs/ENVIRONMENT_AND_SECRETS.md](/Users/sudharshan/Desktop/PES/RF Internship/Baha_Data/docs/ENVIRONMENT_AND_SECRETS.md) for the runtime configuration, hosted auth variables, and object-storage environment contract.
 

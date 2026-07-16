@@ -86,6 +86,7 @@ class EvidenceAnswer(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(min_length=3, max_length=1600)
     audience: Perspective = "adolescent"
+    age_cohort: str | None = None
     top_k: int = Field(default=8, ge=4, le=20)
     filters: dict[str, Any] = Field(default_factory=dict)
 
@@ -303,6 +304,38 @@ class MobileActorResponse(BaseModel):
     school_name: str | None = None
     user_metadata: dict[str, Any] = Field(default_factory=dict)
     student_metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class StudentLinkingStateResponse(BaseModel):
+    student_profile_id: UUID
+    student_code: str
+    legal_consent_band: str | None = None
+    linked_guardian_count: int = 0
+    linked_guardians: list["LinkedGuardianSummary"] = Field(default_factory=list)
+    guardian_link_verification_code: str | None = None
+    guardian_link_code_generated_at: datetime | None = None
+    guardian_link_code_expires_at: datetime | None = None
+    parent_summary_sharing_enabled: bool = False
+    updated_at: datetime | None = None
+
+
+class LinkedGuardianSummary(BaseModel):
+    guardian_id: UUID
+    guardian_user_id: UUID | None = None
+    display_name: str
+    relationship_to_student: str | None = None
+    is_primary: bool = False
+
+
+class StudentParentSummarySharingRequest(BaseModel):
+    enabled: bool
+
+
+class LinkRemovalResponse(BaseModel):
+    student_profile_id: UUID
+    guardian_id: UUID
+    removed: bool
+    message: str
 
 
 class MobileCheckinTemplateSummary(BaseModel):

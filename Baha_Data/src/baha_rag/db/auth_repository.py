@@ -21,6 +21,7 @@ class AuthRepository:
                   u.id as user_id,
                   u.external_auth_id,
                   u.email,
+                  u.metadata,
                   u.phone,
                   u.display_name,
                   u.status as account_status,
@@ -64,6 +65,7 @@ class AuthRepository:
                   u.id as user_id,
                   u.external_auth_id,
                   u.email,
+                  u.metadata,
                   u.phone,
                   u.display_name,
                   u.status as account_status,
@@ -107,6 +109,7 @@ class AuthRepository:
                   u.id as user_id,
                   u.external_auth_id,
                   u.email,
+                  u.metadata,
                   u.phone,
                   u.display_name,
                   u.status as account_status,
@@ -685,7 +688,9 @@ class AuthRepository:
         result = await self.session.execute(
             text(
                 """
-                select metadata ->> 'guardian_link_verification_code' as guardian_link_verification_code
+                select
+                  metadata ->> 'guardian_link_verification_code' as guardian_link_verification_code,
+                  metadata ->> 'guardian_link_code_expires_at' as guardian_link_code_expires_at
                 from student_profiles
                 where id = :student_profile_id
                 limit 1
@@ -699,7 +704,18 @@ class AuthRepository:
             if row and row["guardian_link_verification_code"]
             else ""
         )
-        if existing_code:
+        expires_at_raw = (
+            str(row["guardian_link_code_expires_at"]).strip()
+            if row and row["guardian_link_code_expires_at"]
+            else ""
+        )
+        expires_at = None
+        if expires_at_raw:
+            try:
+                expires_at = datetime.fromisoformat(expires_at_raw.replace("Z", "+00:00"))
+            except ValueError:
+                expires_at = None
+        if existing_code and expires_at and expires_at > datetime.now(timezone.utc):
             return existing_code
 
         code = f"{randbelow(1_000_000):06d}"
@@ -709,9 +725,19 @@ class AuthRepository:
                 update student_profiles
                 set
                   metadata = jsonb_set(
-                    coalesce(metadata, '{}'::jsonb),
-                    '{guardian_link_verification_code}',
-                    to_jsonb(cast(:code as text)),
+                    jsonb_set(
+                      jsonb_set(
+                        coalesce(metadata, '{}'::jsonb),
+                        '{guardian_link_verification_code}',
+                        to_jsonb(cast(:code as text)),
+                        true
+                      ),
+                      '{guardian_link_code_generated_at}',
+                      to_jsonb(to_char(now() at time zone 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')),
+                      true
+                    ),
+                    '{guardian_link_code_expires_at}',
+                    to_jsonb(to_char((now() + interval '30 minutes') at time zone 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')),
                     true
                   ),
                   updated_at = now()
@@ -721,6 +747,28 @@ class AuthRepository:
             {"student_profile_id": student_profile_id, "code": code},
         )
         return code
+
+    async def get_student_guardian_link_code_state(
+        self,
+        *,
+        student_profile_id: UUID,
+    ) -> dict[str, Any] | None:
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  metadata ->> 'guardian_link_verification_code' as guardian_link_verification_code,
+                  metadata ->> 'guardian_link_code_generated_at' as guardian_link_code_generated_at,
+                  metadata ->> 'guardian_link_code_expires_at' as guardian_link_code_expires_at
+                from student_profiles
+                where id = :student_profile_id
+                limit 1
+                """
+            ),
+            {"student_profile_id": student_profile_id},
+        )
+        row = result.mappings().first()
+        return dict(row) if row else None
 
     async def upsert_guardian_link(
         self,

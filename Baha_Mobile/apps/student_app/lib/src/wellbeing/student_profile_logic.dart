@@ -36,7 +36,7 @@ const mainPressureOptions = <String, String>{
   'school': 'School or studies',
   'friends': 'Friends',
   'family': 'Family',
-  'health': 'Health or body',
+  'health': 'Health or physical symptoms',
   'social_media': 'Social media',
   'nothing_specific': 'Nothing specific',
 };
@@ -82,9 +82,9 @@ const helpSeekingOptions = <String, String>{
 };
 
 const connectednessOptions = <String, String>{
-  'very_connected': 'Very connected',
-  'mostly_connected': 'Mostly connected',
-  'mixed': 'Mixed',
+  'very_connected': 'Very supported',
+  'mostly_connected': 'Mostly supported',
+  'mixed': 'Up and down',
   'a_bit_isolated': 'A bit isolated',
   'very_isolated': 'Very isolated',
 };
@@ -101,8 +101,8 @@ const checkinFocusOptions = <String, String>{
   'sleep': 'Sleep',
   'stress': 'Stress',
   'mood': 'Mood',
-  'physical_wellbeing': 'Physical health',
-  'connectedness': 'Friendships',
+  'physical_wellbeing': 'Physical symptoms',
+  'connectedness': 'Support and belonging',
   'no_preference': 'No preference',
 };
 

@@ -121,16 +121,16 @@ Every app-facing content artifact should trace back to:
 
 The apps should consume only publishable, reviewed content. The apps should not directly consume raw acquisition output.
 
-### 2.6 Optimize for four separate apps
+### 2.6 Optimize for one unified app with role surfaces
 
-The data model should assume separate apps for:
+The data model should assume one installed mobile app with role-specific surfaces for:
 
 - Student
 - Parent
 - Teacher
 - BAHA/Counselor
 
-The backend should support distinct read models and permissions for each.
+The backend should still support distinct read models and permissions for each role.
 
 ### 2.7 Keep mobile apps API-first
 

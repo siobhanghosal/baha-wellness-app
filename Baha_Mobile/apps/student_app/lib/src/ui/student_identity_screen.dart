@@ -9,14 +9,14 @@ enum AppEntryMode { signIn, register }
 class StudentIdentityScreen extends StatefulWidget {
   const StudentIdentityScreen({
     required this.defaultExternalAuthId,
-    required this.defaultAuthEmail,
+    required this.defaultPassword,
     required this.apiBaseUrl,
     required this.onSubmit,
     super.key,
   });
 
   final String defaultExternalAuthId;
-  final String defaultAuthEmail;
+  final String defaultPassword;
   final String apiBaseUrl;
   final Future<String?> Function(
     DevelopmentIdentity identity,
@@ -30,7 +30,8 @@ class StudentIdentityScreen extends StatefulWidget {
 
 class _StudentIdentityScreenState extends State<StudentIdentityScreen> {
   late final TextEditingController _externalAuthIdController;
-  late final TextEditingController _emailController;
+  late final TextEditingController _passwordController;
+  late final TextEditingController _confirmPasswordController;
   AppRequestedRole _requestedRole = AppRequestedRole.student;
   AppEntryMode _mode = AppEntryMode.signIn;
   bool _submitting = false;
@@ -41,19 +42,22 @@ class _StudentIdentityScreenState extends State<StudentIdentityScreen> {
     _externalAuthIdController = TextEditingController(
       text: widget.defaultExternalAuthId,
     );
-    _emailController = TextEditingController(text: widget.defaultAuthEmail);
+    _passwordController = TextEditingController(text: widget.defaultPassword);
+    _confirmPasswordController = TextEditingController();
   }
 
   @override
   void dispose() {
     _externalAuthIdController.dispose();
-    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     final externalAuthId = _externalAuthIdController.text.trim();
-    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
     if (externalAuthId.isEmpty) {
       await _showDialogMessage(
         title: 'Enter your sign-in ID',
@@ -61,19 +65,17 @@ class _StudentIdentityScreenState extends State<StudentIdentityScreen> {
       );
       return;
     }
-    if (_mode == AppEntryMode.register && email.isEmpty) {
+    if (password.isEmpty) {
       await _showDialogMessage(
-        title: 'Email required',
-        message: 'Add an email address to create a new account.',
+        title: 'Password required',
+        message: 'Enter your password before continuing.',
       );
       return;
     }
-    if (_mode == AppEntryMode.register &&
-        email.isNotEmpty &&
-        !_looksLikeEmail(email)) {
+    if (_mode == AppEntryMode.register && password.length < 8) {
       await _showDialogMessage(
-        title: 'Enter a valid email',
-        message: 'Use a valid email address before creating a new account.',
+        title: 'Choose a stronger password',
+        message: 'Use at least 8 characters when creating a new account.',
       );
       return;
     }
@@ -87,14 +89,11 @@ class _StudentIdentityScreenState extends State<StudentIdentityScreen> {
       );
       return;
     }
-    if (_mode == AppEntryMode.register &&
-        widget.defaultAuthEmail.isNotEmpty &&
-        email.isNotEmpty &&
-        email == widget.defaultAuthEmail) {
+    if (_mode == AppEntryMode.register && confirmPassword != password) {
       await _showDialogMessage(
-        title: 'Choose a different email',
+        title: 'Passwords do not match',
         message:
-            'The seeded demo email is only for sign-in. Use a different email to create a fresh account.',
+            'Make sure both password fields match before creating the account.',
       );
       return;
     }
@@ -103,7 +102,7 @@ class _StudentIdentityScreenState extends State<StudentIdentityScreen> {
       final errorMessage = await widget.onSubmit(
         DevelopmentIdentity(
           externalAuthId: externalAuthId,
-          authEmail: email.isEmpty ? null : email,
+          password: password,
           requestedRole: _requestedRole,
         ),
         _mode,
@@ -142,11 +141,6 @@ class _StudentIdentityScreenState extends State<StudentIdentityScreen> {
     );
   }
 
-  bool _looksLikeEmail(String value) {
-    final trimmed = value.trim();
-    return trimmed.contains('@') && trimmed.contains('.');
-  }
-
   @override
   Widget build(BuildContext context) {
     final palette = appPaletteForTheme(AppColorTheme.growth);
@@ -165,7 +159,7 @@ class _StudentIdentityScreenState extends State<StudentIdentityScreen> {
                   'Choose who the app is for first, then continue into sign-in or account creation.',
               actions: const [
                 Pill(icon: Icons.apps_rounded, label: 'Unified app'),
-                Pill(icon: Icons.lock_open_rounded, label: 'Dev auth'),
+                Pill(icon: Icons.lock_outline_rounded, label: 'Secure sign-in'),
               ],
             ),
             const SizedBox(height: 20),
@@ -229,20 +223,22 @@ class _StudentIdentityScreenState extends State<StudentIdentityScreen> {
                               widget.defaultExternalAuthId) {
                             _externalAuthIdController.clear();
                           }
-                          if (_emailController.text.trim() ==
-                              widget.defaultAuthEmail) {
-                            _emailController.clear();
+                          if (_passwordController.text.trim() ==
+                              widget.defaultPassword) {
+                            _passwordController.clear();
                           }
+                          _confirmPasswordController.clear();
                         } else {
                           if (_externalAuthIdController.text.trim().isEmpty &&
                               widget.defaultExternalAuthId.isNotEmpty) {
                             _externalAuthIdController.text =
                                 widget.defaultExternalAuthId;
                           }
-                          if (_emailController.text.trim().isEmpty &&
-                              widget.defaultAuthEmail.isNotEmpty) {
-                            _emailController.text = widget.defaultAuthEmail;
+                          if (_passwordController.text.trim().isEmpty &&
+                              widget.defaultPassword.isNotEmpty) {
+                            _passwordController.text = widget.defaultPassword;
                           }
+                          _confirmPasswordController.clear();
                         }
                       });
                     },
@@ -252,44 +248,44 @@ class _StudentIdentityScreenState extends State<StudentIdentityScreen> {
                     controller: _externalAuthIdController,
                     decoration: const InputDecoration(
                       labelText: 'Sign-in ID',
-                      hintText: 'supabase-student-demo',
+                      hintText: 'Enter your sign-in ID',
                     ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      hintText: 'student.demo@baha.local',
+                    controller: _passwordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      hintText: _mode == AppEntryMode.signIn
+                          ? 'Enter your password'
+                          : 'Create a password',
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'API target: ${widget.apiBaseUrl}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
+                  if (_mode == AppEntryMode.register) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _confirmPasswordController,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Confirm password',
+                        hintText: 'Re-enter your password',
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 18),
                   AnimatedPrimaryButton(
                     label: _submitting
                         ? 'Connecting...'
                         : _mode == AppEntryMode.signIn
-                        ? 'Continue to sign in'
-                        : 'Continue to register',
+                        ? 'Sign in'
+                        : 'Create account',
                     icon: _mode == AppEntryMode.signIn
                         ? Icons.arrow_forward_rounded
                         : Icons.person_add_alt_1_rounded,
                     onPressed: _submitting ? () {} : _submit,
                   ),
                 ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            GlassPanel(
-              palette: palette,
-              child: Text(
-                'This demo still uses a development identity bridge under the hood, but the app now validates sign-in versus registration separately so existing emails, reused sign-in IDs, and missing accounts are handled more like a production flow.',
-                style: Theme.of(context).textTheme.bodyLarge,
               ),
             ),
           ],
