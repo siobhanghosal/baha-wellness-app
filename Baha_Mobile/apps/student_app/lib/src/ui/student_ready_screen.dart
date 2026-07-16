@@ -709,6 +709,7 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
           final learnRecommendations = _recommendedLearnCards(
             modules: data.modules,
             points: data.trendPoints,
+            summary: data.summary,
             profile: widget.profile,
             ageBand: widget.profile?.ageBand ?? widget.actor?.ageCohort,
           );
@@ -3608,6 +3609,7 @@ List<_DashboardCallout> _checkinTakeaways({
 List<UiCardItem> _recommendedLearnCards({
   required List<StudentModuleSummary> modules,
   required List<WellbeingTrendPoint> points,
+  required StudentWeeklySummary summary,
   required StudentWellbeingProfile? profile,
   required String? ageBand,
 }) {
@@ -3618,11 +3620,12 @@ List<UiCardItem> _recommendedLearnCards({
     return _recommendedChildLearnCards(
       modules: modules,
       points: points,
+      summary: summary,
       profile: profile,
     );
   }
   final desiredThemes = <String>[
-    ..._recommendedThemeNames(points: points, profile: profile),
+    ..._recommendedThemeNames(points: points, summary: summary, profile: profile),
   ];
   final availableThemes = modules
       .map((module) => module.theme.toLowerCase())
@@ -3634,12 +3637,10 @@ List<UiCardItem> _recommendedLearnCards({
       matches.add(theme);
     }
   }
-  final fallback = modules
-      .map((module) => module.theme)
-      .where((theme) => !matches.contains(theme))
-      .toSet()
-      .take(2)
-      .toList();
+  final fallback = _curatedThemeFallback(
+    modules: modules,
+    excludedThemes: matches,
+  );
   return [...matches.take(2), ...fallback].take(2).map((theme) {
     final started = modules.any(
       (module) =>
@@ -3700,26 +3701,14 @@ List<UiCardItem> _recommendedLearnCards({
 List<UiCardItem> _recommendedChildLearnCards({
   required List<StudentModuleSummary> modules,
   required List<WellbeingTrendPoint> points,
+  required StudentWeeklySummary summary,
   required StudentWellbeingProfile? profile,
 }) {
-  final desiredThemes = <String>[];
-  if (points.isEmpty) {
-    desiredThemes.addAll(const ['Sleep', 'Stress']);
-  } else {
-    final latest = points.last.factorScores;
-    if ((latest['sleep'] ?? 0) >= 2) {
-      desiredThemes.add('Sleep');
-    }
-    if ((latest['stress'] ?? 0) >= 2 || (latest['mood'] ?? 0) >= 2) {
-      desiredThemes.add('Stress');
-    }
-    if ((latest['connectedness'] ?? 0) >= 2) {
-      desiredThemes.add('Bullying');
-    }
-    if (profile?.profileTags.contains('digital_overload') == true) {
-      desiredThemes.add('Healthy Gaming');
-    }
-  }
+  final desiredThemes = _recommendedThemeNames(
+    points: points,
+    summary: summary,
+    profile: profile,
+  );
   final availableThemes = modules
       .map((module) => module.theme.toLowerCase())
       .toSet();
@@ -3727,9 +3716,10 @@ List<UiCardItem> _recommendedChildLearnCards({
     ...desiredThemes.where(
       (theme) => availableThemes.contains(theme.toLowerCase()),
     ),
-    ...modules
-        .map((module) => module.theme)
-        .where((theme) => !desiredThemes.contains(theme)),
+    ..._curatedThemeFallback(
+      modules: modules,
+      excludedThemes: desiredThemes,
+    ),
   }.take(2);
 
   return orderedThemes.map((theme) {
@@ -3791,35 +3781,146 @@ List<UiCardItem> _recommendedChildLearnCards({
 
 List<String> _recommendedThemeNames({
   required List<WellbeingTrendPoint> points,
+  required StudentWeeklySummary summary,
   required StudentWellbeingProfile? profile,
 }) {
-  if (points.isEmpty) {
-    return const ['Sleep', 'Stress'];
-  }
-  final latest = points.last.factorScores;
-  final entries = latest.entries.toList()
-    ..sort((a, b) => b.value.compareTo(a.value));
-  final topFactors = entries.take(2).map((entry) => entry.key).toList();
   final themes = <String>[];
-  for (final factor in topFactors) {
+
+  if (points.isEmpty) {
+    themes.addAll(_themesFromSummary(summary));
+    if (themes.isEmpty) {
+      themes.addAll(const ['Sleep', 'Stress']);
+    }
+    return themes.toSet().toList();
+  }
+
+  final factorScores = <String, double>{
+    'sleep': _averageFactor(points, 'sleep') ?? 0,
+    'stress': _averageFactor(points, 'stress') ?? 0,
+    'energy': _averageFactor(points, 'energy') ?? 0,
+    'mood': _averageFactor(points, 'mood') ?? 0,
+    'connectedness': _averageFactor(points, 'connectedness') ?? 0,
+    'physical_wellbeing': _averageFactor(points, 'physical_wellbeing') ?? 0,
+  };
+
+  final latest = points.last.factorScores;
+  if ((factorScores['sleep'] ?? 0) >= 1.8 || (latest['sleep'] ?? 0) >= 2) {
+    themes.add('Sleep');
+  }
+  if ((factorScores['stress'] ?? 0) >= 1.8 ||
+      (latest['stress'] ?? 0) >= 2 ||
+      (factorScores['energy'] ?? 0) >= 2) {
+    themes.add('Stress');
+  }
+  if ((factorScores['connectedness'] ?? 0) >= 1.8 ||
+      (factorScores['mood'] ?? 0) >= 2.1) {
+    themes.add('Bullying');
+  }
+
+  final remainingFactors = factorScores.entries.toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+  for (final factor in remainingFactors.take(3).map((entry) => entry.key)) {
     switch (factor) {
       case 'sleep':
         themes.add('Sleep');
+        break;
       case 'stress':
       case 'energy':
         themes.add('Stress');
+        break;
       case 'connectedness':
         themes.add('Bullying');
+        break;
       case 'mood':
         themes.add('Bullying');
+        break;
       case 'physical_wellbeing':
         themes.add('Sleep');
+        break;
     }
   }
+
+  themes.addAll(_themesFromSummary(summary));
   if (profile?.profileTags.contains('digital_overload') == true) {
     themes.add('Healthy Gaming');
   }
-  return themes.toSet().toList();
+  final unique = themes.toSet().toList();
+  unique.sort((a, b) => _themeRecommendationPriority(a).compareTo(
+        _themeRecommendationPriority(b),
+      ));
+  return unique;
+}
+
+List<String> _themesFromSummary(StudentWeeklySummary summary) {
+  final payload = summary.summary;
+  final text = [
+    payload['headline'],
+    payload['week_story'],
+    payload['best_progress'],
+    payload['watch_area'],
+    payload['support_nudge'],
+    payload['sleep_trend'],
+    payload['stress_trend'],
+    payload['mood_trend'],
+    payload['connectedness_trend'],
+    ...(payload['risk_flags'] as List<dynamic>? ?? const []),
+    ...(payload['trend_labels'] as List<dynamic>? ?? const []),
+    ...(payload['profile_tags'] as List<dynamic>? ?? const []),
+  ].whereType<Object?>().map((value) => value.toString().toLowerCase()).join(' ');
+
+  final themes = <String>[];
+  if (text.contains('sleep')) {
+    themes.add('Sleep');
+  }
+  if (text.contains('stress') ||
+      text.contains('pressure') ||
+      text.contains('overwhelm')) {
+    themes.add('Stress');
+  }
+  if (text.contains('connection') ||
+      text.contains('friend') ||
+      text.contains('peer') ||
+      text.contains('bully')) {
+    themes.add('Bullying');
+  }
+  if (text.contains('screen') || text.contains('gaming') || text.contains('digital')) {
+    themes.add('Healthy Gaming');
+  }
+  return themes;
+}
+
+List<String> _curatedThemeFallback({
+  required List<StudentModuleSummary> modules,
+  required Iterable<String> excludedThemes,
+}) {
+  final availableThemes = modules.map((module) => module.theme).toSet();
+  final excluded = excludedThemes.map((theme) => theme.toLowerCase()).toSet();
+  final ordered = availableThemes.toList()
+    ..sort(
+      (a, b) => _themeRecommendationPriority(a).compareTo(
+        _themeRecommendationPriority(b),
+      ),
+    );
+  return ordered
+      .where((theme) => !excluded.contains(theme.toLowerCase()))
+      .toList();
+}
+
+int _themeRecommendationPriority(String theme) {
+  switch (theme.toLowerCase()) {
+    case 'sleep':
+      return 0;
+    case 'stress':
+      return 1;
+    case 'bullying':
+      return 2;
+    case 'healthy gaming':
+      return 3;
+    case 'alcohol safety':
+      return 4;
+    default:
+      return 99;
+  }
 }
 
 List<UiCardItem> _recommendedActivityCards({
