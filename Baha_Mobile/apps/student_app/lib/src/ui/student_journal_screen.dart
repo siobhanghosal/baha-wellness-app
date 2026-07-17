@@ -96,13 +96,26 @@ class _StudentJournalScreenState extends State<StudentJournalScreen> {
     required _JournalMode mode,
     _JournalEntry? existing,
   }) async {
+    final controller = ThemeScope.maybeOf(context);
     final entry = await Navigator.of(context).push<_JournalEntry>(
       MaterialPageRoute<_JournalEntry>(
-        builder: (context) => _JournalEditorScreen(
-          mode: mode,
-          initialEntry: existing,
-          ageBand: widget.ageBand,
-        ),
+        builder: (context) => controller == null
+            ? _JournalEditorScreen(
+                mode: mode,
+                initialEntry: existing,
+                ageBand: widget.ageBand,
+              )
+            : ThemeScope(
+                controller: controller,
+                child: AnimatedBuilder(
+                  animation: controller,
+                  builder: (context, _) => _JournalEditorScreen(
+                    mode: mode,
+                    initialEntry: existing,
+                    ageBand: widget.ageBand,
+                  ),
+                ),
+              ),
       ),
     );
     if (entry == null) {
@@ -426,7 +439,21 @@ class _JournalEditorScreenState extends State<_JournalEditorScreen> {
   late bool _isFavorite;
   late String? _selectedPrompt;
 
-  List<String> get _prompts => _journalPromptsForAgeBand(widget.ageBand);
+  List<String> get _prompts {
+    return switch (widget.mode) {
+      _JournalMode.guided => _guidedJournalPromptsForAgeBand(widget.ageBand),
+      _JournalMode.gratitude => _gratitudeJournalPromptsForAgeBand(
+        widget.ageBand,
+      ),
+      _JournalMode.freeWrite => const <String>[],
+    };
+  }
+
+  bool get _usesPrompt =>
+      widget.mode == _JournalMode.guided ||
+      widget.mode == _JournalMode.gratitude;
+
+  bool get _showsMoodTag => widget.mode == _JournalMode.freeWrite;
 
   @override
   void initState() {
@@ -441,7 +468,7 @@ class _JournalEditorScreenState extends State<_JournalEditorScreen> {
     _isFavorite = widget.initialEntry?.isFavorite ?? false;
     _selectedPrompt =
         widget.initialEntry?.prompt ??
-        (widget.mode == _JournalMode.guided ? _prompts.first : null);
+        (_usesPrompt && _prompts.isNotEmpty ? _prompts.first : null);
   }
 
   @override
@@ -486,6 +513,14 @@ class _JournalEditorScreenState extends State<_JournalEditorScreen> {
       _JournalMode.guided => 'Guided reflection',
       _JournalMode.gratitude => 'Gratitude note',
     };
+    final subtitle = switch (widget.mode) {
+      _JournalMode.freeWrite =>
+        'Keep it honest, short if you want, and easy to revisit later.',
+      _JournalMode.guided =>
+        'Use one focused prompt to sort out what happened and what you need next.',
+      _JournalMode.gratitude =>
+        'Capture a few good things, however small, so they are easier to notice again.',
+    };
     return Theme(
       data: buildTheme(palette),
       child: AnimatedGradientScaffold(
@@ -515,29 +550,34 @@ class _JournalEditorScreenState extends State<_JournalEditorScreen> {
               palette: palette,
               kicker: 'Journal entry',
               title: title,
-              subtitle:
-                  'Keep it honest, short if you want, and easy to revisit later.',
+              subtitle: subtitle,
               actions: [
-                Pill(icon: Icons.mood_rounded, label: _mood.label),
+                if (_showsMoodTag)
+                  Pill(icon: Icons.mood_rounded, label: _mood.label),
                 Pill(
                   icon: widget.mode == _JournalMode.guided
                       ? Icons.lightbulb_rounded
+                      : widget.mode == _JournalMode.gratitude
+                      ? Icons.favorite_rounded
                       : Icons.edit_note_rounded,
                   label: widget.mode.label,
                 ),
               ],
             ),
             const SizedBox(height: 18),
-            if (widget.mode == _JournalMode.guided ||
-                widget.mode == _JournalMode.gratitude)
+            if (_usesPrompt)
               GlassPanel(
                 palette: palette,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SectionTitle(
-                      title: 'Prompt',
-                      subtitle: 'Pick one that feels useful right now.',
+                    SectionTitle(
+                      title: widget.mode == _JournalMode.gratitude
+                          ? 'Gratitude angle'
+                          : 'Prompt',
+                      subtitle: widget.mode == _JournalMode.gratitude
+                          ? 'Pick one small thing to notice and build from.'
+                          : 'Pick one that feels useful right now.',
                     ),
                     const SizedBox(height: 12),
                     Wrap(
@@ -556,37 +596,42 @@ class _JournalEditorScreenState extends State<_JournalEditorScreen> {
                   ],
                 ),
               ),
-            if (widget.mode == _JournalMode.guided ||
-                widget.mode == _JournalMode.gratitude)
+            if (_usesPrompt)
               const SizedBox(height: 18),
             GlassPanel(
               palette: palette,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SectionTitle(
-                    title: 'How are you writing today?',
-                    subtitle:
-                        'Choose a mood so later entries are easier to scan.',
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _JournalMood.values.map((mood) {
-                      return ChoiceChip(
-                        label: Text(mood.label),
-                        selected: _mood == mood,
-                        onSelected: (_) => setState(() => _mood = mood),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 18),
+                  if (_showsMoodTag) ...[
+                    const SectionTitle(
+                      title: 'How are you writing today?',
+                      subtitle:
+                          'Choose a mood so later entries are easier to scan.',
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _JournalMood.values.map((mood) {
+                        return ChoiceChip(
+                          label: Text(mood.label),
+                          selected: _mood == mood,
+                          onSelected: (_) => setState(() => _mood = mood),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 18),
+                  ],
                   TextField(
                     controller: _titleController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Title',
-                      hintText: 'Give this entry a short name',
+                      hintText: switch (widget.mode) {
+                        _JournalMode.freeWrite => 'Give this entry a short name',
+                        _JournalMode.guided => 'Name this reflection',
+                        _JournalMode.gratitude => 'Name this gratitude note',
+                      },
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -594,10 +639,19 @@ class _JournalEditorScreenState extends State<_JournalEditorScreen> {
                     controller: _bodyController,
                     maxLines: 12,
                     decoration: InputDecoration(
-                      labelText: 'Your words',
-                      hintText:
-                          _selectedPrompt ??
+                      labelText: widget.mode == _JournalMode.gratitude
+                          ? 'What are you thankful for?'
+                          : 'Your words',
+                      hintText: switch (widget.mode) {
+                        _JournalMode.freeWrite =>
                           'Write what is on your mind, what happened, or what you need next.',
+                        _JournalMode.guided =>
+                          _selectedPrompt ??
+                              'Write a short reflection that answers the prompt in your own words.',
+                        _JournalMode.gratitude =>
+                          _selectedPrompt ??
+                              'Name one to three things that felt kind, helpful, or quietly good today.',
+                      },
                       alignLabelWithHint: true,
                     ),
                   ),
@@ -738,7 +792,8 @@ class _JournalEntryCard extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              Pill(icon: Icons.mood_rounded, label: entry.moodLabel),
+              if (entry.mode == _JournalMode.freeWrite)
+                Pill(icon: Icons.mood_rounded, label: entry.moodLabel),
               Pill(icon: Icons.auto_stories_rounded, label: entry.mode.label),
               Pill(
                 icon: Icons.schedule_rounded,
@@ -855,7 +910,7 @@ class _JournalEntry {
   }
 }
 
-List<String> _journalPromptsForAgeBand(String? ageBand) {
+List<String> _guidedJournalPromptsForAgeBand(String? ageBand) {
   return switch (ageBand) {
     '9_12' => const [
       'What felt easy today?',
@@ -880,6 +935,31 @@ List<String> _journalPromptsForAgeBand(String? ageBand) {
       'What helped you stay steady today?',
       'What do you want to let go of before tomorrow?',
       'What is one next step that actually feels manageable?',
+    ],
+  };
+}
+
+List<String> _gratitudeJournalPromptsForAgeBand(String? ageBand) {
+  return switch (ageBand) {
+    '9_12' => const [
+      'What made you smile today?',
+      'Who helped you today?',
+      'What part of today felt warm, fun, or safe?',
+    ],
+    '13_14' => const [
+      'What felt a little better than you expected today?',
+      'Who or what gave you support today?',
+      'What is one small thing you want to remember from today?',
+    ],
+    '18_plus' => const [
+      'What helped you feel more grounded today?',
+      'Who, what, or where gave you a little steadiness today?',
+      'What is one thing from today that deserves more credit?',
+    ],
+    _ => const [
+      'What softened the day, even a little?',
+      'Who or what helped you hold steady today?',
+      'What is one small good thing you want to keep in view?',
     ],
   };
 }

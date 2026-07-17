@@ -351,7 +351,7 @@ class _GuardianReadyScreenState extends State<GuardianReadyScreen> {
               );
         } on BahaApiException catch (error) {
           summaryAccessMessageByStudent[student.studentProfileId] =
-              error.message;
+              _friendlyParentSummaryMessage(error);
         } catch (_) {}
         try {
           platformConsentByStudent[student.studentProfileId] = await widget
@@ -556,6 +556,19 @@ class _GuardianReadyScreenState extends State<GuardianReadyScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _openBuddyHome() {
+    setState(() => _currentIndex = 2);
+  }
+
+  Future<void> _openGuardianSupport() async {
+    await _pushRoute<void>(
+      builder: (context) => GuardianSupportScreen(
+        apiClient: widget.apiClient,
+        identity: widget.identity,
+      ),
+    );
+  }
+
   Future<void> _openStudentSummary(MobileLinkedStudentSummary student) async {
     await _pushRoute<void>(
       builder: (context) => GuardianStudentSummaryScreen(
@@ -624,6 +637,8 @@ class _GuardianReadyScreenState extends State<GuardianReadyScreen> {
               onGrantSummary: _grantSummaryConsent,
               onOpenSummary: _openStudentSummary,
               onUnpairStudent: _confirmUnpairStudent,
+              onOpenBuddy: _openBuddyHome,
+              onOpenSupport: _openGuardianSupport,
               onRefresh: _loadGuardianHome,
             ),
             GuardianLearningHubScreen(
@@ -748,6 +763,8 @@ class _GuardianHomeTab extends StatelessWidget {
     required this.onGrantSummary,
     required this.onOpenSummary,
     required this.onUnpairStudent,
+    required this.onOpenBuddy,
+    required this.onOpenSupport,
     required this.onRefresh,
   });
 
@@ -775,12 +792,12 @@ class _GuardianHomeTab extends StatelessWidget {
   final ValueChanged<MobileLinkedStudentSummary> onGrantSummary;
   final ValueChanged<MobileLinkedStudentSummary> onOpenSummary;
   final ValueChanged<MobileLinkedStudentSummary> onUnpairStudent;
+  final VoidCallback onOpenBuddy;
+  final Future<void> Function() onOpenSupport;
   final Future<void> Function() onRefresh;
 
   @override
   Widget build(BuildContext context) {
-    final summary = selectedSummary?.summary ?? const <String, dynamic>{};
-    final selectedStudent = this.selectedStudent;
     return Theme(
       data: buildTheme(palette),
       child: AnimatedGradientScaffold(
@@ -799,10 +816,10 @@ class _GuardianHomeTab extends StatelessWidget {
                     kicker: 'Parent or guardian',
                     title: students.isEmpty
                         ? 'Link your child in one short step'
-                        : 'Family overview',
+                        : 'Family home',
                     subtitle: students.isEmpty
-                        ? 'Link a student account to view summaries, guidance, and support tools.'
-                        : 'See patterns, watch areas, and support ideas without exposing your child’s private entries.',
+                        ? 'Link a child account to view summaries, guidance, and support tools.'
+                        : 'Support first, then open the child summaries you need without exposing private daily entries.',
                     actions: [
                       const Pill(
                         icon: Icons.family_restroom_rounded,
@@ -819,6 +836,37 @@ class _GuardianHomeTab extends StatelessWidget {
                     GlassPanel(palette: palette, child: Text(errorMessage!)),
                     const SizedBox(height: 18),
                   ],
+                  GlassPanel(
+                    palette: palette,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SectionTitle(
+                          title: 'Quick support',
+                          subtitle:
+                              'Open the fastest help options first, then move into the child summary view when you need it.',
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            FilledButton.icon(
+                              onPressed: onOpenBuddy,
+                              icon: const Icon(Icons.smart_toy_rounded),
+                              label: const Text('Parent Buddy'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () => unawaited(onOpenSupport()),
+                              icon: const Icon(Icons.health_and_safety_rounded),
+                              label: const Text('SOS Help'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   if (students.isEmpty) ...[
                     _GuardianLinkPanel(
                       palette: palette,
@@ -868,134 +916,15 @@ class _GuardianHomeTab extends StatelessWidget {
                       ),
                     ),
                   ] else ...[
-                    if (selectedSummary != null && selectedStudent != null) ...[
-                      GlassPanel(
-                        palette: palette,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SectionTitle(
-                              title: 'Family snapshot',
-                              subtitle:
-                                  'A short weekly view without exposing private answers.',
-                            ),
-                            ParentStudentPicker(
-                              students: students,
-                              selectedStudentProfileId:
-                                  selectedStudentProfileId ??
-                                  students.first.studentProfileId,
-                              onChanged: onSelectedStudentChanged,
-                            ),
-                            const SizedBox(height: 18),
-                            Text(
-                              _compactSummaryText(
-                                summary['headline']?.toString() ??
-                                    'No summary available yet.',
-                              ),
-                              style: Theme.of(context).textTheme.titleLarge
-                                  ?.copyWith(fontWeight: FontWeight.w800),
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _GuardianMiniStatCard(
-                                    palette: palette,
-                                    title: 'Concern flags',
-                                    value: '${_guardianConcernCount(summary)}',
-                                    subtitle: 'Repeated signals',
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _GuardianMiniStatCard(
-                                    palette: palette,
-                                    title: 'Positive shifts',
-                                    value:
-                                        '${_guardianPositiveShiftCount(summary)}',
-                                    subtitle: 'Areas improving',
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _GuardianMiniStatCard(
-                                    palette: palette,
-                                    title: 'Watch points',
-                                    value:
-                                        '${_guardianWatchPointCount(summary)}',
-                                    subtitle: 'Worth checking in on',
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: [
-                                FilledButton.icon(
-                                  onPressed: () =>
-                                      onOpenSummary(selectedStudent),
-                                  icon: const Icon(Icons.insights_rounded),
-                                  label: const Text('Open full summary'),
-                                ),
-                                OutlinedButton.icon(
-                                  onPressed: () => onRefresh(),
-                                  icon: const Icon(Icons.refresh_rounded),
-                                  label: const Text('Refresh snapshot'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                    ],
-                    if (selectedSummary != null && selectedStudent != null) ...[
-                      GlassPanel(
-                        palette: palette,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SectionTitle(
-                              title: 'Support next',
-                              subtitle: 'Short prompts you can use right away.',
-                            ),
-                            _GuardianNarrativeCard(
-                              palette: palette,
-                              title: 'Conversation starter',
-                              body: _compactSummaryText(
-                                summary['safe_talking_point']?.toString() ??
-                                    summary['conversation_starter']
-                                        ?.toString() ??
-                                    'Start small: ask what felt easiest this week and what felt heavier.',
-                              ),
-                              icon: Icons.forum_rounded,
-                            ),
-                            const SizedBox(height: 12),
-                            _GuardianNarrativeCard(
-                              palette: palette,
-                              title: 'One thing to watch next',
-                              body: _compactSummaryText(
-                                summary['watch_area']?.toString() ??
-                                    'Watch for repeated shifts rather than reacting to one difficult day.',
-                              ),
-                              icon: Icons.visibility_rounded,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                    ],
                     GlassPanel(
                       palette: palette,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const SectionTitle(
-                            title: 'Linked students',
+                            title: 'Linked children',
                             subtitle:
-                                'Student app access lets your child use BAHA. Parent summary access lets you view their high-level weekly trends.',
+                                'Student access lets your child use BAHA. Summary view lets you open their high-level weekly trends.',
                           ),
                           ...students.map((student) {
                             final platformConsent =
@@ -1832,6 +1761,158 @@ class _GuardianProfileScreenState extends State<GuardianProfileScreen> {
   }
 }
 
+class GuardianSupportScreen extends StatefulWidget {
+  const GuardianSupportScreen({
+    required this.apiClient,
+    required this.identity,
+    super.key,
+  });
+
+  final BahaApiClient apiClient;
+  final DevelopmentIdentity identity;
+
+  @override
+  State<GuardianSupportScreen> createState() => _GuardianSupportScreenState();
+}
+
+class _GuardianSupportScreenState extends State<GuardianSupportScreen> {
+  late Future<List<MobileSupportContact>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = widget.apiClient.listSupportContacts(identity: widget.identity);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final themeController = ThemeScope.maybeOf(context);
+    final palette = appPaletteForTheme(
+      themeController?.colorTheme ?? AppColorTheme.growth,
+      isDark: themeController?.isDark ?? false,
+    );
+    return Theme(
+      data: buildTheme(palette),
+      child: AnimatedGradientScaffold(
+        palette: palette,
+        child: FutureBuilder<List<MobileSupportContact>>(
+          future: _future,
+          builder: (context, snapshot) {
+            final contacts = snapshot.data ?? const <MobileSupportContact>[];
+            return ListView(
+              padding: const EdgeInsets.all(22),
+              children: [
+                DashboardTopBar(palette: palette),
+                _GuardianBackRow(palette: palette),
+                HeroHeader(
+                  palette: palette,
+                  kicker: 'Parent support',
+                  title: 'A calm place to decide what to do next',
+                  subtitle:
+                      'Use this when you need urgent next steps, school support contacts, or a calmer plan before talking with your child.',
+                  actions: const [
+                    Pill(
+                      icon: Icons.health_and_safety_rounded,
+                      label: 'Support',
+                    ),
+                    Pill(icon: Icons.family_restroom_rounded, label: 'Parent'),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                GlassPanel(
+                  palette: palette,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      SectionTitle(
+                        title: 'If a child may be in immediate danger',
+                        subtitle:
+                            'Move out of the app and contact local emergency services, the school crisis contact, or the fastest trusted adult support available to you right away.',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                GlassPanel(
+                  palette: palette,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      SectionTitle(
+                        title: 'If the situation feels urgent but not immediate',
+                        subtitle:
+                            'Keep the conversation simple, stay calm, and use one direct question at a time. Then reach out to the listed school or BAHA support contacts below.',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                GlassPanel(
+                  palette: palette,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
+                        title: 'Available support contacts',
+                        subtitle:
+                            'These are the parent-facing contact points available for this account.',
+                      ),
+                      if (snapshot.connectionState != ConnectionState.done)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: CircularProgressIndicator(),
+                        )
+                      else if (contacts.isEmpty)
+                        Text(
+                          'No support contacts are available yet for this account.',
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        )
+                      else
+                        ...contacts.map(
+                          (contact) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: GlassPanel(
+                              palette: palette,
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    contact.label,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w800),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    contact.contactType.replaceAll('_', ' '),
+                                  ),
+                                  if (contact.phone != null) ...[
+                                    const SizedBox(height: 4),
+                                    Text('Phone: ${contact.phone}'),
+                                  ],
+                                  if (contact.email != null) ...[
+                                    const SizedBox(height: 4),
+                                    Text('Email: ${contact.email}'),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
 class _GuardianLearningTopic {
   const _GuardianLearningTopic({
     required this.title,
@@ -2225,86 +2306,6 @@ class _GuardianLinkPanel extends StatelessWidget {
   }
 }
 
-class _GuardianMiniStatCard extends StatelessWidget {
-  const _GuardianMiniStatCard({
-    required this.palette,
-    required this.title,
-    required this.value,
-    required this.subtitle,
-  });
-
-  final PrototypePalette palette;
-  final String title;
-  final String value;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: palette.primary.withValues(alpha: .08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: palette.primary.withValues(alpha: .12)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 4),
-          Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-        ],
-      ),
-    );
-  }
-}
-
-int _guardianConcernCount(Map<String, dynamic> summary) {
-  final flags = summary['risk_flags'] as List<dynamic>? ?? const [];
-  return flags.length;
-}
-
-int _guardianPositiveShiftCount(Map<String, dynamic> summary) {
-  final trends = (summary['trend_labels'] as List<dynamic>? ?? const [])
-      .map((value) => value.toString().toLowerCase())
-      .toList();
-  final positive = trends.where(
-    (trend) =>
-        trend.contains('improv') ||
-        trend.contains('recover') ||
-        trend.contains('steady') ||
-        trend.contains('stable'),
-  );
-  final bestProgress = (summary['best_progress']?.toString() ?? '').trim();
-  if (positive.isEmpty &&
-      bestProgress.isNotEmpty &&
-      !bestProgress.startsWith('No ')) {
-    return 1;
-  }
-  return positive.length;
-}
-
-int _guardianWatchPointCount(Map<String, dynamic> summary) {
-  final watchArea = (summary['watch_area']?.toString() ?? '').trim();
-  final flags = _guardianConcernCount(summary);
-  if (watchArea.isEmpty || watchArea.startsWith('No ')) {
-    return flags;
-  }
-  return flags == 0 ? 1 : flags;
-}
-
 String _compactSummaryText(String value) {
   final cleaned = value.replaceAll(RegExp(r'\s+'), ' ').trim();
   if (cleaned.isEmpty) {
@@ -2314,6 +2315,18 @@ String _compactSummaryText(String value) {
   return firstSentence.length <= 140
       ? firstSentence
       : '${firstSentence.substring(0, 137).trimRight()}...';
+}
+
+String _friendlyParentSummaryMessage(BahaApiException error) {
+  if (error.statusCode == 404) {
+    return 'This summary will appear after the student completes a few more check-ins.';
+  }
+  if (error.message.toLowerCase().contains(
+    'student has not enabled parent summary sharing',
+  )) {
+    return 'The student has not turned on parent summary sharing yet.';
+  }
+  return error.message;
 }
 
 class _GuardianChecklistRow extends StatelessWidget {
@@ -2599,7 +2612,7 @@ class _GuardianStudentSummaryScreenState
           studentProfileId: widget.student.studentProfileId,
         );
       } on BahaApiException catch (error) {
-        summaryError = error.message;
+        summaryError = _friendlyParentSummaryMessage(error);
       }
     }
     return _GuardianStudentSummaryViewModel(
@@ -2661,12 +2674,6 @@ class _GuardianStudentSummaryScreenState
                 (summaryMap['trend_labels'] as List<dynamic>? ?? const [])
                     .map((value) => value.toString())
                     .toList();
-            final conversationStarter =
-                summaryMap['safe_talking_point']?.toString() ??
-                summaryMap['conversation_starter']?.toString() ??
-                (summaryMap['best_progress'] != null
-                    ? 'Ask what part of the week felt a little easier and what helped.'
-                    : 'Start with a calm check-in: “How has this week felt for you overall?”');
             final watchNextWeek =
                 summaryMap['watch_area']?.toString() ??
                 (flags.isNotEmpty
@@ -2764,9 +2771,15 @@ class _GuardianStudentSummaryScreenState
                         const SectionTitle(
                           title: 'No weekly summary available yet',
                           subtitle:
-                              'This usually means the student has not built enough recent check-in history for a meaningful pattern summary.',
+                              'This usually means there are not enough completed student check-ins yet to build a meaningful parent summary.',
                         ),
-                        if (data.summaryError != null) Text(data.summaryError!),
+                        if (data.summaryError != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            data.summaryError!,
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                        ],
                       ],
                     ),
                   )
@@ -2777,63 +2790,41 @@ class _GuardianStudentSummaryScreenState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SectionTitle(
-                          title: 'This week at a glance',
+                          title: 'Weekly picture',
                           subtitle:
-                              'Short signals with numbers first and detail second.',
+                              'A short view built from repeated patterns, not one difficult day.',
                         ),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _GuardianMiniStatCard(
-                                palette: palette,
-                                title: 'Concern flags',
-                                value: '${flags.length}',
-                                subtitle: 'Repeated signals',
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _GuardianMiniStatCard(
-                                palette: palette,
-                                title: 'Trend labels',
-                                value: '${trends.length}',
-                                subtitle: 'Named patterns',
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _GuardianMiniStatCard(
-                                palette: palette,
-                                title: 'Visible tiers',
-                                value:
-                                    '${data.summary?.visibleTiers.length ?? 0}',
-                                subtitle: 'Summary access',
-                              ),
-                            ),
-                          ],
+                        Text(
+                          _compactSummaryText(
+                            summaryMap['headline']?.toString() ??
+                                'No headline is available yet.',
+                          ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 14),
-                        _SummaryBlock(
-                          title: 'Headline',
-                          value: _compactSummaryText(
-                            summaryMap['headline']?.toString() ?? 'No headline',
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        _SummaryBlock(
-                          title: 'Best shift',
-                          value: _compactSummaryText(
-                            summaryMap['best_progress']?.toString() ??
-                                'No clear improvement signal yet.',
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        _SummaryBlock(
-                          title: 'Watch next',
-                          value: _compactSummaryText(
-                            summaryMap['watch_area']?.toString() ??
-                                'No watch area detected this week.',
-                          ),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (flags.isNotEmpty)
+                              _GuardianStatusPill(
+                                label:
+                                    '${flags.length} repeated signal${flags.length == 1 ? '' : 's'}',
+                                ok: false,
+                              ),
+                            if (trends.isNotEmpty)
+                              _GuardianStatusPill(
+                                label:
+                                    '${trends.length} stable trend${trends.length == 1 ? '' : 's'}',
+                                ok: true,
+                              ),
+                            _GuardianStatusPill(
+                              label:
+                                  '${data.summary?.visibleTiers.length ?? 0} visible tier${(data.summary?.visibleTiers.length ?? 0) == 1 ? '' : 's'}',
+                              ok: true,
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 14),
                         Wrap(
@@ -2864,28 +2855,39 @@ class _GuardianStudentSummaryScreenState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SectionTitle(
-                          title: 'How to respond this week',
+                          title: 'What BAHA is seeing',
                           subtitle:
-                              'Short prompts for a calmer, more useful check-in.',
+                              'Short conclusions first, with the supporting evidence right below them.',
                         ),
-                        _SummaryBlock(
+                        _GuardianNarrativeCard(
+                          palette: palette,
                           title: 'What changed',
-                          value: _compactSummaryText(whatChanged),
+                          body: _compactSummaryText(whatChanged),
+                          icon: Icons.sync_alt_rounded,
                         ),
                         const SizedBox(height: 10),
-                        _SummaryBlock(
-                          title: 'Conversation starter',
-                          value: _compactSummaryText(conversationStarter),
+                        _GuardianNarrativeCard(
+                          palette: palette,
+                          title: 'What seems steadier',
+                          body: _compactSummaryText(
+                            summaryMap['best_progress']?.toString() ??
+                                'No clear steady area has stood out yet.',
+                          ),
+                          icon: Icons.trending_up_rounded,
                         ),
                         const SizedBox(height: 10),
-                        _SummaryBlock(
-                          title: 'Watch next week',
-                          value: _compactSummaryText(watchNextWeek),
+                        _GuardianNarrativeCard(
+                          palette: palette,
+                          title: 'What to watch next',
+                          body: _compactSummaryText(watchNextWeek),
+                          icon: Icons.visibility_rounded,
                         ),
                         const SizedBox(height: 10),
-                        _SummaryBlock(
-                          title: 'Support step',
-                          value: _compactSummaryText(supportAction),
+                        _GuardianNarrativeCard(
+                          palette: palette,
+                          title: 'One support step',
+                          body: _compactSummaryText(supportAction),
+                          icon: Icons.handshake_rounded,
                         ),
                       ],
                     ),
@@ -2897,10 +2899,23 @@ class _GuardianStudentSummaryScreenState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SectionTitle(
-                          title: 'Trends and alerts',
+                          title: 'Why BAHA says this',
                           subtitle:
-                              'These labels are the safe parent-facing signals BAHA has derived so far.',
+                              'These are the repeated parent-safe signals behind the summary view.',
                         ),
+                        Text(
+                          _compactSummaryText(
+                            flags.isNotEmpty && trends.isNotEmpty
+                                ? 'Repeated signals: ${flags.join(', ')}. Trend labels: ${trends.join(', ')}.'
+                                : flags.isNotEmpty
+                                ? 'Repeated signals: ${flags.join(', ')}.'
+                                : trends.isNotEmpty
+                                ? 'Trend labels: ${trends.join(', ')}.'
+                                : 'No stable repeated signals are available yet.',
+                          ),
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        const SizedBox(height: 12),
                         if (trends.isNotEmpty)
                           Wrap(
                             spacing: 8,
@@ -2984,30 +2999,6 @@ class _GuardianBackRow extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _SummaryBlock extends StatelessWidget {
-  const _SummaryBlock({required this.title, required this.value});
-
-  final String title;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 4),
-        Text(value),
-      ],
     );
   }
 }

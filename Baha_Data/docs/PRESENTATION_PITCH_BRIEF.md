@@ -142,12 +142,12 @@ The strongest working demo slices are:
 
 - student onboarding and entry
 - adaptive daily check-in flow
-- student dashboard and trend views
+- student dashboard and trend views with separate evidence-led analytics windows
 - structured learning lanes for ages 9 to 12
-- student wellness activities
+- student wellness activities, including journaling
 - BAHA Buddy chat
 - parent account linking flow
-- parent privacy-safe weekly summary view
+- parent privacy-safe weekly summary view with support-first home layout
 - parent learning and parent Buddy starter experience
 
 ## What Still Exists More As Future Scope Or Placeholder

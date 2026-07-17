@@ -146,6 +146,13 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
     );
   }
 
+  Future<void> _openExploreTab() async {
+    if (!mounted) {
+      return;
+    }
+    setState(() => _currentIndex = 1);
+  }
+
   Future<void> _openJournal() async {
     await _pushRoute(
       builder: (context) => StudentJournalScreen(
@@ -531,6 +538,7 @@ class _StudentReadyScreenState extends State<StudentReadyScreen> {
               onboardingState: widget.onboardingState,
               profile: _profile,
               onOpenProgress: _openProgress,
+              onOpenLearn: _openExploreTab,
               onOpenProfileSetup: _openProfileSetup,
               onOpenCheckins: _openCheckins,
               onOpenSupport: _openSupport,
@@ -628,6 +636,7 @@ class StudentReferenceHomeTab extends StatefulWidget {
     required this.onboardingState,
     required this.profile,
     required this.onOpenProgress,
+    required this.onOpenLearn,
     required this.onOpenProfileSetup,
     required this.onOpenCheckins,
     required this.onOpenSupport,
@@ -643,6 +652,7 @@ class StudentReferenceHomeTab extends StatefulWidget {
   final AuthOnboardingState? onboardingState;
   final StudentWellbeingProfile? profile;
   final Future<void> Function() onOpenProgress;
+  final Future<void> Function() onOpenLearn;
   final Future<StudentWellbeingProfile?> Function() onOpenProfileSetup;
   final Future<void> Function() onOpenCheckins;
   final Future<void> Function() onOpenSupport;
@@ -937,12 +947,7 @@ class _StudentReferenceHomeTabState extends State<StudentReferenceHomeTab> {
                             label: const Text('Open your week'),
                           ),
                           OutlinedButton.icon(
-                            onPressed: () => widget.onCardTap(
-                              learningCardsForAgeBand(
-                                widget.profile?.ageBand ??
-                                    widget.actor?.ageCohort,
-                              ).first,
-                            ),
+                            onPressed: widget.onOpenLearn,
                             icon: const Icon(Icons.auto_stories_rounded),
                             label: const Text('Open learning'),
                           ),
@@ -2490,7 +2495,10 @@ class _StudentLocalToolScreenState extends State<StudentLocalToolScreen> {
                         phase.label,
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.w900),
+                            ?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              color: palette.text,
+                            ),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -2498,7 +2506,10 @@ class _StudentLocalToolScreenState extends State<StudentLocalToolScreen> {
                             ? '${_breathingPhaseSecondsLeft}s in this phase'
                             : 'Tap start to begin',
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: palette.text.withValues(alpha: .88),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -2519,7 +2530,10 @@ class _StudentLocalToolScreenState extends State<StudentLocalToolScreen> {
                   : _breathingTotalSecondsLeft == 0
                   ? 'Session complete'
                   : 'Use this before check-ins, support, or sleep modules.',
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: palette.text.withValues(alpha: .9),
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 18),
             AnimatedPrimaryButton(

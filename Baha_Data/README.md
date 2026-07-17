@@ -103,6 +103,7 @@ Current demo-facing mobile UX improvements:
   - `Recommended next` is the first section
   - `SOS Help`, `BAHA Buddy`, and `Daily Check-in` are exposed as the main quick-support actions
   - weekly scores and detailed pattern visuals were moved off the home screen into a dedicated `Your Week` surface
+  - the `Keep going` shortcut now opens the full learning hub instead of dropping the student into one preselected topic
 - the floating action button now opens a `Quick support` launcher instead of jumping straight into daily check-in
 - the student wellbeing model is now framed in product language as:
   - sleep
@@ -119,6 +120,8 @@ Current demo-facing mobile UX improvements:
   - free write mode
   - guided prompts adapted by age band
   - gratitude mode
+  - guided reflections and gratitude notes now behave as separate flows instead of sharing the same editor purpose
+  - editor routes now inherit the active theme correctly instead of falling back to the default palette
   - search and favorites
   - local reminder toggle
   - streak and entry counts
@@ -133,10 +136,19 @@ Current demo-facing mobile UX improvements:
     - Bullying
     - Healthy Gaming
     - Alcohol Safety
-- the parent weekly summary now includes a privacy-safe response layer with:
-  - shorter summary cards
-  - quantitative mini-stats for concern flags / positive shifts / watch points
-  - a shorter conversation starter and support step
+- the dedicated student `Your Week` screen now uses evidence-led trend views:
+  - multiple time windows (`7D`, `14D`, `30D`, and all available history)
+  - factor-specific charts plus an overall view
+  - short narrative conclusions with explicit evidence instead of opaque score cards
+  - pattern notes framed as trends and support prompts rather than diagnosis
+- the parent home is now support-first:
+  - `Parent Buddy` and `SOS Help` appear before child summaries
+  - `Linked children` wording replaces `Linked students` in the visible guardian UX
+  - the parent summary preview is shorter and opens into a separate evidence-led child summary view
+- the parent summary flow now emphasizes:
+  - short weekly conclusions
+  - visible trend and repeated-signal evidence
+  - support actions and conversation prompts without raw child entries
 
 If a currently running local API returns `404` for the new Buddy stream route after pulling these changes, it usually means the old container/process is still running. Recreate the API container:
 
